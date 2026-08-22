@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 340 60% 98%;
+    --foreground: 340 30% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 30% 20%;
+    --primary: 350 85% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 70% 90%;
+    --secondary-foreground: 200 40% 25%;
+    --muted: 340 30% 95%;
+    --muted-foreground: 340 15% 45%;
+    --accent: 25 95% 88%;
+    --accent-foreground: 25 40% 25%;
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 340 30% 90%;
+    --input: 340 30% 90%;
+    --ring: 350 85% 68%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 335 30% 8%;
+    --foreground: 340 25% 92%;
+    --card: 335 25% 12%;
+    --card-foreground: 340 25% 92%;
+    --primary: 350 80% 65%;
+    --primary-foreground: 340 30% 10%;
+    --secondary: 200 35% 20%;
+    --secondary-foreground: 200 40% 90%;
+    --muted: 335 20% 16%;
+    --muted-foreground: 340 15% 65%;
+    --accent: 25 45% 22%;
+    --accent-foreground: 25 60% 88%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 335 20% 20%;
+    --input: 335 20% 20%;
+    --ring: 350 80% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply bg-background text-foreground;
+    overscroll-behavior-y: none;
+  }
+  body {
+    font-family: "Nunito", system-ui, sans-serif;
+  }
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 999px;
+}
