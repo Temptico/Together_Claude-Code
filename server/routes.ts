@@ -554,6 +554,16 @@ export function registerRoutes(app: Express) {
     })
   );
 
+  app.delete(
+    "/api/users/:id",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.id);
+      if (!user) return;
+      await storage.deleteUserAccount(user);
+      res.status(204).end();
+    })
+  );
+
   // ---------------- Push ----------------
   app.get(
     "/api/push/vapid-public-key",

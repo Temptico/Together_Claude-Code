@@ -72,6 +72,30 @@ export async function updateUser(id: string, patch: Partial<User>): Promise<User
   return user;
 }
 
+export async function deleteUserAccount(user: User): Promise<void> {
+  // Right-to-erasure account deletion: removes every row that references
+  // this user, unlinks them from their partner, and finally the account
+  // itself. Content the user created but shared with their partner (planned
+  // dates, custom questions/challenges) is deleted too rather than
+  // reassigned, which is the simplest and safest reading of "erase my data."
+  if (user.partnerId) {
+    await db.update(users).set({ partnerId: null }).where(eq(users.id, user.partnerId));
+  }
+
+  await db.delete(moods).where(eq(moods.userId, user.id));
+  await db.delete(questionAnswers).where(eq(questionAnswers.userId, user.id));
+  await db.delete(challengeCompletions).where(eq(challengeCompletions.userId, user.id));
+  await db.delete(plannedDates).where(eq(plannedDates.userId, user.id));
+  await db.delete(customQuestions).where(eq(customQuestions.createdBy, user.id));
+  await db.delete(customChallenges).where(eq(customChallenges.createdBy, user.id));
+  await db.delete(reactions).where(eq(reactions.userId, user.id));
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
+  await db.delete(reminderLog).where(eq(reminderLog.userId, user.id));
+  await db.delete(dailyAssignments).where(eq(dailyAssignments.coupleKey, coupleKeyFor(user)));
+
+  await db.delete(users).where(eq(users.id, user.id));
+}
+
 export async function connectPartner(
   userId: string,
   code: string

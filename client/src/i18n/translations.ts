@@ -136,6 +136,9 @@ export const translations = {
       timeUpdated: "Čas opomnika je bil posodobljen",
       darkMode: "Temni način",
       customContent: "Lastna vprašanja in izzivi",
+      deleteAccount: "Izbriši račun",
+      deleteAccountWarning: "To bo trajno izbrisalo tvoj račun in vse tvoje podatke (razpoloženja, odgovore, izzive, načrtovane zmenke in fotografije) — tudi tiste, ki jih vidi tvoj partner. Dejanja ni mogoče razveljaviti.",
+      deleteAccountConfirm: "Trajno izbriši",
     },
     custom: {
       title: "Lastna vprašanja in izzivi",
@@ -291,6 +294,9 @@ export const translations = {
       timeUpdated: "Reminder time updated",
       darkMode: "Dark mode",
       customContent: "Custom questions & challenges",
+      deleteAccount: "Delete account",
+      deleteAccountWarning: "This will permanently delete your account and all your data (moods, answers, challenges, planned dates and photos) — including what your partner can see. This can't be undone.",
+      deleteAccountConfirm: "Delete permanently",
     },
     custom: {
       title: "Custom questions & challenges",
@@ -446,6 +452,9 @@ export const translations = {
       timeUpdated: "Vrijeme podsjetnika je ažurirano",
       darkMode: "Tamni način",
       customContent: "Vlastita pitanja i izazovi",
+      deleteAccount: "Izbriši račun",
+      deleteAccountWarning: "Ovo će trajno izbrisati tvoj račun i sve tvoje podatke (raspoloženja, odgovore, izazove, planirane spojeve i fotografije) — uključujući ono što vidi tvoj partner. Ova radnja se ne može poništiti.",
+      deleteAccountConfirm: "Trajno izbriši",
     },
     custom: {
       title: "Vlastita pitanja i izazovi",

@@ -76,8 +76,9 @@ export default function Terms() {
           <h2 className="font-extrabold">5. Kje in kako dolgo hranimo podatke</h2>
           <p>
             Podatki so shranjeni v podatkovni bazi PostgreSQL pri gostitelju Neon. Podatke hranimo, dokler ima
-            uporabnik aktiven račun v aplikaciji. Po prejemu zahteve za izbris računa podatke trajno izbrišemo v
-            razumnem roku, razen če zakon zahteva drugače.
+            uporabnik aktiven račun v aplikaciji. Račun in vse podatke lahko kadar koli takoj in samodejno izbrišeš
+            sam v profilu ("Izbriši račun"), lahko pa zahtevo pošlješ tudi na e-pošto spodaj — v obeh primerih so
+            podatki trajno odstranjeni takoj.
           </p>
         </section>
 
