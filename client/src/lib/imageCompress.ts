@@ -1,4 +1,8 @@
-export function compressImageFile(file: File, maxDim = 1280, quality = 0.75): Promise<string> {
+// Photos are stored as base64 directly in the database, so they're kept
+// deliberately small — this is a thumbnail-sized memory of the date, not a
+// full-resolution photo library. ~900px/0.6 quality keeps typical uploads
+// under ~150-250KB instead of 1-3MB, which matters for free-tier DB storage.
+export function compressImageFile(file: File, maxDim = 900, quality = 0.6): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Napaka pri branju slike"));

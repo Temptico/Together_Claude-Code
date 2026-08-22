@@ -39,6 +39,9 @@ export const translations = {
       anniversaryYears: "let skupaj",
       days: "dni",
       surpriseMe: "Presenetí me",
+      notifPromptBody: "Omogoči obvestila, da izveš takoj, ko partner deli razpoloženje, odgovori na vprašanje ali opravi izziv.",
+      notifPromptLater: "Morda kasneje",
+      notifPromptEnable: "Omogoči obvestila",
     },
     partner: {
       connectTitle: "Poveži se s partnerjem",
@@ -191,6 +194,9 @@ export const translations = {
       anniversaryYears: "years together",
       days: "days",
       surpriseMe: "Surprise me",
+      notifPromptBody: "Enable notifications to know right away when your partner shares their mood, answers a question, or completes a challenge.",
+      notifPromptLater: "Maybe later",
+      notifPromptEnable: "Enable notifications",
     },
     partner: {
       connectTitle: "Connect with your partner",
@@ -343,6 +349,9 @@ export const translations = {
       anniversaryYears: "godina zajedno",
       days: "dana",
       surpriseMe: "Iznenadi me",
+      notifPromptBody: "Omogući obavijesti da odmah saznaš kad partner podijeli raspoloženje, odgovori na pitanje ili izvrši izazov.",
+      notifPromptLater: "Možda kasnije",
+      notifPromptEnable: "Omogući obavijesti",
     },
     partner: {
       connectTitle: "Poveži se s partnerom",

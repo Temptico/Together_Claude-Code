@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ReactionBar } from "@/components/ReactionBar";
+import { NotificationOptInDialog } from "@/components/NotificationOptInDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -58,6 +59,7 @@ export default function Home() {
         userId={data.user.id}
       />
       <UpcomingDatesCard dates={data.upcomingDates} />
+      <NotificationOptInDialog />
     </div>
   );
 }
