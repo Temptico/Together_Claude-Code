@@ -334,6 +334,11 @@ export async function getRecentCompletions(userId: string, limit = 30) {
 export async function getDateIdeas(filters: { category?: string; duration?: string; cost?: string }) {
   const all = await db.select().from(dateIdeas);
   return all.filter((idea: typeof dateIdeas.$inferSelect) => {
+    // Externally-sourced entries (OSM/Google, upserted from nearby search)
+    // only belong in "Najdi v bližini" results — they lack a real
+    // description/duration/cost and would look out of place mixed into the
+    // hand-curated catalog.
+    if (idea.externalId != null) return false;
     if (filters.category && filters.category !== "vse" && idea.category !== filters.category) return false;
     if (filters.duration && idea.duration !== filters.duration) return false;
     if (filters.cost && idea.cost !== filters.cost) return false;
@@ -626,7 +631,8 @@ export async function getReactionsForTargets(targetType: "mood" | "answer" | "ch
 // ---------------- Random idea ----------------
 export async function getRandomDateIdea(excludeId?: number) {
   const all = await db.select().from(dateIdeas);
-  const pool = excludeId ? all.filter((i: typeof dateIdeas.$inferSelect) => i.id !== excludeId) : all;
+  const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null);
+  const pool = excludeId ? curated.filter((i: typeof dateIdeas.$inferSelect) => i.id !== excludeId) : curated;
   if (pool.length === 0) return undefined;
   return pool[Math.floor(Math.random() * pool.length)];
 }
