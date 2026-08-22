@@ -14,7 +14,7 @@ async function main() {
   await runSeed();
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
 
   registerRoutes(app);
 

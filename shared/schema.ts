@@ -110,6 +110,7 @@ export const plannedDates = pgTable("planned_dates", {
   scheduledAt: timestamp("scheduled_at").notNull(),
   notes: text("notes"),
   completed: boolean("completed").notNull().default(false),
+  photo: text("photo"), // base64 data URL, added by either partner as a memory of the date
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

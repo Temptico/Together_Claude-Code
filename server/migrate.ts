@@ -78,6 +78,7 @@ const STATEMENTS = [
       scheduled_at timestamp NOT NULL,
       notes text,
       completed boolean NOT NULL DEFAULT false,
+      photo text,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
   `CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -138,6 +139,7 @@ const STATEMENTS = [
   `ALTER TABLE challenge_completions ADD COLUMN IF NOT EXISTS source varchar(16) NOT NULL DEFAULT 'builtin'`,
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS external_id text`,
   `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_external_id_idx ON date_ideas (external_id)`,
+  `ALTER TABLE planned_dates ADD COLUMN IF NOT EXISTS photo text`,
 ];
 
 export async function runMigrations() {

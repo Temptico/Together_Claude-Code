@@ -46,16 +46,31 @@ export default function Register() {
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-4 rounded-3xl bg-white/95 p-6 text-foreground shadow-xl"
+        className="flex flex-col gap-4 rounded-3xl bg-white/95 p-6 text-slate-900 shadow-xl"
       >
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="name">{t("auth.name")}</Label>
-          <Input id="name" placeholder={t("auth.namePlaceholder")} {...register("name")} />
+          <Label htmlFor="name" className="text-slate-700">
+            {t("auth.name")}
+          </Label>
+          <Input
+            id="name"
+            placeholder={t("auth.namePlaceholder")}
+            className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
+            {...register("name")}
+          />
           {errors.name && <p className="text-xs font-semibold text-destructive">{errors.name.message}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">{t("auth.email")}</Label>
-          <Input id="email" type="email" placeholder={t("auth.emailPlaceholder")} {...register("email")} />
+          <Label htmlFor="email" className="text-slate-700">
+            {t("auth.email")}
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder={t("auth.emailPlaceholder")}
+            className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
+            {...register("email")}
+          />
           {errors.email && <p className="text-xs font-semibold text-destructive">{errors.email.message}</p>}
         </div>
 

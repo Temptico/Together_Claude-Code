@@ -226,7 +226,7 @@ export default function Profile() {
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
-          <a href="mailto:podpora@together.app" className="flex items-center justify-between py-4">
+          <a href="mailto:info@temptico.com" className="flex items-center justify-between py-4">
             <div className="flex items-center gap-2 font-bold">
               <HelpCircle className="h-5 w-5 text-primary" /> {t("profile.help")}
             </div>

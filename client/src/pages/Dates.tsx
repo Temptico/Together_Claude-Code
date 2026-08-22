@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
+import { DatePhotoField } from "@/components/DatePhotoField";
 import { CATEGORY_LABELS, DURATION_LABELS, COST_LABELS, LOCATION_TYPES } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -273,7 +274,7 @@ function NearbyTab() {
       )}
 
       {results.some((idea: any) => idea.externalId) && (
-        <p className="text-xs text-muted-foreground">{t("dates.googlePlacesNote")}</p>
+        <p className="text-xs text-muted-foreground">{t("dates.livePlacesNote")}</p>
       )}
 
       <div className="flex flex-col gap-3">
@@ -341,6 +342,11 @@ function PlannedTab() {
               )}
             </div>
             {d.notes && <p className="text-sm text-muted-foreground">{d.notes}</p>}
+            <DatePhotoField
+              plannedDateId={d.id}
+              photo={d.photo}
+              invalidateKeys={[["/api/dates/planned", user!.id]]}
+            />
             <div className="flex gap-2">
               {!d.completed && (
                 <Button size="sm" variant="secondary" onClick={() => completeMutation.mutate(d.id)}>
@@ -455,18 +461,25 @@ function CalendarTab() {
         )}
         {selectedItems.map((d) => (
           <Card key={d.id}>
-            <CardContent className="flex items-center justify-between gap-2 py-3">
-              <div>
-                <p className="text-sm font-bold">{d.idea?.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(d.scheduledAt).toLocaleTimeString("sl-SI", { hour: "2-digit", minute: "2-digit" })}
-                </p>
+            <CardContent className="flex flex-col gap-2 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold">{d.idea?.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(d.scheduledAt).toLocaleTimeString("sl-SI", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                {d.completed ? (
+                  <Badge>{t("dates.completed")}</Badge>
+                ) : (
+                  <Badge variant="secondary">{CATEGORY_LABELS[d.idea?.category] || d.idea?.category}</Badge>
+                )}
               </div>
-              {d.completed ? (
-                <Badge>{t("dates.completed")}</Badge>
-              ) : (
-                <Badge variant="secondary">{CATEGORY_LABELS[d.idea?.category] || d.idea?.category}</Badge>
-              )}
+              <DatePhotoField
+                plannedDateId={d.id}
+                photo={d.photo}
+                invalidateKeys={[["/api/dates/planned", user!.id]]}
+              />
             </CardContent>
           </Card>
         ))}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as storage from "./storage.js";
 import { getVapidPublicKey, notifyUser } from "./push.js";
 import { fetchNearbyPlaces } from "./places.js";
+import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
   insertUserSchema,
   insertMoodSchema,
@@ -135,7 +136,7 @@ export function registerRoutes(app: Express) {
         storage.resolveDailyQuestion(user, date),
         storage.resolveDailyChallenge(user, date),
         storage.calculateStreak(user.id),
-        storage.getUpcomingPlannedDates(user.id, 3),
+        storage.getUpcomingPlannedDates(user, 3),
       ]);
 
       const myAnswer = question ? await storage.getAnswerForDate(user.id, question.id, date) : undefined;
@@ -313,24 +314,29 @@ export function registerRoutes(app: Express) {
 
       const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm);
 
-      let googleIdeas: any[] = [];
-      const liveResults = await fetchNearbyPlaces(lat, lng, types, radiusKm);
-      if (liveResults) {
+      const withDistance = async (items: { lat: number; lng: number; externalId: string }[] | null) => {
+        if (!items) return [] as any[];
         const upserted = await Promise.all(
-          liveResults
-            .filter((r) => r.lat != null && r.lng != null)
-            .map((r) => storage.upsertGoogleIdea(r as any))
+          items.filter((r) => r.lat != null && r.lng != null).map((r) => storage.upsertExternalIdea(r as any))
         );
-        googleIdeas = upserted
+        return upserted
           .filter((idea): idea is NonNullable<typeof idea> => !!idea)
           .map((idea) => ({
             ...idea,
             distanceKm: Math.round(storage.haversineKm(lat, lng, idea.lat!, idea.lng!) * 10) / 10,
           }));
-      }
+      };
+
+      // OpenStreetMap needs no API key, so it's always attempted; Google Places
+      // is an optional extra layer when GOOGLE_PLACES_API_KEY is configured.
+      const [osmResults, googleResults] = await Promise.all([
+        fetchNearbyOsmPlaces(lat, lng, types, radiusKm),
+        fetchNearbyPlaces(lat, lng, types, radiusKm),
+      ]);
+      const [osmIdeas, googleIdeas] = await Promise.all([withDistance(osmResults), withDistance(googleResults)]);
 
       const byId = new Map<number, any>();
-      for (const idea of [...localIdeas, ...googleIdeas]) byId.set(idea.id, idea);
+      for (const idea of [...localIdeas, ...osmIdeas, ...googleIdeas]) byId.set(idea.id, idea);
       const merged = [...byId.values()].sort((a, b) => a.distanceKm - b.distanceKm);
 
       res.json(merged);
@@ -341,7 +347,9 @@ export function registerRoutes(app: Express) {
   app.get(
     "/api/dates/planned/:userId",
     ah(async (req, res) => {
-      const rows = await storage.getPlannedDates(req.params.userId);
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      const rows = await storage.getPlannedDates(user);
       const withIdeas = await Promise.all(
         rows.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId) }))
       );
@@ -397,12 +405,21 @@ export function registerRoutes(app: Express) {
         time: z.string().optional(),
         notes: z.string().optional(),
         completed: z.boolean().optional(),
+        photo: z
+          .string()
+          .max(7_000_000, "Slika je prevelika")
+          .regex(/^data:image\//, "Neveljavna slika")
+          .nullable()
+          .optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: "Neveljavni podatki" });
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
         return;
       }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+
       const patch: any = {};
       if (parsed.data.date && parsed.data.time) {
         const scheduledAt = new Date(`${parsed.data.date}T${parsed.data.time}`);
@@ -414,8 +431,9 @@ export function registerRoutes(app: Express) {
       }
       if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
       if (parsed.data.completed !== undefined) patch.completed = parsed.data.completed;
+      if (parsed.data.photo !== undefined) patch.photo = parsed.data.photo;
 
-      const row = await storage.updatePlannedDate(Number(req.params.id), parsed.data.userId, patch);
+      const row = await storage.updatePlannedDate(Number(req.params.id), user, patch);
       if (!row) {
         res.status(404).json({ error: "Zmenek ne obstaja" });
         return;
@@ -432,7 +450,9 @@ export function registerRoutes(app: Express) {
         res.status(400).json({ error: "Manjka uporabnik" });
         return;
       }
-      await storage.deletePlannedDate(Number(req.params.id), userId);
+      const user = await requireUser(req, res, userId);
+      if (!user) return;
+      await storage.deletePlannedDate(Number(req.params.id), user);
       res.status(204).end();
     })
   );

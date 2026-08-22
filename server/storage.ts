@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, asc } from "drizzle-orm";
+import { eq, and, or, desc, gte, asc, inArray } from "drizzle-orm";
 import { db } from "./db.js";
 import {
   users,
@@ -332,7 +332,7 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export async function upsertGoogleIdea(idea: {
+export async function upsertExternalIdea(idea: {
   externalId: string;
   title: string;
   description: string;
@@ -382,16 +382,20 @@ export async function createPlannedDate(
   return row;
 }
 
-export async function getPlannedDates(userId: string) {
+function coupleIds(user: User): string[] {
+  return user.partnerId ? [user.id, user.partnerId] : [user.id];
+}
+
+export async function getPlannedDates(user: User) {
   return db
     .select()
     .from(plannedDates)
-    .where(eq(plannedDates.userId, userId))
+    .where(inArray(plannedDates.userId, coupleIds(user)))
     .orderBy(plannedDates.scheduledAt);
 }
 
-export async function getUpcomingPlannedDates(userId: string, limit = 3) {
-  const all = await getPlannedDates(userId);
+export async function getUpcomingPlannedDates(user: User, limit = 3) {
+  const all = await getPlannedDates(user);
   const now = new Date();
   return all
     .filter((d: typeof plannedDates.$inferSelect) => !d.completed && new Date(d.scheduledAt) >= now)
@@ -400,19 +404,19 @@ export async function getUpcomingPlannedDates(userId: string, limit = 3) {
 
 export async function updatePlannedDate(
   id: number,
-  userId: string,
-  patch: Partial<{ scheduledAt: Date; notes: string; completed: boolean }>
+  user: User,
+  patch: Partial<{ scheduledAt: Date; notes: string; completed: boolean; photo: string | null }>
 ) {
   const [row] = await db
     .update(plannedDates)
     .set(patch)
-    .where(and(eq(plannedDates.id, id), eq(plannedDates.userId, userId)))
+    .where(and(eq(plannedDates.id, id), inArray(plannedDates.userId, coupleIds(user))))
     .returning();
   return row;
 }
 
-export async function deletePlannedDate(id: number, userId: string) {
-  await db.delete(plannedDates).where(and(eq(plannedDates.id, id), eq(plannedDates.userId, userId)));
+export async function deletePlannedDate(id: number, user: User) {
+  await db.delete(plannedDates).where(and(eq(plannedDates.id, id), inArray(plannedDates.userId, coupleIds(user))));
 }
 
 // ---------------- Stats & timeline ----------------

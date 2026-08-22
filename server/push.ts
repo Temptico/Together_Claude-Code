@@ -15,7 +15,7 @@ function ensureConfigured() {
     privateKey = generated.privateKey;
     console.log("[push] No VAPID keys set, generated ephemeral dev keys.");
   }
-  webpush.setVapidDetails("mailto:together@example.com", publicKey, privateKey);
+  webpush.setVapidDetails("mailto:info@temptico.com", publicKey, privateKey);
   (globalThis as any).__VAPID_PUBLIC_KEY__ = publicKey;
   configured = true;
 }

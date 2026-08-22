@@ -50,15 +50,13 @@ export function PlanDateDialog({
           <DialogTitle>{idea?.title}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Label htmlFor="date">{t("dates.date")}</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Label htmlFor="time">{t("dates.time")}</Label>
-              <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="date">{t("dates.date")}</Label>
+            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="time">{t("dates.time")}</Label>
+            <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="notes">{t("dates.notes")}</Label>
