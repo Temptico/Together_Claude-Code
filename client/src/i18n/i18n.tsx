@@ -15,10 +15,22 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
+const SUPPORTED_LANGUAGES: Language[] = ["sl", "en", "hr"];
+
+function detectDeviceLanguage(): Language {
+  const candidates = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+  for (const candidate of candidates) {
+    const primary = candidate?.slice(0, 2).toLowerCase();
+    if (SUPPORTED_LANGUAGES.includes(primary as Language)) return primary as Language;
+  }
+  return "en";
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "en" || stored === "sl" || stored === "hr" ? stored : "sl";
+    if (stored === "en" || stored === "sl" || stored === "hr") return stored;
+    return detectDeviceLanguage();
   });
 
   const setLang = (l: Language) => {
