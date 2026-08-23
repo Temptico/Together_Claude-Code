@@ -29,6 +29,8 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS questions (
       id serial PRIMARY KEY,
       text text NOT NULL,
+      text_en text,
+      text_hr text,
       category varchar(32) NOT NULL
     )`,
   `CREATE TABLE IF NOT EXISTS question_answers (
@@ -43,6 +45,8 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS challenges (
       id serial PRIMARY KEY,
       text text NOT NULL,
+      text_en text,
+      text_hr text,
       category varchar(32) NOT NULL,
       difficulty varchar(16) NOT NULL DEFAULT 'easy',
       active boolean NOT NULL DEFAULT true
@@ -53,7 +57,8 @@ const STATEMENTS = [
       challenge_id integer NOT NULL,
       source varchar(16) NOT NULL DEFAULT 'builtin',
       date text NOT NULL,
-      created_at timestamp NOT NULL DEFAULT now()
+      created_at timestamp NOT NULL DEFAULT now(),
+      completed_at timestamp
     )`,
   `CREATE TABLE IF NOT EXISTS date_ideas (
       id serial PRIMARY KEY,
@@ -150,6 +155,16 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_external_id_idx ON date_ideas (external_id)`,
   `ALTER TABLE planned_dates ADD COLUMN IF NOT EXISTS photo text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS pin text`,
+  `ALTER TABLE challenge_completions ADD COLUMN IF NOT EXISTS completed_at timestamp`,
+  // Accepting a challenge used to mean completing it. Rows from before this
+  // distinction existed were all "completed" the moment they were created —
+  // backfill them once, scoped to before this feature shipped so it never
+  // touches a genuinely pending acceptance made after.
+  `UPDATE challenge_completions SET completed_at = created_at WHERE completed_at IS NULL AND created_at < '2026-08-24'`,
+  `ALTER TABLE questions ADD COLUMN IF NOT EXISTS text_en text`,
+  `ALTER TABLE questions ADD COLUMN IF NOT EXISTS text_hr text`,
+  `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_en text`,
+  `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_hr text`,
 ];
 
 export async function runMigrations() {

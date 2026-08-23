@@ -57,7 +57,9 @@ export const insertMoodSchema = createInsertSchema(moods, {
 // ---------- Daily Questions ----------
 export const questions = pgTable("questions", {
   id: serial("id").primaryKey(),
-  text: text("text").notNull(),
+  text: text("text").notNull(), // Slovenian, the fallback for any language
+  textEn: text("text_en"),
+  textHr: text("text_hr"),
   category: varchar("category", { length: 32 }).notNull(),
 });
 
@@ -78,7 +80,9 @@ export const insertAnswerSchema = createInsertSchema(questionAnswers, {
 // ---------- Challenges ----------
 export const challenges = pgTable("challenges", {
   id: serial("id").primaryKey(),
-  text: text("text").notNull(),
+  text: text("text").notNull(), // Slovenian, the fallback for any language
+  textEn: text("text_en"),
+  textHr: text("text_hr"),
   category: varchar("category", { length: 32 }).notNull(),
   difficulty: varchar("difficulty", { length: 16 }).notNull().default("easy"),
   active: boolean("active").notNull().default(true),
@@ -90,7 +94,8 @@ export const challengeCompletions = pgTable("challenge_completions", {
   challengeId: integer("challenge_id").notNull(),
   source: varchar("source", { length: 16 }).notNull().default("builtin"), // 'builtin' | 'custom'
   date: text("date").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(), // when the challenge was accepted
+  completedAt: timestamp("completed_at"), // null until marked done — accepting is not completing
 });
 
 // ---------- Date ideas ----------

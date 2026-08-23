@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, asc, inArray } from "drizzle-orm";
+import { eq, and, or, desc, gte, asc, inArray, isNotNull } from "drizzle-orm";
 import { db } from "./db.js";
 import {
   users,
@@ -171,6 +171,15 @@ async function getBuiltinQuestionOfTheDay(date: string, coupleKey: string) {
   return all[dayIndex(date + coupleKey) % all.length];
 }
 
+// Builtin questions/challenges are authored in Slovenian with optional EN/HR
+// translations; custom (user-written) ones only ever exist in one language,
+// so this is only applied to builtin rows.
+export function pickLocalizedText(row: { text: string; textEn: string | null; textHr: string | null }, language: string): string {
+  if (language === "en") return row.textEn || row.text;
+  if (language === "hr") return row.textHr || row.text;
+  return row.text;
+}
+
 export type ResolvedQuestion = { id: number; text: string; category: string; isCustom: boolean };
 
 export async function resolveDailyQuestion(user: User, date: string): Promise<ResolvedQuestion | undefined> {
@@ -189,7 +198,8 @@ export async function resolveDailyQuestion(user: User, date: string): Promise<Re
       if (custom) return { id: custom.id, text: custom.text, category: "lastno", isCustom: true };
     } else {
       const [builtin] = await db.select().from(questions).where(eq(questions.id, existingAssignment.itemId));
-      if (builtin) return { id: builtin.id, text: builtin.text, category: builtin.category, isCustom: false };
+      if (builtin)
+        return { id: builtin.id, text: pickLocalizedText(builtin, user.language), category: builtin.category, isCustom: false };
     }
   }
 
@@ -215,7 +225,7 @@ export async function resolveDailyQuestion(user: User, date: string): Promise<Re
     .insert(dailyAssignments)
     .values({ coupleKey, date, type: "question", itemId: builtin.id, source: "builtin" })
     .onConflictDoNothing();
-  return { id: builtin.id, text: builtin.text, category: builtin.category, isCustom: false };
+  return { id: builtin.id, text: pickLocalizedText(builtin, user.language), category: builtin.category, isCustom: false };
 }
 
 export async function getAnswerForDate(userId: string, questionId: number, date: string) {
@@ -284,7 +294,13 @@ export async function resolveDailyChallenge(user: User, date: string): Promise<R
     } else {
       const [builtin] = await db.select().from(challenges).where(eq(challenges.id, existingAssignment.itemId));
       if (builtin)
-        return { id: builtin.id, text: builtin.text, category: builtin.category, difficulty: builtin.difficulty, isCustom: false };
+        return {
+          id: builtin.id,
+          text: pickLocalizedText(builtin, user.language),
+          category: builtin.category,
+          difficulty: builtin.difficulty,
+          isCustom: false,
+        };
     }
   }
 
@@ -313,7 +329,13 @@ export async function resolveDailyChallenge(user: User, date: string): Promise<R
     .insert(dailyAssignments)
     .values({ coupleKey, date, type: "challenge", itemId: builtin.id, source: "builtin" })
     .onConflictDoNothing();
-  return { id: builtin.id, text: builtin.text, category: builtin.category, difficulty: builtin.difficulty, isCustom: false };
+  return {
+    id: builtin.id,
+    text: pickLocalizedText(builtin, user.language),
+    category: builtin.category,
+    difficulty: builtin.difficulty,
+    isCustom: false,
+  };
 }
 
 export async function getCompletionForDate(userId: string, challengeId: number, date: string) {
@@ -330,7 +352,7 @@ export async function getCompletionForDate(userId: string, challengeId: number, 
   return row;
 }
 
-export async function completeChallenge(
+export async function acceptChallenge(
   userId: string,
   challengeId: number,
   date: string,
@@ -345,11 +367,27 @@ export async function completeChallenge(
   return row;
 }
 
+// Marks an already-accepted challenge as done. Returns undefined if it was
+// never accepted — completing isn't possible without accepting first.
+export async function markChallengeCompleted(userId: string, challengeId: number, date: string) {
+  const existing = await getCompletionForDate(userId, challengeId, date);
+  if (!existing) return undefined;
+  if (existing.completedAt) return existing;
+  const [row] = await db
+    .update(challengeCompletions)
+    .set({ completedAt: new Date() })
+    .where(eq(challengeCompletions.id, existing.id))
+    .returning();
+  return row;
+}
+
+// Only counts challenges that were actually finished, not just accepted —
+// used for streaks, memories, and activity tracking.
 export async function getRecentCompletions(userId: string, limit = 30) {
   return db
     .select()
     .from(challengeCompletions)
-    .where(eq(challengeCompletions.userId, userId))
+    .where(and(eq(challengeCompletions.userId, userId), isNotNull(challengeCompletions.completedAt)))
     .orderBy(desc(challengeCompletions.date))
     .limit(limit);
 }
@@ -524,7 +562,13 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
       db
         .select()
         .from(challengeCompletions)
-        .where(and(eq(challengeCompletions.userId, userId), eq(challengeCompletions.date, targetDate))),
+        .where(
+          and(
+            eq(challengeCompletions.userId, userId),
+            eq(challengeCompletions.date, targetDate),
+            isNotNull(challengeCompletions.completedAt)
+          )
+        ),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
@@ -728,7 +772,13 @@ export async function hasActivityToday(userId: string, date: string): Promise<bo
   const [completion] = await db
     .select()
     .from(challengeCompletions)
-    .where(and(eq(challengeCompletions.userId, userId), eq(challengeCompletions.date, date)));
+    .where(
+      and(
+        eq(challengeCompletions.userId, userId),
+        eq(challengeCompletions.date, date),
+        isNotNull(challengeCompletions.completedAt)
+      )
+    );
   return !!completion;
 }
 
@@ -766,7 +816,10 @@ export async function getAdminStats() {
   const [todayMoods, todayAnswers, todayCompletions] = await Promise.all([
     db.select().from(moods).where(eq(moods.date, today)),
     db.select().from(questionAnswers).where(eq(questionAnswers.date, today)),
-    db.select().from(challengeCompletions).where(eq(challengeCompletions.date, today)),
+    db
+      .select()
+      .from(challengeCompletions)
+      .where(and(eq(challengeCompletions.date, today), isNotNull(challengeCompletions.completedAt))),
   ]);
   for (const m of todayMoods) activeTodaySet.add(m.userId);
   for (const a of todayAnswers) activeTodaySet.add(a.userId);

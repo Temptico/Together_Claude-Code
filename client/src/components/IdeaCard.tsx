@@ -2,7 +2,7 @@ import { MapPin, Clock, CalendarPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { COST_LABELS, DURATION_LABELS, CATEGORY_LABELS } from "@/lib/dateIdeaFormat";
+import { costLabel, durationLabel, categoryLabel } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 
 export function IdeaCard({
@@ -18,14 +18,14 @@ export function IdeaCard({
       <CardContent className="flex flex-col gap-2 py-4">
         <div className="flex items-start justify-between gap-2">
           <p className="font-extrabold leading-tight">{idea.title}</p>
-          <Badge>{CATEGORY_LABELS[idea.category] || idea.category}</Badge>
+          <Badge>{categoryLabel(t, idea.category)}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">{idea.description}</p>
         <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" /> {DURATION_LABELS[idea.duration] || idea.duration}
+            <Clock className="h-3.5 w-3.5" /> {durationLabel(t, idea.duration)}
           </span>
-          <span>{COST_LABELS[idea.cost] || idea.cost}</span>
+          <span>{costLabel(t, idea.cost)}</span>
           {idea.distanceKm != null && (
             <span className="flex items-center gap-1 text-primary">
               <MapPin className="h-3.5 w-3.5" /> {idea.distanceKm.toFixed(1)} km

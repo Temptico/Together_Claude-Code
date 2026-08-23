@@ -22,6 +22,7 @@ type HomeData = {
   question: any | null;
   myAnswer: any | null;
   challenge: any | null;
+  challengeAccepted: boolean;
   challengeCompleted: boolean;
   upcomingDates: any[];
   anniversaryCountdown: { daysUntil: number; isToday: boolean; years: number } | null;
@@ -67,6 +68,7 @@ export default function Home() {
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
       <DailyChallengeCard
         challenge={data.challenge}
+        accepted={data.challengeAccepted}
         completed={data.challengeCompleted}
         userId={data.user.id}
       />
@@ -260,10 +262,12 @@ function DailyQuestionCard({ question, myAnswer }: { question: any; myAnswer: an
 
 function DailyChallengeCard({
   challenge,
+  accepted,
   completed,
   userId,
 }: {
   challenge: any;
+  accepted: boolean;
   completed: boolean;
   userId: string;
 }) {
@@ -271,11 +275,20 @@ function DailyChallengeCard({
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const mutation = useMutation({
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["/api/home", userId] });
+    qc.invalidateQueries({ queryKey: ["/api/memories", userId] });
+  };
+
+  const acceptMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/challenge/accept", { userId, challengeId: challenge.id }),
+    onSuccess: invalidate,
+  });
+
+  const completeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/challenge/complete", { userId, challengeId: challenge.id }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/home", userId] });
-      qc.invalidateQueries({ queryKey: ["/api/memories", userId] });
+      invalidate();
       toast({ title: t("home.challengeCompleted") });
     },
   });
@@ -289,7 +302,7 @@ function DailyChallengeCard({
           <Trophy className="h-5 w-5 text-primary" />
           <CardTitle>{t("home.dailyChallenge")}</CardTitle>
         </div>
-        <Badge variant="accent">{challenge.category}</Badge>
+        <Badge variant="accent">{t("category." + challenge.category)}</Badge>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <p className="text-sm font-semibold">{challenge.text}</p>
@@ -297,8 +310,26 @@ function DailyChallengeCard({
           <div className="flex items-center gap-2 self-start rounded-full bg-primary/15 px-4 py-2 text-sm font-bold text-primary">
             <Check className="h-4 w-4" /> {t("home.challengeCompleted")}
           </div>
+        ) : accepted ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground">
+              {t("home.challengeAccepted")}
+            </span>
+            <Button
+              size="sm"
+              disabled={completeMutation.isPending}
+              onClick={() => completeMutation.mutate()}
+            >
+              {t("home.markChallengeCompleted")}
+            </Button>
+          </div>
         ) : (
-          <Button size="sm" className="self-start" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button
+            size="sm"
+            className="self-start"
+            disabled={acceptMutation.isPending}
+            onClick={() => acceptMutation.mutate()}
+          >
             {t("home.acceptChallenge")}
           </Button>
         )}

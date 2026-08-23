@@ -42,11 +42,12 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["'Nunito'", "system-ui", "sans-serif"],
+        sans: ["'Mulish'", "system-ui", "sans-serif"],
+        display: ["'Baloo 2'", "'Mulish'", "system-ui", "sans-serif"],
       },
       backgroundImage: {
-        "together-gradient": "linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #a1c4fd 100%)",
-        "together-warm": "linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)",
+        "together-gradient": "linear-gradient(160deg, #ffb199 0%, #ff8a65 45%, #ff6b6b 100%)",
+        "together-warm": "linear-gradient(135deg, #ff6b6b 0%, #ffa94d 100%)",
       },
     },
   },

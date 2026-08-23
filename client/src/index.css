@@ -5,45 +5,45 @@
 @layer base {
   :root {
     color-scheme: light;
-    --background: 340 60% 98%;
-    --foreground: 340 30% 20%;
+    --background: 30 100% 95%;
+    --foreground: 355 26% 22%;
     --card: 0 0% 100%;
-    --card-foreground: 340 30% 20%;
-    --primary: 350 85% 68%;
+    --card-foreground: 355 26% 22%;
+    --primary: 0 100% 71%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 190 70% 90%;
-    --secondary-foreground: 200 40% 25%;
-    --muted: 340 30% 95%;
-    --muted-foreground: 340 15% 45%;
-    --accent: 25 95% 88%;
-    --accent-foreground: 25 40% 25%;
-    --destructive: 0 75% 60%;
+    --secondary: 30 70% 90%;
+    --secondary-foreground: 20 45% 28%;
+    --muted: 30 45% 94%;
+    --muted-foreground: 20 20% 45%;
+    --accent: 36 95% 88%;
+    --accent-foreground: 30 60% 28%;
+    --destructive: 355 75% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 340 30% 90%;
-    --input: 340 30% 90%;
-    --ring: 350 85% 68%;
-    --radius: 1rem;
+    --border: 30 40% 88%;
+    --input: 30 40% 88%;
+    --ring: 0 100% 71%;
+    --radius: 1.375rem;
   }
 
   .dark {
     color-scheme: dark;
-    --background: 335 30% 8%;
-    --foreground: 340 25% 92%;
-    --card: 335 25% 12%;
-    --card-foreground: 340 25% 92%;
-    --primary: 350 80% 65%;
-    --primary-foreground: 340 30% 10%;
-    --secondary: 200 35% 20%;
-    --secondary-foreground: 200 40% 90%;
-    --muted: 335 20% 16%;
-    --muted-foreground: 340 15% 65%;
-    --accent: 25 45% 22%;
-    --accent-foreground: 25 60% 88%;
-    --destructive: 0 70% 55%;
+    --background: 20 26% 9%;
+    --foreground: 30 40% 92%;
+    --card: 20 22% 13%;
+    --card-foreground: 30 40% 92%;
+    --primary: 0 90% 66%;
+    --primary-foreground: 20 30% 12%;
+    --secondary: 25 25% 20%;
+    --secondary-foreground: 30 50% 88%;
+    --muted: 20 18% 17%;
+    --muted-foreground: 30 20% 65%;
+    --accent: 36 45% 24%;
+    --accent-foreground: 36 70% 85%;
+    --destructive: 355 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 335 20% 20%;
-    --input: 335 20% 20%;
-    --ring: 350 80% 65%;
+    --border: 20 20% 22%;
+    --input: 20 20% 22%;
+    --ring: 0 90% 66%;
   }
 }
 
@@ -57,7 +57,12 @@
     overscroll-behavior-y: none;
   }
   body {
-    font-family: "Nunito", system-ui, sans-serif;
+    font-family: "Mulish", system-ui, sans-serif;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: "Baloo 2", "Mulish", system-ui, sans-serif;
   }
 }
 

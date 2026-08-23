@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { getPushSubscriptionsForUser } from "./storage.js";
+import { getPushSubscriptionsForUser, getUserById } from "./storage.js";
 
 let configured = false;
 
@@ -27,6 +27,8 @@ export function getVapidPublicKey(): string {
 
 export async function notifyUser(userId: string, payload: { title: string; body: string; tag?: string }) {
   ensureConfigured();
+  const user = await getUserById(userId);
+  if (!user?.notificationsEnabled) return;
   const subs = await getPushSubscriptionsForUser(userId);
   await Promise.all(
     subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>

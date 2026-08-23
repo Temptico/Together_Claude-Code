@@ -76,6 +76,14 @@ export function registerRoutes(app: Express) {
         return;
       }
 
+      // TEMPORARY: set DISABLE_PIN_CHECK=1 in Render to let any known email
+      // log in regardless of PIN, for testing. Remove the env var to restore
+      // normal PIN verification — no code change needed either way.
+      if (process.env.DISABLE_PIN_CHECK === "1") {
+        res.json(storage.omitPin(user));
+        return;
+      }
+
       if (!user.pin) {
         // Legacy account created before PINs existed: the first PIN entered
         // on login claims the account going forward, rather than locking
@@ -178,7 +186,8 @@ export function registerRoutes(app: Express) {
         question: question || null,
         myAnswer: myAnswer || null,
         challenge: challenge || null,
-        challengeCompleted: !!completion,
+        challengeAccepted: !!completion,
+        challengeCompleted: !!completion?.completedAt,
         upcomingDates: upcomingWithIdeas,
         anniversaryCountdown,
       });
@@ -259,7 +268,7 @@ export function registerRoutes(app: Express) {
 
   // ---------------- Challenges ----------------
   app.post(
-    "/api/challenge/complete",
+    "/api/challenge/accept",
     ah(async (req, res) => {
       const schema = z.object({ userId: z.string(), challengeId: z.number() });
       const parsed = schema.safeParse(req.body);
@@ -277,12 +286,34 @@ export function registerRoutes(app: Express) {
         return;
       }
 
-      const completion = await storage.completeChallenge(
+      const acceptance = await storage.acceptChallenge(
         user.id,
         parsed.data.challengeId,
         date,
         todaysChallenge.isCustom ? "custom" : "builtin"
       );
+      res.status(201).json(acceptance);
+    })
+  );
+
+  app.post(
+    "/api/challenge/complete",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string(), challengeId: z.number() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const date = storage.todayStr();
+
+      const completion = await storage.markChallengeCompleted(user.id, parsed.data.challengeId, date);
+      if (!completion) {
+        res.status(400).json({ error: "Izziv še ni sprejet" });
+        return;
+      }
 
       if (user.partnerId) {
         notifyUser(user.partnerId, {
@@ -291,7 +322,7 @@ export function registerRoutes(app: Express) {
           tag: "challenge",
         }).catch(() => {});
       }
-      res.status(201).json(completion);
+      res.status(200).json(completion);
     })
   );
 
@@ -519,14 +550,16 @@ export function registerRoutes(app: Express) {
           const q = isCustom
             ? customQs.find((c: any) => c.id === entry.detail.questionId)
             : questions.find((q: any) => q.id === entry.detail.questionId);
-          return { ...entry, questionText: q?.text, reactions: reactionList };
+          const questionText = !q ? undefined : isCustom ? q.text : storage.pickLocalizedText(q, user.language);
+          return { ...entry, questionText, reactions: reactionList };
         }
         if (entry.type === "challenge") {
           const isCustom = entry.detail.source === "custom";
           const c = isCustom
             ? customChs.find((c: any) => c.id === entry.detail.challengeId)
             : challenges.find((c: any) => c.id === entry.detail.challengeId);
-          return { ...entry, challengeText: c?.text, reactions: reactionList };
+          const challengeText = !c ? undefined : isCustom ? c.text : storage.pickLocalizedText(c, user.language);
+          return { ...entry, challengeText, reactions: reactionList };
         }
         return { ...entry, reactions: reactionList };
       };

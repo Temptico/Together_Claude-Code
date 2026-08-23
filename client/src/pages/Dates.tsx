@@ -17,14 +17,23 @@ import { Input } from "@/components/ui/input";
 import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
 import { DatePhotoField } from "@/components/DatePhotoField";
-import { CATEGORY_LABELS, DURATION_LABELS, COST_LABELS, LOCATION_TYPES } from "@/lib/dateIdeaFormat";
+import {
+  categoryLabel,
+  durationLabel,
+  costLabel,
+  locationTypeLabel,
+  DATE_CATEGORY_IDS,
+  DURATION_IDS,
+  COST_IDS,
+  LOCATION_TYPE_IDS,
+} from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const CATEGORIES = ["vse", "doma", "na-prostem", "kulturno", "aktivno", "sprosceno"];
+const CATEGORIES = DATE_CATEGORY_IDS;
 
 export default function Dates() {
   const { t } = useTranslation();
@@ -94,7 +103,7 @@ function CatalogTab() {
               category === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             )}
           >
-            {CATEGORY_LABELS[c]}
+            {categoryLabel(t, c)}
           </button>
         ))}
       </div>
@@ -106,9 +115,9 @@ function CatalogTab() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="any">{t("dates.duration")}</SelectItem>
-            {Object.entries(DURATION_LABELS).map(([value, label]) => (
+            {DURATION_IDS.map((value) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {durationLabel(t, value)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -119,9 +128,9 @@ function CatalogTab() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="any">{t("dates.cost")}</SelectItem>
-            {Object.entries(COST_LABELS).map(([value, label]) => (
+            {COST_IDS.map((value) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {costLabel(t, value)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -182,12 +191,12 @@ function SurpriseDialog({
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-lg font-extrabold">{idea.title}</p>
-                <Badge>{CATEGORY_LABELS[idea.category] || idea.category}</Badge>
+                <Badge>{categoryLabel(t, idea.category)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">{idea.description}</p>
               <div className="mt-2 flex gap-3 text-xs font-bold text-muted-foreground">
-                <span>{DURATION_LABELS[idea.duration] || idea.duration}</span>
-                <span>{COST_LABELS[idea.cost] || idea.cost}</span>
+                <span>{durationLabel(t, idea.duration)}</span>
+                <span>{costLabel(t, idea.cost)}</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -248,16 +257,16 @@ function NearbyTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
-        {LOCATION_TYPES.map((lt) => (
+        {LOCATION_TYPE_IDS.map((id) => (
           <button
-            key={lt.id}
-            onClick={() => toggleType(lt.id)}
+            key={id}
+            onClick={() => toggleType(id)}
             className={cn(
               "rounded-full px-3 py-1.5 text-xs font-bold",
-              selectedTypes.includes(lt.id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              selectedTypes.includes(id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             )}
           >
-            {lt.label}
+            {locationTypeLabel(t, id)}
           </button>
         ))}
       </div>
@@ -343,7 +352,7 @@ function PlannedTab() {
               {d.completed ? (
                 <Badge variant="default">{t("dates.completed")}</Badge>
               ) : (
-                <Badge variant="secondary">{CATEGORY_LABELS[d.idea?.category] || d.idea?.category}</Badge>
+                <Badge variant="secondary">{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
               )}
             </div>
             {d.notes && <p className="text-sm text-muted-foreground">{d.notes}</p>}
@@ -477,7 +486,7 @@ function CalendarTab() {
                 {d.completed ? (
                   <Badge>{t("dates.completed")}</Badge>
                 ) : (
-                  <Badge variant="secondary">{CATEGORY_LABELS[d.idea?.category] || d.idea?.category}</Badge>
+                  <Badge variant="secondary">{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
                 )}
               </div>
               <DatePhotoField
