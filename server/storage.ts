@@ -433,6 +433,8 @@ export async function upsertExternalIdea(idea: {
   locationType: string;
   city?: string;
   address?: string;
+  phone?: string;
+  website?: string;
   lat: number;
   lng: number;
 }) {

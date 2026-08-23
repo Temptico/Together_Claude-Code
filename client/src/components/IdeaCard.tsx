@@ -1,4 +1,4 @@
-import { MapPin, Clock, CalendarPlus } from "lucide-react";
+import { MapPin, Clock, CalendarPlus, Map, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,32 @@ export function IdeaCard({
             </span>
           )}
         </div>
-        <Button size="sm" variant="secondary" className="mt-1 self-start" onClick={() => onPlan(idea)}>
-          <CalendarPlus className="h-4 w-4" />
-          {t("dates.planDate")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="sm" variant="secondary" onClick={() => onPlan(idea)}>
+            <CalendarPlus className="h-4 w-4" />
+            {t("dates.planDate")}
+          </Button>
+          {idea.lat != null && idea.lng != null && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${idea.lat},${idea.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs font-bold text-primary"
+            >
+              <Map className="h-3.5 w-3.5" /> {t("dates.viewMap")}
+            </a>
+          )}
+          {idea.website && (
+            <a
+              href={idea.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs font-bold text-primary"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> {t("dates.website")}
+            </a>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

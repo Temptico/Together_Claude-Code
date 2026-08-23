@@ -32,6 +32,8 @@ export type OsmNearbyResult = {
   locationType: string;
   city?: string;
   address?: string;
+  phone?: string;
+  website?: string;
   lat: number;
   lng: number;
 };
@@ -103,6 +105,8 @@ export async function fetchNearbyOsmPlaces(
 
       const mapping = OSM_TYPE_MAP[matchedType];
       const address = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
+      const website = tags.website || tags["contact:website"];
+      const phone = tags.phone || tags["contact:phone"];
 
       results.push({
         externalId: `osm:${el.type}:${el.id}`,
@@ -113,6 +117,8 @@ export async function fetchNearbyOsmPlaces(
         duration: "1h",
         locationType: matchedType,
         address: address || undefined,
+        website: website || undefined,
+        phone: phone || undefined,
         lat: elLat,
         lng: elLng,
       });

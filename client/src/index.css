@@ -90,3 +90,10 @@
   background: hsl(var(--primary) / 0.3);
   border-radius: 999px;
 }
+
+/* iOS Safari centers the value text of date/time inputs by default,
+   inconsistent with every other left-aligned input in the app. */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+}

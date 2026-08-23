@@ -332,48 +332,60 @@ function PlannedTab() {
   if (isLoading) return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
   if (planned.length === 0) return <p className="text-sm text-muted-foreground">{t("home.noUpcomingDates")}</p>;
 
+  const upcoming = planned.filter((d) => !d.completed);
+  const past = planned.filter((d) => d.completed);
+
+  const renderCard = (d: any) => (
+    <Card key={d.id}>
+      <CardContent className="flex flex-col gap-2 py-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-extrabold">{d.idea?.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(d.scheduledAt).toLocaleString("sl-SI", {
+                day: "numeric",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+          {d.completed ? (
+            <Badge variant="default">{t("dates.completed")}</Badge>
+          ) : (
+            <Badge variant="secondary">{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
+          )}
+        </div>
+        {d.notes && <p className="text-sm text-muted-foreground">{d.notes}</p>}
+        <DatePhotoField plannedDateId={d.id} photo={d.photo} invalidateKeys={[["/api/dates/planned", user!.id]]} />
+        <div className="flex gap-2">
+          {!d.completed && (
+            <Button size="sm" variant="secondary" onClick={() => completeMutation.mutate(d.id)}>
+              <Check className="h-4 w-4" /> {t("dates.markComplete")}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(d.id)}>
+            <Trash2 className="h-4 w-4" /> {t("dates.delete")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="flex flex-col gap-3">
-      {planned.map((d) => (
-        <Card key={d.id}>
-          <CardContent className="flex flex-col gap-2 py-4">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-extrabold">{d.idea?.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(d.scheduledAt).toLocaleString("sl-SI", {
-                    day: "numeric",
-                    month: "long",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-              {d.completed ? (
-                <Badge variant="default">{t("dates.completed")}</Badge>
-              ) : (
-                <Badge variant="secondary">{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
-              )}
-            </div>
-            {d.notes && <p className="text-sm text-muted-foreground">{d.notes}</p>}
-            <DatePhotoField
-              plannedDateId={d.id}
-              photo={d.photo}
-              invalidateKeys={[["/api/dates/planned", user!.id]]}
-            />
-            <div className="flex gap-2">
-              {!d.completed && (
-                <Button size="sm" variant="secondary" onClick={() => completeMutation.mutate(d.id)}>
-                  <Check className="h-4 w-4" /> {t("dates.markComplete")}
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(d.id)}>
-                <Trash2 className="h-4 w-4" /> {t("dates.delete")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="flex flex-col gap-5">
+      {upcoming.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.upcomingSection")}</h2>
+          {upcoming.map(renderCard)}
+        </div>
+      )}
+      {past.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.pastSection")}</h2>
+          {past.map(renderCard)}
+        </div>
+      )}
     </div>
   );
 }

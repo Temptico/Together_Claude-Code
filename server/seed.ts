@@ -75,13 +75,14 @@ const DATE_IDEAS: Array<{
   locationType?: string;
   city?: string;
   address?: string;
+  website?: string;
   tags?: string[];
   lat?: number;
   lng?: number;
 }> = [
   // Doma
   { title: "Kuhanje novega recepta", description: "Izbrajta si recept, ki ga še nista poskusila, in ga skupaj pripravita.", category: "doma", cost: "eur", duration: "1h" },
-  { title: "Virtualni obisk muzeja", description: "Raziščita enega izmed svetovnih muzejev prek spletnega virtualnega ogleda.", category: "doma", cost: "brezplacno", duration: "1h" },
+  { title: "Virtualni obisk muzeja", description: "Odpri Google Arts & Culture in izbrajta muzej, ki bi ga rada obiskala — od Louvra do Van Gogha.", category: "doma", cost: "brezplacno", duration: "1h", website: "https://artsandculture.google.com" },
   { title: "Ustvarjanje skupnega seznama želja", description: "Zapišita si stvari, ki bi ju rada skupaj doživela.", category: "doma", cost: "brezplacno", duration: "30min" },
   { title: "Filmski maraton", description: "Izberita trilogijo ali serijo filmov in preživita večer z njimi.", category: "doma", cost: "brezplacno", duration: "2h+" },
   { title: "Ples v dnevni sobi", description: "Predvajajta najljubšo glasbo in zaplešita, kot da vaju nihče ne gleda.", category: "doma", cost: "brezplacno", duration: "30min" },
@@ -150,10 +151,20 @@ export async function runSeed() {
   }
 
   const existingIdeas = await db.select().from(dateIdeas);
-  const existingTitles = new Set(existingIdeas.map((i: { title: string }) => i.title));
-  const missingIdeas = DATE_IDEAS.filter((idea) => !existingTitles.has(idea.title));
+  const existingIdeasByTitle = new Map(existingIdeas.map((i: { title: string }) => [i.title, i]));
+  const missingIdeas = DATE_IDEAS.filter((idea) => !existingIdeasByTitle.has(idea.title));
   if (missingIdeas.length > 0) {
     await db.insert(dateIdeas).values(missingIdeas as any);
     console.log(`[seed] Inserted ${missingIdeas.length} date ideas`);
+  }
+  // "Virtualni obisk muzeja" used to be a generic idea with nowhere to go —
+  // backfill the pointer + updated description onto the existing row.
+  const virtualMuseum = DATE_IDEAS.find((i) => i.title === "Virtualni obisk muzeja")!;
+  const existingVirtualMuseum = existingIdeasByTitle.get(virtualMuseum.title) as typeof dateIdeas.$inferSelect | undefined;
+  if (existingVirtualMuseum && !existingVirtualMuseum.website) {
+    await db
+      .update(dateIdeas)
+      .set({ website: virtualMuseum.website, description: virtualMuseum.description })
+      .where(eq(dateIdeas.id, existingVirtualMuseum.id));
   }
 }
