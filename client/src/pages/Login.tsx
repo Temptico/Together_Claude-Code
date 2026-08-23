@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { User } from "@shared/schema";
+import { loginSchema, type User } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,6 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useState } from "react";
 
-const loginSchema = z.object({ email: z.string().email("Neveljaven e-poštni naslov") });
 type LoginData = z.infer<typeof loginSchema>;
 
 export default function Login() {
@@ -35,6 +34,8 @@ export default function Login() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setServerError(t("auth.notFound"));
+      } else if (err instanceof ApiError && err.status === 401) {
+        setServerError(t("auth.wrongPin"));
       } else {
         setServerError(t("common.error"));
       }
@@ -64,6 +65,21 @@ export default function Login() {
             {...register("email")}
           />
           {errors.email && <p className="text-xs font-semibold text-destructive">{errors.email.message}</p>}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pin" className="text-slate-700">
+            {t("auth.pin")}
+          </Label>
+          <Input
+            id="pin"
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder={t("auth.pinPlaceholder")}
+            className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 tracking-[0.3em]"
+            {...register("pin")}
+          />
+          {errors.pin && <p className="text-xs font-semibold text-destructive">{errors.pin.message}</p>}
         </div>
 
         {serverError && <p className="text-sm font-semibold text-destructive">{serverError}</p>}

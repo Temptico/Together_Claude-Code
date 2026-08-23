@@ -15,6 +15,8 @@ export default function Register() {
   const { setUser } = useAuth();
   const [, navigate] = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [confirmPin, setConfirmPin] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const {
     register,
@@ -24,10 +26,15 @@ export default function Register() {
 
   const onSubmit = async (data: InsertUser) => {
     setServerError(null);
+    setConfirmError(null);
+    if (data.pin !== confirmPin) {
+      setConfirmError(t("auth.pinMismatch"));
+      return;
+    }
     try {
       const user = await apiRequest<User>("POST", "/api/auth/register", data);
       setUser(user);
-      navigate(sessionStorage.getItem("together:pendingInviteCode") ? "/connect" : "/");
+      navigate(sessionStorage.getItem("together:pendingInviteCode") ? "/connect" : "/onboarding");
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setServerError(t("auth.emailInUse"));
@@ -72,6 +79,36 @@ export default function Register() {
             {...register("email")}
           />
           {errors.email && <p className="text-xs font-semibold text-destructive">{errors.email.message}</p>}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pin" className="text-slate-700">
+            {t("auth.pin")}
+          </Label>
+          <Input
+            id="pin"
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder={t("auth.pinPlaceholder")}
+            className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 tracking-[0.3em]"
+            {...register("pin")}
+          />
+          {errors.pin && <p className="text-xs font-semibold text-destructive">{errors.pin.message}</p>}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="confirmPin" className="text-slate-700">
+            {t("auth.confirmPin")}
+          </Label>
+          <Input
+            id="confirmPin"
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value)}
+            className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 tracking-[0.3em]"
+          />
+          {confirmError && <p className="text-xs font-semibold text-destructive">{confirmError}</p>}
         </div>
 
         {serverError && <p className="text-sm font-semibold text-destructive">{serverError}</p>}

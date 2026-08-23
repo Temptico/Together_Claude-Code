@@ -17,6 +17,26 @@ const QUESTIONS: { text: string; category: string }[] = [
   { text: "Na kaj si v zadnjem tednu najbolj ponosen/ponosna?", category: "vsakdan" },
   { text: "Kaj je bilo tvoje najljubše darilo, ki si ga kdaj prejel/a?", category: "spomini" },
   { text: "Kako si predstavljaš najin popoln vikend?", category: "sanje" },
+  { text: "Kaj bi rad/a, da se drug o drugem naučiva letos?", category: "odnos" },
+  { text: "Katera navada pri meni te najbolj nasmeji?", category: "sreca" },
+  { text: "Kaj je bil najbolj noro doživetje v tvojem življenju?", category: "spomini" },
+  { text: "Kako veš, da te imam rad/a?", category: "custva" },
+  { text: "Kaj bi počel/a, če bi imel/a popolnoma prost dan brez obveznosti?", category: "sanje" },
+  { text: "Katero prigodo iz otroštva bi rad/a, da bolje poznam?", category: "spomini" },
+  { text: "Kaj ti trenutno povzroča največ stresa in kako ti lahko pomagam?", category: "custva" },
+  { text: "Kaj je nekaj, kar bi rad/a poskusil/a, a si še nisi upal/a?", category: "sanje" },
+  { text: "Kaj te je pri meni prepričalo na najinem prvem zmenku?", category: "spomini" },
+  { text: "Kateri je tvoj najljubši način, da ti pokažem ljubezen?", category: "odnos" },
+  { text: "Kaj bi rad/a, da počneva več skupaj?", category: "odnos" },
+  { text: "Kateri majhen trenutek te je ta teden osrečil?", category: "vsakdan" },
+  { text: "Za kaj v najinem odnosu si najbolj hvaležen/hvaležna?", category: "hvaleznost" },
+  { text: "Kaj bi rad/a, da si zapomniva iz letošnjega leta?", category: "spomini" },
+  { text: "Kako se najraje sprostiš po napornem dnevu?", category: "hobiji" },
+  { text: "Kaj je nekaj, kar občuduješ pri meni, pa ti tega morda nikoli nisem povedal/a?", category: "odnos" },
+  { text: "Kje vidiva sebe čez pet let?", category: "sanje" },
+  { text: "Kaj je tvoja najljubša skupna tradicija?", category: "spomini" },
+  { text: "Kako ti lahko olajšam ta teden?", category: "custva" },
+  { text: "Kaj bi si želel/a, da počneva na najinem naslednjem dopustu?", category: "sanje" },
 ];
 
 const CHALLENGES: { text: string; category: string; difficulty: string }[] = [
@@ -30,6 +50,19 @@ const CHALLENGES: { text: string; category: string; difficulty: string }[] = [
   { text: "Naredita fotografiranje drug drugega.", category: "kreativnost", difficulty: "easy" },
   { text: "Skupaj meditirajta 10 minut.", category: "wellness", difficulty: "easy" },
   { text: "Pripravita presenečenje drug za drugega.", category: "presenecenja", difficulty: "hard" },
+  { text: "Napišita drug drugemu 5 stvari, ki jih cenita drug pri drugem.", category: "komunikacija", difficulty: "easy" },
+  { text: "Skupaj sestavita seznam predvajanja s pesmimi, ki vaju spominjajo drug na drugega.", category: "kreativnost", difficulty: "easy" },
+  { text: "En dan brez pritoževanja — poskusita opaziti in izreči samo pozitivne stvari.", category: "komunikacija", difficulty: "medium" },
+  { text: "Skupaj naredita 15 minut vadbe ali raztezanja.", category: "wellness", difficulty: "easy" },
+  { text: "Obudita spomin na prvi zmenek — pojdita na podoben kraj ali ponovita aktivnost.", category: "romantika", difficulty: "medium" },
+  { text: "Vsak napiše 3 stvari, ki bi jih rad/a poskusil/a v prihodnjem letu, in si jih delita.", category: "nacrtovanje", difficulty: "easy" },
+  { text: "Skupaj pospravita in preuredita en prostor v domu.", category: "aktivnost", difficulty: "medium" },
+  { text: "Naredita seznam 10 stvari, za katere sta drug drugemu hvaležna.", category: "komunikacija", difficulty: "easy" },
+  { text: "Preizkusita novo igro ali družabno igro, ki je še nista igrala.", category: "zabava", difficulty: "easy" },
+  { text: "Pošlji/pošljita si sporočilo sredi dneva samo zato, da poveste, da razmišljata drug o drugem.", category: "komunikacija", difficulty: "easy" },
+  { text: "Skupaj naredita nekaj dobrodelnega ali pomagajta nekomu v skupnosti.", category: "presenecenja", difficulty: "hard" },
+  { text: "En večer brez zaslonov — telefone odložita za vsaj dve uri.", category: "narava", difficulty: "medium" },
+  { text: "Preglejta stare fotografije ali videe iz vajine zveze in obudita spomine.", category: "romantika", difficulty: "easy" },
 ];
 
 const DATE_IDEAS: Array<{
@@ -87,15 +120,19 @@ const DATE_IDEAS: Array<{
 
 export async function runSeed() {
   const existingQuestions = await db.select().from(questions);
-  if (existingQuestions.length === 0) {
-    await db.insert(questions).values(QUESTIONS);
-    console.log(`[seed] Inserted ${QUESTIONS.length} questions`);
+  const existingQuestionTexts = new Set(existingQuestions.map((q: { text: string }) => q.text));
+  const missingQuestions = QUESTIONS.filter((q) => !existingQuestionTexts.has(q.text));
+  if (missingQuestions.length > 0) {
+    await db.insert(questions).values(missingQuestions);
+    console.log(`[seed] Inserted ${missingQuestions.length} questions`);
   }
 
   const existingChallenges = await db.select().from(challenges);
-  if (existingChallenges.length === 0) {
-    await db.insert(challenges).values(CHALLENGES);
-    console.log(`[seed] Inserted ${CHALLENGES.length} challenges`);
+  const existingChallengeTexts = new Set(existingChallenges.map((c: { text: string }) => c.text));
+  const missingChallenges = CHALLENGES.filter((c) => !existingChallengeTexts.has(c.text));
+  if (missingChallenges.length > 0) {
+    await db.insert(challenges).values(missingChallenges);
+    console.log(`[seed] Inserted ${missingChallenges.length} challenges`);
   }
 
   const existingIdeas = await db.select().from(dateIdeas);

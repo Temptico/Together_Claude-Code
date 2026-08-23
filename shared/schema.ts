@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   id: varchar("id", { length: 24 }).primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  pin: text("pin"), // bcrypt hash of a 4-6 digit numeric PIN; never sent to clients
   connectCode: varchar("connect_code", { length: 8 }).notNull().unique(),
   partnerId: varchar("partner_id", { length: 24 }),
   anniversaryDate: text("anniversary_date"), // stored as YYYY-MM-DD
@@ -25,10 +26,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const PIN_REGEX = /^\d{4,6}$/;
+
 export const insertUserSchema = createInsertSchema(users, {
   name: z.string().min(1, "Ime je obvezno"),
   email: z.string().email("Neveljaven e-poštni naslov"),
-}).pick({ name: true, email: true });
+})
+  .pick({ name: true, email: true })
+  .extend({ pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk") });
+
+export const loginSchema = z.object({
+  email: z.string().email("Neveljaven e-poštni naslov"),
+  pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk"),
+});
 
 // ---------- Moods ----------
 export const moods = pgTable("moods", {
@@ -121,6 +131,20 @@ export const insertPlannedDateSchema = z.object({
   notes: z.string().optional(),
 });
 
+// ---------- Wishlist ----------
+export const wishlistItems = pgTable("wishlist_items", {
+  id: serial("id").primaryKey(),
+  coupleKey: varchar("couple_key", { length: 49 }).notNull(),
+  createdBy: varchar("created_by", { length: 24 }).notNull(),
+  text: text("text").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWishlistItemSchema = z.object({
+  text: z.string().min(2, "Prekratko").max(200, "Predolgo"),
+});
+
 // ---------- Reactions ----------
 export const reactions = pgTable("reactions", {
   id: serial("id").primaryKey(),
@@ -210,6 +234,7 @@ export type Challenge = typeof challenges.$inferSelect;
 export type ChallengeCompletion = typeof challengeCompletions.$inferSelect;
 export type DateIdea = typeof dateIdeas.$inferSelect;
 export type PlannedDate = typeof plannedDates.$inferSelect;
+export type WishlistItem = typeof wishlistItems.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type Reaction = typeof reactions.$inferSelect;
 export type CustomQuestion = typeof customQuestions.$inferSelect;

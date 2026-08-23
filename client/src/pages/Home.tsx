@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Heart, Flame, Settings, Trophy, MessageCircle, CalendarHeart, ChevronRight, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,17 @@ export default function Home() {
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
+
+  // Viewing Home counts as having seen the partner's latest mood — clears
+  // the BottomNav badge for it. BottomNav doesn't share React state with
+  // this component, so a custom event nudges it to re-check localStorage
+  // right away instead of waiting for its next query refetch.
+  useEffect(() => {
+    if (data?.partnerMood) {
+      localStorage.setItem("together:lastSeenPartnerMoodId", String(data.partnerMood.id));
+      window.dispatchEvent(new Event("together:partnerMoodSeen"));
+    }
+  }, [data?.partnerMood?.id]);
 
   if (isLoading || !data) {
     return (

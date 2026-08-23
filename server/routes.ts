@@ -6,11 +6,13 @@ import { fetchNearbyPlaces } from "./places.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
   insertUserSchema,
+  loginSchema,
   insertMoodSchema,
   insertAnswerSchema,
   insertPlannedDateSchema,
   insertCustomQuestionSchema,
   insertCustomChallengeSchema,
+  insertWishlistItemSchema,
   REACTION_EMOJIS,
 } from "../shared/schema.js";
 
@@ -54,16 +56,16 @@ export function registerRoutes(app: Express) {
         res.status(409).json({ error: "Ta e-poštni naslov je že v uporabi. Prosimo, prijavi se." });
         return;
       }
-      const user = await storage.createUser(parsed.data.name, parsed.data.email);
-      res.status(201).json(user);
+      const pinHash = await storage.hashPin(parsed.data.pin);
+      const user = await storage.createUser(parsed.data.name, parsed.data.email, pinHash);
+      res.status(201).json(storage.omitPin(user));
     })
   );
 
   app.post(
     "/api/auth/login",
     ah(async (req, res) => {
-      const schema = z.object({ email: z.string().email("Neveljaven e-poštni naslov") });
-      const parsed = schema.safeParse(req.body);
+      const parsed = loginSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
         return;
@@ -73,7 +75,23 @@ export function registerRoutes(app: Express) {
         res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo. Ustvari nov račun." });
         return;
       }
-      res.json(user);
+
+      if (!user.pin) {
+        // Legacy account created before PINs existed: the first PIN entered
+        // on login claims the account going forward, rather than locking
+        // anyone out.
+        const pinHash = await storage.hashPin(parsed.data.pin);
+        const updated = await storage.updateUser(user.id, { pin: pinHash });
+        res.json(storage.omitPin(updated));
+        return;
+      }
+
+      const valid = await storage.verifyPin(parsed.data.pin, user.pin);
+      if (!valid) {
+        res.status(401).json({ error: "Napačen PIN" });
+        return;
+      }
+      res.json(storage.omitPin(user));
     })
   );
 
@@ -85,7 +103,7 @@ export function registerRoutes(app: Express) {
         res.status(404).json({ error: "Uporabnik ne obstaja" });
         return;
       }
-      res.json(user);
+      res.json(storage.omitPin(user));
     })
   );
 
@@ -104,7 +122,7 @@ export function registerRoutes(app: Express) {
         res.status(400).json({ error: result.error });
         return;
       }
-      res.json(result.partner);
+      res.json(storage.omitPin(result.partner));
     })
   );
 
@@ -152,8 +170,8 @@ export function registerRoutes(app: Express) {
       const anniversaryCountdown = user.anniversaryDate ? computeAnniversaryCountdown(user.anniversaryDate) : null;
 
       res.json({
-        user,
-        partner: partner || null,
+        user: storage.omitPin(user),
+        partner: partner ? storage.omitPin(partner) : null,
         streak,
         myMood: myMood ? { ...myMood, reactions: moodReactions.get(myMood.id) || [] } : null,
         partnerMood: partnerMood ? { ...partnerMood, reactions: moodReactions.get(partnerMood.id) || [] } : null,
@@ -465,9 +483,13 @@ export function registerRoutes(app: Express) {
       if (!user) return;
       const stats = await storage.getStats(user.id);
       const ids = user.partnerId ? [user.id, user.partnerId] : [user.id];
-      const timeline = await storage.getTimeline(ids, 20);
+      const [timeline, onThisDay] = await Promise.all([
+        storage.getTimeline(ids, 20),
+        storage.getOnThisDayMemories(ids),
+      ]);
+      const all = [...timeline, ...onThisDay];
 
-      // enrich timeline entries with question/challenge text where relevant
+      // enrich entries with question/challenge text where relevant
       const [questions, challenges, customQs, customChs] = await Promise.all([
         storage.getAllQuestions(),
         storage.getActiveChallenges(),
@@ -478,19 +500,19 @@ export function registerRoutes(app: Express) {
       const reactionsByType = {
         mood: await storage.getReactionsForTargets(
           "mood",
-          timeline.filter((e) => e.type === "mood").map((e) => e.detail.id)
+          all.filter((e) => e.type === "mood").map((e) => e.detail.id)
         ),
         answer: await storage.getReactionsForTargets(
           "answer",
-          timeline.filter((e) => e.type === "answer").map((e) => e.detail.id)
+          all.filter((e) => e.type === "answer").map((e) => e.detail.id)
         ),
         challenge: await storage.getReactionsForTargets(
           "challenge",
-          timeline.filter((e) => e.type === "challenge").map((e) => e.detail.id)
+          all.filter((e) => e.type === "challenge").map((e) => e.detail.id)
         ),
       };
 
-      const enriched = timeline.map((entry) => {
+      const enrich = (entry: (typeof all)[number]) => {
         const reactionList = reactionsByType[entry.type].get(entry.detail.id) || [];
         if (entry.type === "answer") {
           const isCustom = entry.detail.source === "custom";
@@ -507,9 +529,9 @@ export function registerRoutes(app: Express) {
           return { ...entry, challengeText: c?.text, reactions: reactionList };
         }
         return { ...entry, reactions: reactionList };
-      });
+      };
 
-      res.json({ stats, timeline: enriched });
+      res.json({ stats, timeline: timeline.map(enrich), onThisDay: onThisDay.map(enrich) });
     })
   );
 
@@ -534,6 +556,8 @@ export function registerRoutes(app: Express) {
         notificationsEnabled: z.boolean().optional(),
         reminderTime: z.string().optional(),
         language: z.enum(["sl", "en", "hr"]).optional(),
+        pin: z.string().regex(/^\d{4,6}$/, "PIN mora imeti 4-6 številk").optional(),
+        currentPin: z.string().optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -549,8 +573,21 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const updated = await storage.updateUser(user.id, parsed.data as any);
-      res.json(updated);
+      const { currentPin, pin, ...rest } = parsed.data;
+      const patch: any = { ...rest };
+
+      if (pin) {
+        if (user.pin) {
+          if (!currentPin || !(await storage.verifyPin(currentPin, user.pin))) {
+            res.status(401).json({ error: "Napačen trenutni PIN" });
+            return;
+          }
+        }
+        patch.pin = await storage.hashPin(pin);
+      }
+
+      const updated = await storage.updateUser(user.id, patch);
+      res.json(storage.omitPin(updated));
     })
   );
 
@@ -709,6 +746,64 @@ export function registerRoutes(app: Express) {
       const user = await requireUser(req, res, userId);
       if (!user) return;
       await storage.deleteCustomChallenge(Number(req.params.id), user);
+      res.status(204).end();
+    })
+  );
+
+  // ---------------- Wishlist ----------------
+  app.get(
+    "/api/wishlist/:userId",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      const items = await storage.getWishlist(user);
+      res.json(items);
+    })
+  );
+
+  app.post(
+    "/api/wishlist",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string() }).and(insertWishlistItemSchema);
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const item = await storage.createWishlistItem(user, parsed.data.text);
+      res.status(201).json(item);
+    })
+  );
+
+  app.patch(
+    "/api/wishlist/:id",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string(), completed: z.boolean() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const item = await storage.updateWishlistItem(Number(req.params.id), user, parsed.data.completed);
+      if (!item) {
+        res.status(404).json({ error: "Ni najdeno" });
+        return;
+      }
+      res.json(item);
+    })
+  );
+
+  app.delete(
+    "/api/wishlist/:id",
+    ah(async (req, res) => {
+      const userId = req.query.userId as string;
+      const user = await requireUser(req, res, userId);
+      if (!user) return;
+      await storage.deleteWishlistItem(Number(req.params.id), user);
       res.status(204).end();
     })
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Check, MapPin, ChevronLeft, ChevronRight, Sparkles, Dices } from "lucide-react";
+import { Trash2, Check, MapPin, ChevronLeft, ChevronRight, Sparkles, Dices, Plus, Heart } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
 import { DatePhotoField } from "@/components/DatePhotoField";
@@ -31,11 +32,12 @@ export default function Dates() {
     <div className="flex flex-col gap-4 px-4 pt-4">
       <h1 className="text-xl font-extrabold">{t("dates.title")}</h1>
       <Tabs defaultValue="catalog">
-        <TabsList>
-          <TabsTrigger value="catalog">{t("dates.catalog")}</TabsTrigger>
-          <TabsTrigger value="nearby">{t("dates.nearby")}</TabsTrigger>
-          <TabsTrigger value="planned">{t("dates.planned")}</TabsTrigger>
-          <TabsTrigger value="calendar">{t("dates.calendar")}</TabsTrigger>
+        <TabsList className="flex-nowrap justify-start overflow-x-auto">
+          <TabsTrigger value="catalog" className="flex-none">{t("dates.catalog")}</TabsTrigger>
+          <TabsTrigger value="nearby" className="flex-none">{t("dates.nearby")}</TabsTrigger>
+          <TabsTrigger value="planned" className="flex-none">{t("dates.planned")}</TabsTrigger>
+          <TabsTrigger value="calendar" className="flex-none">{t("dates.calendar")}</TabsTrigger>
+          <TabsTrigger value="wishlist" className="flex-none">{t("dates.wishlist")}</TabsTrigger>
         </TabsList>
         <TabsContent value="catalog" className="mt-4">
           <CatalogTab />
@@ -48,6 +50,9 @@ export default function Dates() {
         </TabsContent>
         <TabsContent value="calendar" className="mt-4">
           <CalendarTab />
+        </TabsContent>
+        <TabsContent value="wishlist" className="mt-4">
+          <WishlistTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -484,6 +489,105 @@ function CalendarTab() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function WishlistTab() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [text, setText] = useState("");
+
+  const queryKey = ["/api/wishlist", user!.id];
+  const { data: items = [], isLoading } = useQuery<any[]>({ queryKey });
+
+  const addMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/wishlist", { userId: user!.id, text }),
+    onSuccess: () => {
+      setText("");
+      qc.invalidateQueries({ queryKey });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, completed }: { id: number; completed: boolean }) =>
+      apiRequest("PATCH", `/api/wishlist/${id}`, { userId: user!.id, completed }),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/wishlist/${id}?userId=${user!.id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  });
+
+  const pending = items.filter((i) => !i.completed);
+  const completed = items.filter((i) => i.completed);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t("dates.wishlistPlaceholder")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && text.trim()) addMutation.mutate();
+          }}
+        />
+        <Button size="icon" disabled={!text.trim() || addMutation.isPending} onClick={() => addMutation.mutate()}>
+          <Plus className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+          <Heart className="h-8 w-8" />
+          <p className="text-sm">{t("dates.wishlistEmpty")}</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {pending.map((item) => (
+            <Card key={item.id}>
+              <CardContent className="flex items-center gap-3 py-3">
+                <button
+                  onClick={() => toggleMutation.mutate({ id: item.id, completed: true })}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-primary/40"
+                  aria-label={t("dates.markComplete")}
+                />
+                <p className="flex-1 text-sm">{item.text}</p>
+                <button onClick={() => deleteMutation.mutate(item.id)} className="text-muted-foreground hover:text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </CardContent>
+            </Card>
+          ))}
+          {completed.length > 0 && (
+            <>
+              <p className="mt-2 text-xs font-bold text-muted-foreground">{t("dates.completed")}</p>
+              {completed.map((item) => (
+                <Card key={item.id} className="opacity-60">
+                  <CardContent className="flex items-center gap-3 py-3">
+                    <button
+                      onClick={() => toggleMutation.mutate({ id: item.id, completed: false })}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                      aria-label={t("dates.markComplete")}
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <p className="flex-1 text-sm line-through">{item.text}</p>
+                    <button onClick={() => deleteMutation.mutate(item.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

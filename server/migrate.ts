@@ -9,6 +9,7 @@ const STATEMENTS = [
       id varchar(24) PRIMARY KEY,
       name text NOT NULL,
       email text NOT NULL UNIQUE,
+      pin text,
       connect_code varchar(8) NOT NULL UNIQUE,
       partner_id varchar(24),
       anniversary_date text,
@@ -131,6 +132,14 @@ const STATEMENTS = [
       type varchar(24) NOT NULL,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+  `CREATE TABLE IF NOT EXISTS wishlist_items (
+      id serial PRIMARY KEY,
+      couple_key varchar(49) NOT NULL,
+      created_by varchar(24) NOT NULL,
+      text text NOT NULL,
+      completed boolean NOT NULL DEFAULT false,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS reactions_target_user_idx ON reactions (target_type, target_id, user_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS daily_assignment_idx ON daily_assignments (couple_key, date, type)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS reminder_log_idx ON reminder_log (user_id, date, type)`,
@@ -140,6 +149,7 @@ const STATEMENTS = [
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS external_id text`,
   `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_external_id_idx ON date_ideas (external_id)`,
   `ALTER TABLE planned_dates ADD COLUMN IF NOT EXISTS photo text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS pin text`,
 ];
 
 export async function runMigrations() {

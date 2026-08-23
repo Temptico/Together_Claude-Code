@@ -15,12 +15,28 @@ import {
   customChallenges,
   dailyAssignments,
   reminderLog,
+  wishlistItems,
   type User,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
+import bcrypt from "bcryptjs";
 
 const idGen = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 20);
 const codeGen = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8);
+
+export function hashPin(pin: string): Promise<string> {
+  return bcrypt.hash(pin, 10);
+}
+
+export function verifyPin(pin: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(pin, hash);
+}
+
+// Strips the PIN hash before a user row is ever sent to a client.
+export function omitPin<T extends { pin?: string | null }>(user: T): Omit<T, "pin"> {
+  const { pin, ...rest } = user;
+  return rest;
+}
 
 export function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -41,13 +57,13 @@ export function coupleKeyFor(user: User): string {
 }
 
 // ---------------- Users ----------------
-export async function createUser(name: string, email: string): Promise<User> {
+export async function createUser(name: string, email: string, pinHash: string): Promise<User> {
   let connectCode = codeGen();
   // extremely unlikely collision, but guard anyway
   while (await getUserByConnectCode(connectCode)) connectCode = codeGen();
   const [user] = await db
     .insert(users)
-    .values({ id: idGen(), name, email, connectCode })
+    .values({ id: idGen(), name, email, pin: pinHash, connectCode })
     .returning();
   return user;
 }
@@ -88,6 +104,7 @@ export async function deleteUserAccount(user: User): Promise<void> {
   await db.delete(plannedDates).where(eq(plannedDates.userId, user.id));
   await db.delete(customQuestions).where(eq(customQuestions.createdBy, user.id));
   await db.delete(customChallenges).where(eq(customChallenges.createdBy, user.id));
+  await db.delete(wishlistItems).where(eq(wishlistItems.createdBy, user.id));
   await db.delete(reactions).where(eq(reactions.userId, user.id));
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
   await db.delete(reminderLog).where(eq(reminderLog.userId, user.id));
@@ -488,6 +505,27 @@ export async function getTimeline(userIds: string[], limit = 20): Promise<Timeli
   return entries.slice(0, limit);
 }
 
+export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineEntry[]> {
+  const now = new Date();
+  const targetDate = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const entries: TimelineEntry[] = [];
+  for (const userId of userIds) {
+    const [m, a, c] = await Promise.all([
+      db.select().from(moods).where(and(eq(moods.userId, userId), eq(moods.date, targetDate))),
+      db.select().from(questionAnswers).where(and(eq(questionAnswers.userId, userId), eq(questionAnswers.date, targetDate))),
+      db
+        .select()
+        .from(challengeCompletions)
+        .where(and(eq(challengeCompletions.userId, userId), eq(challengeCompletions.date, targetDate))),
+    ]);
+    for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
+    for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
+    for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+  }
+  return entries;
+}
+
 export async function calculateStreak(userId: string): Promise<number> {
   const [m, a, c] = await Promise.all([
     getRecentMoods(userId, 60),
@@ -576,6 +614,36 @@ export async function deleteCustomChallenge(id: number, user: User) {
   await db
     .delete(customChallenges)
     .where(and(eq(customChallenges.id, id), eq(customChallenges.coupleKey, coupleKeyFor(user))));
+}
+
+// ---------------- Wishlist ----------------
+export async function getWishlist(user: User) {
+  return db
+    .select()
+    .from(wishlistItems)
+    .where(eq(wishlistItems.coupleKey, coupleKeyFor(user)))
+    .orderBy(desc(wishlistItems.createdAt));
+}
+
+export async function createWishlistItem(user: User, text: string) {
+  const [row] = await db
+    .insert(wishlistItems)
+    .values({ coupleKey: coupleKeyFor(user), createdBy: user.id, text })
+    .returning();
+  return row;
+}
+
+export async function updateWishlistItem(id: number, user: User, completed: boolean) {
+  const [row] = await db
+    .update(wishlistItems)
+    .set({ completed })
+    .where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))))
+    .returning();
+  return row;
+}
+
+export async function deleteWishlistItem(id: number, user: User) {
+  await db.delete(wishlistItems).where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))));
 }
 
 // ---------------- Reactions ----------------
@@ -674,4 +742,39 @@ export async function wasReminderSent(userId: string, date: string, type: string
 
 export async function markReminderSent(userId: string, date: string, type: string) {
   await db.insert(reminderLog).values({ userId, date, type }).onConflictDoNothing();
+}
+
+// ---------------- Admin ----------------
+export async function getAdminStats() {
+  const allUsers = await db.select().from(users);
+  const today = todayStr();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const totalUsers = allUsers.length;
+  const connectedUsers = allUsers.filter((u: User) => u.partnerId).length;
+  const connectedCouples = Math.round(connectedUsers / 2);
+  const newThisWeek = allUsers.filter((u: User) => u.createdAt >= weekAgo).length;
+
+  const activeTodaySet = new Set<string>();
+  const [todayMoods, todayAnswers, todayCompletions] = await Promise.all([
+    db.select().from(moods).where(eq(moods.date, today)),
+    db.select().from(questionAnswers).where(eq(questionAnswers.date, today)),
+    db.select().from(challengeCompletions).where(eq(challengeCompletions.date, today)),
+  ]);
+  for (const m of todayMoods) activeTodaySet.add(m.userId);
+  for (const a of todayAnswers) activeTodaySet.add(a.userId);
+  for (const c of todayCompletions) activeTodaySet.add(c.userId);
+
+  const recentUsers = [...allUsers]
+    .sort((a: User, b: User) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 15)
+    .map((u: User) => ({ name: u.name, email: u.email, connected: !!u.partnerId, createdAt: u.createdAt }));
+
+  return {
+    totalUsers,
+    connectedCouples,
+    newThisWeek,
+    activeToday: activeTodaySet.size,
+    recentUsers,
+  };
 }

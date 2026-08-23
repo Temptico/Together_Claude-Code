@@ -5,11 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ReactionBar } from "@/components/ReactionBar";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { MOOD_LEVELS } from "@shared/schema";
 
 type MemoriesData = {
   stats: { moodCount: number; answeredCount: number; completedCount: number; avgMood: number };
   timeline: any[];
+  onThisDay: any[];
 };
 
 export default function Memories() {
@@ -32,6 +34,15 @@ export default function Memories() {
             <StatCard icon={Trophy} value={data.stats.completedCount} label={t("memories.challengesCompleted")} />
             <StatCard icon={Heart} value={data.stats.avgMood || "–"} label={t("memories.avgMood")} />
           </div>
+
+          {data.onThisDay.length > 0 && (
+            <div className="flex flex-col gap-3 rounded-3xl bg-together-warm p-4 text-white">
+              <h2 className="flex items-center gap-2 font-extrabold">🕰️ {t("memories.onThisDay")}</h2>
+              {data.onThisDay.map((entry, i) => (
+                <TimelineEntryCard key={i} entry={entry} isMe={entry.userId === user!.id} viewerId={user!.id} light />
+              ))}
+            </div>
+          )}
 
           <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.recentMemories")}</h2>
 
@@ -68,7 +79,17 @@ function StatCard({ icon: Icon, value, label }: { icon: any; value: number | str
   );
 }
 
-function TimelineEntryCard({ entry, isMe, viewerId }: { entry: any; isMe: boolean; viewerId: string }) {
+function TimelineEntryCard({
+  entry,
+  isMe,
+  viewerId,
+  light,
+}: {
+  entry: any;
+  isMe: boolean;
+  viewerId: string;
+  light?: boolean;
+}) {
   const dateLabel = new Date(entry.date).toLocaleDateString("sl-SI", { day: "numeric", month: "long" });
   const who = isMe ? "Ti" : "Partner";
 
@@ -84,17 +105,17 @@ function TimelineEntryCard({ entry, isMe, viewerId }: { entry: any; isMe: boolea
       </p>
     );
   } else if (entry.type === "answer") {
-    icon = <MessageCircle className="h-5 w-5 text-primary" />;
+    icon = <MessageCircle className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
       <div>
         <p className="text-sm">
           <strong>{who}</strong> je odgovoril/a na vprašanje{entry.questionText ? `: „${entry.questionText}“` : ""}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">{entry.detail.answer}</p>
+        <p className={cn("mt-1 text-sm", light ? "text-white/85" : "text-muted-foreground")}>{entry.detail.answer}</p>
       </div>
     );
   } else if (entry.type === "challenge") {
-    icon = <Trophy className="h-5 w-5 text-primary" />;
+    icon = <Trophy className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
       <p className="text-sm">
         <strong>{who}</strong> je opravil/a izziv{entry.challengeText ? `: ${entry.challengeText}` : ""}
@@ -103,12 +124,12 @@ function TimelineEntryCard({ entry, isMe, viewerId }: { entry: any; isMe: boolea
   }
 
   return (
-    <Card>
+    <Card className={light ? "border-white/20 bg-white/15" : undefined}>
       <CardContent className="flex items-start gap-3 py-3">
         <div className="mt-0.5">{icon}</div>
-        <div className="flex-1">
+        <div className={cn("flex-1", light && "text-white")}>
           {content}
-          <p className="mt-1 text-xs text-muted-foreground">{dateLabel}</p>
+          <p className={cn("mt-1 text-xs", light ? "text-white/75" : "text-muted-foreground")}>{dateLabel}</p>
           <div className="mt-2">
             <ReactionBar
               targetType={entry.type}
