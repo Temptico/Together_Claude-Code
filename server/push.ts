@@ -25,10 +25,14 @@ export function getVapidPublicKey(): string {
   return (globalThis as any).__VAPID_PUBLIC_KEY__;
 }
 
-export async function notifyUser(userId: string, payload: { title: string; body: string; tag?: string }) {
+export async function notifyUser(
+  userId: string,
+  buildPayload: (recipientLanguage: string) => { title: string; body: string; tag?: string }
+) {
   ensureConfigured();
   const user = await getUserById(userId);
   if (!user?.notificationsEnabled) return;
+  const payload = buildPayload(user.language);
   const subs = await getPushSubscriptionsForUser(userId);
   await Promise.all(
     subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>

@@ -5,6 +5,13 @@ import { getVapidPublicKey, notifyUser } from "./push.js";
 import { fetchNearbyPlaces } from "./places.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
+  moodNotification,
+  answerNotification,
+  challengeNotification,
+  reactionNotification,
+  planDateNotification,
+} from "./notificationText.js";
+import {
   insertUserSchema,
   loginSchema,
   insertMoodSchema,
@@ -210,18 +217,11 @@ export function registerRoutes(app: Express) {
       const mood = await storage.createMood(user.id, parsed.data.level, parsed.data.note ?? undefined, date);
 
       if (user.partnerId) {
-        const moodLabels: Record<number, string> = {
-          1: "zelo slabo",
-          2: "žalostno",
-          3: "v redu",
-          4: "dobro",
-          5: "odlično",
-        };
-        notifyUser(user.partnerId, {
+        notifyUser(user.partnerId, (lang) => ({
           title: "Together",
-          body: `Tvoj partner se danes počuti ${moodLabels[parsed.data.level] || ""}! 🌟`,
+          body: moodNotification(lang, parsed.data.level),
           tag: "mood",
-        }).catch(() => {});
+        })).catch(() => {});
       }
       res.status(201).json(mood);
     })
@@ -256,11 +256,11 @@ export function registerRoutes(app: Express) {
       );
 
       if (user.partnerId) {
-        notifyUser(user.partnerId, {
+        notifyUser(user.partnerId, (lang) => ({
           title: "Together",
-          body: "Partner je odgovoril na današnje vprašanje. Preveri odgovor.",
+          body: answerNotification(lang),
           tag: "question",
-        }).catch(() => {});
+        })).catch(() => {});
       }
       res.status(201).json(answer);
     })
@@ -316,11 +316,11 @@ export function registerRoutes(app: Express) {
       }
 
       if (user.partnerId) {
-        notifyUser(user.partnerId, {
+        notifyUser(user.partnerId, (lang) => ({
           title: "Together",
-          body: "Partner je dokončal današnji izziv! 🏆",
+          body: challengeNotification(lang),
           tag: "challenge",
-        }).catch(() => {});
+        })).catch(() => {});
       }
       res.status(200).json(completion);
     })
@@ -441,6 +441,15 @@ export function registerRoutes(app: Express) {
       }
 
       const row = await storage.createPlannedDate(user.id, parsed.data.ideaId, scheduledAt, parsed.data.notes);
+
+      if (user.partnerId) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: planDateNotification(lang, idea.title),
+          tag: "plan-date",
+        })).catch(() => {});
+      }
+
       res.status(201).json({ ...row, idea });
     })
   );
@@ -695,11 +704,11 @@ export function registerRoutes(app: Express) {
       if (result) {
         const owner = await storage.getTargetOwner(parsed.data.targetType, parsed.data.targetId);
         if (owner && owner !== user.id) {
-          notifyUser(owner, {
+          notifyUser(owner, (lang) => ({
             title: "Together",
-            body: `Partner se je odzval/a z ${parsed.data.emoji}`,
+            body: reactionNotification(lang, parsed.data.emoji),
             tag: "reaction",
-          }).catch(() => {});
+          })).catch(() => {});
         }
       }
 

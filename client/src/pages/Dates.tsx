@@ -28,9 +28,11 @@ import {
   LOCATION_TYPE_IDS,
 } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
+import { translations } from "@/i18n/translations";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { bcp47 } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
 const CATEGORIES = DATE_CATEGORY_IDS;
@@ -303,7 +305,7 @@ function NearbyTab() {
 }
 
 function PlannedTab() {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -342,7 +344,7 @@ function PlannedTab() {
           <div>
             <p className="font-extrabold">{d.idea?.title}</p>
             <p className="text-xs text-muted-foreground">
-              {new Date(d.scheduledAt).toLocaleString("sl-SI", {
+              {new Date(d.scheduledAt).toLocaleString(bcp47(lang), {
                 day: "numeric",
                 month: "long",
                 hour: "2-digit",
@@ -390,8 +392,6 @@ function PlannedTab() {
   );
 }
 
-const WEEKDAY_LABELS_SL = ["Pon", "Tor", "Sre", "Čet", "Pet", "Sob", "Ned"];
-
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -425,10 +425,11 @@ function CalendarTab() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const todayKey = dateKey(new Date());
-  const monthLabel = viewDate.toLocaleDateString(lang === "sl" ? "sl-SI" : "en-US", {
+  const monthLabel = viewDate.toLocaleDateString(bcp47(lang), {
     month: "long",
     year: "numeric",
   });
+  const weekdayLabels = translations[lang].dates.weekdays;
 
   const selectedItems = selectedDate ? byDay.get(selectedDate) || [] : [];
 
@@ -451,7 +452,7 @@ function CalendarTab() {
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground">
-        {WEEKDAY_LABELS_SL.map((w) => (
+        {weekdayLabels.map((w) => (
           <div key={w}>{w}</div>
         ))}
       </div>
@@ -492,7 +493,7 @@ function CalendarTab() {
                 <div>
                   <p className="text-sm font-bold">{d.idea?.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(d.scheduledAt).toLocaleTimeString("sl-SI", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(d.scheduledAt).toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
                 {d.completed ? (

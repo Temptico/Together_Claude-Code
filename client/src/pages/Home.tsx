@@ -11,6 +11,8 @@ import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { bcp47 } from "@/lib/locale";
+import { categoryLabel } from "@/lib/dateIdeaFormat";
 import { MOOD_LEVELS } from "@shared/schema";
 
 type HomeData = {
@@ -147,16 +149,8 @@ function ConnectBanner() {
 }
 
 function PartnerMoodCard({ mood, userId }: { mood: any; userId: string }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const level = mood ? MOOD_LEVELS.find((m) => m.level === mood.level) : null;
-
-  const messages: Record<number, string> = {
-    1: "Partner ima težek dan in bi potreboval/a nekaj podpore.",
-    2: "Partner bi potreboval/a malo spodbude.",
-    3: "Partner se počuti v redu.",
-    4: "Partner je dobre volje.",
-    5: "Partner se počuti odlično!",
-  };
 
   return (
     <Card>
@@ -169,9 +163,9 @@ function PartnerMoodCard({ mood, userId }: { mood: any; userId: string }) {
             <div className="flex items-center gap-3">
               <div className="text-4xl">{level.emoji}</div>
               <div>
-                <p className="text-sm font-semibold">{messages[level.level]}</p>
+                <p className="text-sm font-semibold">{t("home.partnerMoodMessage" + level.level)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(mood.createdAt).toLocaleTimeString("sl-SI", { hour: "2-digit", minute: "2-digit" })}
+                  {new Date(mood.createdAt).toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
             </div>
@@ -222,7 +216,7 @@ function MoodCheckIn({ myMood, userId }: { myMood: any; userId: string }) {
                 disabled={mutation.isPending}
                 onClick={() => mutation.mutate(m.level)}
                 className="flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-3xl transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
-                aria-label={m.label}
+                aria-label={t("mood.level" + m.level)}
               >
                 {m.emoji}
               </button>
@@ -339,7 +333,7 @@ function DailyChallengeCard({
 }
 
 function UpcomingDatesCard({ dates }: { dates: any[] }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-2 space-y-0">
@@ -356,10 +350,10 @@ function UpcomingDatesCard({ dates }: { dates: any[] }) {
                 <div>
                   <p className="text-sm font-bold">{d.idea?.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(d.scheduledAt).toLocaleDateString("sl-SI", { day: "numeric", month: "long" })}
+                    {new Date(d.scheduledAt).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" })}
                   </p>
                 </div>
-                <Badge>{d.idea?.category}</Badge>
+                <Badge>{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
               </div>
             ))}
           </div>

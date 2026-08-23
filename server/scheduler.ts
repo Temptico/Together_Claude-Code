@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { notifyUser } from "./push.js";
+import { dailyReminderNotification, anniversaryNotification, streakFreezeNotification } from "./notificationText.js";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -23,11 +24,11 @@ async function tick() {
         if (!alreadySent) {
           const activeToday = await storage.hasActivityToday(user.id, date);
           if (!activeToday) {
-            await notifyUser(user.id, {
+            await notifyUser(user.id, (lang) => ({
               title: "Together",
-              body: "Ne pozabi na današnje razpoloženje, vprašanje ali izziv! 💗",
+              body: dailyReminderNotification(lang),
               tag: "daily-reminder",
-            });
+            }));
           }
           await storage.markReminderSent(user.id, date, "daily");
         }
@@ -40,11 +41,11 @@ async function tick() {
           const anniv = new Date(user.anniversaryDate);
           if (anniv.getMonth() === now.getMonth() && anniv.getDate() === now.getDate()) {
             const years = now.getFullYear() - anniv.getFullYear();
-            await notifyUser(user.id, {
+            await notifyUser(user.id, (lang) => ({
               title: "Together",
-              body: years > 0 ? `Danes je vajina ${years}. obletnica! 💕` : "Danes je vajina obletnica! 💕",
+              body: anniversaryNotification(lang, years),
               tag: "anniversary",
-            });
+            }));
           }
           await storage.markReminderSent(user.id, date, "anniversary");
         }
@@ -58,11 +59,11 @@ async function tick() {
           if (!activeToday) {
             const streak = await storage.calculateStreak(user.id);
             if (streak > 0) {
-              await notifyUser(user.id, {
+              await notifyUser(user.id, (lang) => ({
                 title: "Together",
-                body: `🔥 Tvoj niz ${streak} dni bo prekinjen, če danes ne opravita vsaj ene aktivnosti!`,
+                body: streakFreezeNotification(lang, streak),
                 tag: "streak-freeze",
-              });
+              }));
             }
           }
           await storage.markReminderSent(user.id, date, "streak_freeze");

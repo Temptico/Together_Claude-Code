@@ -6,6 +6,7 @@ import { ReactionBar } from "@/components/ReactionBar";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { bcp47 } from "@/lib/locale";
 import { MOOD_LEVELS } from "@shared/schema";
 
 type MemoriesData = {
@@ -90,8 +91,9 @@ function TimelineEntryCard({
   viewerId: string;
   light?: boolean;
 }) {
-  const dateLabel = new Date(entry.date).toLocaleDateString("sl-SI", { day: "numeric", month: "long" });
-  const who = isMe ? "Ti" : "Partner";
+  const { t, lang } = useTranslation();
+  const dateLabel = new Date(entry.date).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" });
+  const who = isMe ? t("memories.you") : t("memories.partner");
 
   let icon = <Smile className="h-5 w-5 text-primary" />;
   let content: ReactNode = null;
@@ -101,7 +103,7 @@ function TimelineEntryCard({
     icon = <span className="text-xl">{level?.emoji}</span>;
     content = (
       <p className="text-sm">
-        <strong>{who}</strong> je delil/a razpoloženje: {level?.label}
+        <strong>{who}</strong> {t("memories.sharedMood")}: {level ? t("mood.level" + level.level) : ""}
       </p>
     );
   } else if (entry.type === "answer") {
@@ -109,7 +111,8 @@ function TimelineEntryCard({
     content = (
       <div>
         <p className="text-sm">
-          <strong>{who}</strong> je odgovoril/a na vprašanje{entry.questionText ? `: „${entry.questionText}“` : ""}
+          <strong>{who}</strong> {t("memories.answeredQuestion")}
+          {entry.questionText ? `: „${entry.questionText}“` : ""}
         </p>
         <p className={cn("mt-1 text-sm", light ? "text-white/85" : "text-muted-foreground")}>{entry.detail.answer}</p>
       </div>
@@ -118,7 +121,8 @@ function TimelineEntryCard({
     icon = <Trophy className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
       <p className="text-sm">
-        <strong>{who}</strong> je opravil/a izziv{entry.challengeText ? `: ${entry.challengeText}` : ""}
+        <strong>{who}</strong> {t("memories.completedChallenge")}
+        {entry.challengeText ? `: ${entry.challengeText}` : ""}
       </p>
     );
   }

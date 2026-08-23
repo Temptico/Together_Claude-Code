@@ -26,6 +26,7 @@ import { DeleteAccountDialog } from "@/components/DeleteAccountDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { bcp47 } from "@/lib/locale";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
@@ -91,7 +92,7 @@ export default function Profile() {
   };
 
   const anniversaryDisplay = user!.anniversaryDate
-    ? new Date(user!.anniversaryDate).toLocaleDateString("sl-SI", { day: "numeric", month: "long", year: "numeric" })
+    ? new Date(user!.anniversaryDate).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long", year: "numeric" })
     : null;
 
   return (
