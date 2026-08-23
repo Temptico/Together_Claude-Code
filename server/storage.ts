@@ -88,6 +88,13 @@ export async function updateUser(id: string, patch: Partial<User>): Promise<User
   return user;
 }
 
+// Clears a user's PIN so they can claim a new one on their next login —
+// the only recovery path since there's no email-based reset flow.
+export async function resetPinByEmail(email: string): Promise<User | undefined> {
+  const [user] = await db.update(users).set({ pin: null }).where(eq(users.email, email)).returning();
+  return user;
+}
+
 export async function deleteUserAccount(user: User): Promise<void> {
   // Right-to-erasure account deletion: removes every row that references
   // this user, unlinks them from their partner, and finally the account
