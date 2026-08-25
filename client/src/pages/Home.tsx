@@ -27,7 +27,6 @@ type HomeData = {
   challengeAccepted: boolean;
   challengeCompleted: boolean;
   upcomingDates: any[];
-  anniversaryCountdown: { daysUntil: number; isToday: boolean; years: number } | null;
 };
 
 export default function Home() {
@@ -63,7 +62,6 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
       <HomeHeader data={data} />
-      {data.anniversaryCountdown && <AnniversaryCountdownCard countdown={data.anniversaryCountdown} />}
       {!data.partner && <ConnectBanner />}
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
@@ -101,33 +99,6 @@ function HomeHeader({ data }: { data: HomeData }) {
         </Link>
       </div>
     </div>
-  );
-}
-
-function AnniversaryCountdownCard({
-  countdown,
-}: {
-  countdown: { daysUntil: number; isToday: boolean; years: number };
-}) {
-  const { t } = useTranslation();
-  return (
-    <Card className="bg-together-gradient text-white">
-      <CardContent className="flex items-center gap-3 py-4">
-        <div className="text-3xl">💍</div>
-        {countdown.isToday ? (
-          <p className="font-extrabold">{t("home.anniversaryToday")}</p>
-        ) : (
-          <div>
-            <p className="text-2xl font-extrabold leading-none">
-              {countdown.daysUntil} {t("home.days")}
-            </p>
-            <p className="text-xs font-semibold text-white/90">
-              {t("home.anniversaryIn")} · {countdown.years} {t("home.anniversaryYears")}
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

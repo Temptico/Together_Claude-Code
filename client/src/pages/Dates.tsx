@@ -229,7 +229,7 @@ function NearbyTab() {
   const [locError, setLocError] = useState<string | null>(null);
   const [planIdea, setPlanIdea] = useState<any>(null);
 
-  const { data: results = [], isFetching, refetch } = useQuery({
+  const { data, isFetching, refetch } = useQuery<{ results: any[]; searchFailed: boolean }>({
     queryKey: ["/api/dates/nearby", coords?.lat, coords?.lng, selectedTypes.join(",")],
     queryFn: async () => {
       const params = new URLSearchParams({ lat: String(coords!.lat), lng: String(coords!.lng) });
@@ -238,6 +238,8 @@ function NearbyTab() {
     },
     enabled: !!coords,
   });
+  const results = data?.results ?? [];
+  const searchFailed = data?.searchFailed ?? false;
 
   const toggleType = (id: string) => {
     setSelectedTypes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -286,7 +288,9 @@ function NearbyTab() {
       {locError && <p className="text-sm font-semibold text-destructive">{locError}</p>}
 
       {coords && !isFetching && results.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("dates.noResults")}</p>
+        <p className="text-sm text-muted-foreground">
+          {searchFailed ? t("dates.searchFailed") : t("dates.noResults")}
+        </p>
       )}
 
       {results.some((idea: any) => idea.externalId) && (

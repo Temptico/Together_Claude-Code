@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, MessageCircle, Trophy, Smile } from "lucide-react";
+import { Heart, MessageCircle, Trophy, Smile, CalendarHeart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReactionBar } from "@/components/ReactionBar";
 import { useTranslation } from "@/i18n/i18n";
@@ -13,6 +13,7 @@ type MemoriesData = {
   stats: { moodCount: number; answeredCount: number; completedCount: number; avgMood: number };
   timeline: any[];
   onThisDay: any[];
+  partnerName: string | null;
 };
 
 export default function Memories() {
@@ -40,7 +41,14 @@ export default function Memories() {
             <div className="flex flex-col gap-3 rounded-3xl bg-together-warm p-4 text-white">
               <h2 className="flex items-center gap-2 font-extrabold">🕰️ {t("memories.onThisDay")}</h2>
               {data.onThisDay.map((entry, i) => (
-                <TimelineEntryCard key={i} entry={entry} isMe={entry.userId === user!.id} viewerId={user!.id} light />
+                <TimelineEntryCard
+                  key={i}
+                  entry={entry}
+                  isMe={entry.userId === user!.id}
+                  viewerId={user!.id}
+                  partnerName={data.partnerName}
+                  light
+                />
               ))}
             </div>
           )}
@@ -58,7 +66,13 @@ export default function Memories() {
           ) : (
             <div className="flex flex-col gap-3">
               {data.timeline.map((entry, i) => (
-                <TimelineEntryCard key={i} entry={entry} isMe={entry.userId === user!.id} viewerId={user!.id} />
+                <TimelineEntryCard
+                  key={i}
+                  entry={entry}
+                  isMe={entry.userId === user!.id}
+                  viewerId={user!.id}
+                  partnerName={data.partnerName}
+                />
               ))}
             </div>
           )}
@@ -84,16 +98,18 @@ function TimelineEntryCard({
   entry,
   isMe,
   viewerId,
+  partnerName,
   light,
 }: {
   entry: any;
   isMe: boolean;
   viewerId: string;
+  partnerName?: string | null;
   light?: boolean;
 }) {
   const { t, lang } = useTranslation();
   const dateLabel = new Date(entry.date).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" });
-  const who = isMe ? t("memories.you") : t("memories.partner");
+  const who = isMe ? t("memories.you") : partnerName || t("memories.partner");
 
   let icon = <Smile className="h-5 w-5 text-primary" />;
   let content: ReactNode = null;
@@ -125,6 +141,14 @@ function TimelineEntryCard({
         {entry.challengeText ? `: ${entry.challengeText}` : ""}
       </p>
     );
+  } else if (entry.type === "date") {
+    icon = <CalendarHeart className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
+    content = (
+      <p className="text-sm">
+        <strong>{who}</strong> {t("memories.completedDate")}
+        {entry.detail.idea?.title ? `: ${entry.detail.idea.title}` : ""}
+      </p>
+    );
   }
 
   return (
@@ -134,14 +158,16 @@ function TimelineEntryCard({
         <div className={cn("flex-1", light && "text-white")}>
           {content}
           <p className={cn("mt-1 text-xs", light ? "text-white/75" : "text-muted-foreground")}>{dateLabel}</p>
-          <div className="mt-2">
-            <ReactionBar
-              targetType={entry.type}
-              targetId={entry.detail.id}
-              reactions={entry.reactions || []}
-              invalidateKeys={[["/api/memories", viewerId]]}
-            />
-          </div>
+          {entry.type !== "date" && (
+            <div className="mt-2">
+              <ReactionBar
+                targetType={entry.type}
+                targetId={entry.detail.id}
+                reactions={entry.reactions || []}
+                invalidateKeys={[["/api/memories", viewerId]]}
+              />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

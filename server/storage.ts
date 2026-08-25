@@ -530,23 +530,45 @@ export async function getStats(userId: string) {
 }
 
 export type TimelineEntry = {
-  type: "mood" | "answer" | "challenge";
+  type: "mood" | "answer" | "challenge" | "date";
   date: string;
   userId: string;
   detail: any;
 };
 
+function dateKeyFromTimestamp(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+async function getRecentCompletedDates(userId: string, limit: number) {
+  const rows = await db
+    .select()
+    .from(plannedDates)
+    .where(and(eq(plannedDates.userId, userId), eq(plannedDates.completed, true)))
+    .orderBy(desc(plannedDates.scheduledAt))
+    .limit(limit);
+  return Promise.all(
+    rows.map(async (row: typeof plannedDates.$inferSelect) => ({
+      ...row,
+      idea: await getDateIdeaById(row.ideaId),
+    }))
+  );
+}
+
 export async function getTimeline(userIds: string[], limit = 20): Promise<TimelineEntry[]> {
   const entries: TimelineEntry[] = [];
   for (const userId of userIds) {
-    const [m, a, c] = await Promise.all([
+    const [m, a, c, d] = await Promise.all([
       getRecentMoods(userId, limit),
       getRecentAnswers(userId, limit),
       getRecentCompletions(userId, limit),
+      getRecentCompletedDates(userId, limit),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
     for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+    for (const planned of d)
+      entries.push({ type: "date", date: dateKeyFromTimestamp(new Date(planned.scheduledAt)), userId, detail: planned });
   }
   entries.sort((a, b) => (a.date < b.date ? 1 : -1));
   return entries.slice(0, limit);
@@ -558,7 +580,7 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
 
   const entries: TimelineEntry[] = [];
   for (const userId of userIds) {
-    const [m, a, c] = await Promise.all([
+    const [m, a, c, plannedRows] = await Promise.all([
       db.select().from(moods).where(and(eq(moods.userId, userId), eq(moods.date, targetDate))),
       db.select().from(questionAnswers).where(and(eq(questionAnswers.userId, userId), eq(questionAnswers.date, targetDate))),
       db
@@ -571,10 +593,15 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
             isNotNull(challengeCompletions.completedAt)
           )
         ),
+      db.select().from(plannedDates).where(and(eq(plannedDates.userId, userId), eq(plannedDates.completed, true))),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
     for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+    for (const planned of plannedRows as (typeof plannedDates.$inferSelect)[]) {
+      if (dateKeyFromTimestamp(new Date(planned.scheduledAt)) !== targetDate) continue;
+      entries.push({ type: "date", date: targetDate, userId, detail: { ...planned, idea: await getDateIdeaById(planned.ideaId) } });
+    }
   }
   return entries;
 }

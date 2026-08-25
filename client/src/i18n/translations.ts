@@ -105,6 +105,7 @@ export const translations = {
       locationDenied: "Dostop do lokacije ni dovoljen. Omogoči ga v nastavitvah brskalnika.",
       enableLocation: "Dovoli dostop do lokacije",
       noResults: "Ni rezultatov za izbrane filtre",
+      searchFailed: "Iskanje trenutno ni uspelo. Poskusi znova čez trenutek.",
       markComplete: "Označi kot opravljeno",
       delete: "Izbriši",
       completed: "Opravljeno",
@@ -142,6 +143,7 @@ export const translations = {
       sharedMood: "je delil/a razpoloženje",
       answeredQuestion: "je odgovoril/a na vprašanje",
       completedChallenge: "je opravil/a izziv",
+      completedDate: "je opravil/a zmenek",
     },
     mood: {
       level1: "Zelo slabo",
@@ -414,6 +416,7 @@ export const translations = {
       locationDenied: "Location access denied. Enable it in your browser settings.",
       enableLocation: "Allow location access",
       noResults: "No results for the selected filters",
+      searchFailed: "The search failed. Try again in a moment.",
       markComplete: "Mark as done",
       delete: "Delete",
       completed: "Completed",
@@ -451,6 +454,7 @@ export const translations = {
       sharedMood: "shared a mood",
       answeredQuestion: "answered the question",
       completedChallenge: "completed the challenge",
+      completedDate: "went on a date",
     },
     mood: {
       level1: "Very bad",
@@ -723,6 +727,7 @@ export const translations = {
       locationDenied: "Pristup lokaciji nije dopušten. Omogući ga u postavkama preglednika.",
       enableLocation: "Dopusti pristup lokaciji",
       noResults: "Nema rezultata za odabrane filtre",
+      searchFailed: "Pretraga trenutačno nije uspjela. Pokušaj ponovno za koji trenutak.",
       markComplete: "Označi kao izvršeno",
       delete: "Izbriši",
       completed: "Izvršeno",
@@ -760,6 +765,7 @@ export const translations = {
       sharedMood: "je podijelio/la raspoloženje",
       answeredQuestion: "je odgovorio/la na pitanje",
       completedChallenge: "je izvršio/la izazov",
+      completedDate: "je bio/bila na spoju",
     },
     mood: {
       level1: "Vrlo loše",

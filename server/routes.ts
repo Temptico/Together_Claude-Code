@@ -27,18 +27,6 @@ function ah(fn: (req: Request, res: Response) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 }
 
-function computeAnniversaryCountdown(anniversaryDate: string) {
-  const anniv = new Date(anniversaryDate);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let next = new Date(now.getFullYear(), anniv.getMonth(), anniv.getDate());
-  if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, anniv.getMonth(), anniv.getDate());
-  const daysUntil = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const isToday = daysUntil === 0;
-  const years = next.getFullYear() - anniv.getFullYear();
-  return { daysUntil, isToday, years };
-}
-
 async function requireUser(req: Request, res: Response, id: string) {
   const user = await storage.getUserById(id);
   if (!user) {
@@ -182,8 +170,6 @@ export function registerRoutes(app: Express) {
       const moodTargetIds = [myMood?.id, partnerMood?.id].filter((id): id is number => id != null);
       const moodReactions = await storage.getReactionsForTargets("mood", moodTargetIds);
 
-      const anniversaryCountdown = user.anniversaryDate ? computeAnniversaryCountdown(user.anniversaryDate) : null;
-
       res.json({
         user: storage.omitPin(user),
         partner: partner ? storage.omitPin(partner) : null,
@@ -196,7 +182,6 @@ export function registerRoutes(app: Express) {
         challengeAccepted: !!completion,
         challengeCompleted: !!completion?.completedAt,
         upcomingDates: upcomingWithIdeas,
-        anniversaryCountdown,
       });
     })
   );
@@ -388,7 +373,12 @@ export function registerRoutes(app: Express) {
       for (const idea of [...localIdeas, ...osmIdeas, ...googleIdeas]) byId.set(idea.id, idea);
       const merged = [...byId.values()].sort((a, b) => a.distanceKm - b.distanceKm);
 
-      res.json(merged);
+      // Both external lookups returning null (not just empty) means the search
+      // itself failed (timeout, rate limit, network) — worth telling the user
+      // apart from "there's genuinely nothing nearby".
+      const searchFailed = osmResults === null && googleResults === null;
+
+      res.json({ results: merged, searchFailed });
     })
   );
 
@@ -521,6 +511,7 @@ export function registerRoutes(app: Express) {
     ah(async (req, res) => {
       const user = await requireUser(req, res, req.params.userId);
       if (!user) return;
+      const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
       const stats = await storage.getStats(user.id);
       const ids = user.partnerId ? [user.id, user.partnerId] : [user.id];
       const [timeline, onThisDay] = await Promise.all([
@@ -553,7 +544,7 @@ export function registerRoutes(app: Express) {
       };
 
       const enrich = (entry: (typeof all)[number]) => {
-        const reactionList = reactionsByType[entry.type].get(entry.detail.id) || [];
+        const reactionList = (reactionsByType as any)[entry.type]?.get(entry.detail.id) || [];
         if (entry.type === "answer") {
           const isCustom = entry.detail.source === "custom";
           const q = isCustom
@@ -573,7 +564,12 @@ export function registerRoutes(app: Express) {
         return { ...entry, reactions: reactionList };
       };
 
-      res.json({ stats, timeline: timeline.map(enrich), onThisDay: onThisDay.map(enrich) });
+      res.json({
+        stats,
+        timeline: timeline.map(enrich),
+        onThisDay: onThisDay.map(enrich),
+        partnerName: partner?.name || null,
+      });
     })
   );
 

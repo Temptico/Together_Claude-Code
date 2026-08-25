@@ -50,10 +50,13 @@ export async function fetchNearbyOsmPlaces(
   const radiusMeters = Math.round(radiusKm * 1000);
   const around = `(around:${radiusMeters},${lat},${lng})`;
   const clauses = requestedTypes.map((t) => `${OSM_TYPE_MAP[t].query}${around};`).join("\n  ");
-  const query = `[out:json][timeout:15];\n(\n  ${clauses}\n);\nout center 30;`;
+  // A densely-mapped area (most of Western Europe) can have far more matching
+  // nodes within the same radius than Ljubljana does, so the query needs real
+  // headroom — a short timeout here silently looked like "nothing nearby".
+  const query = `[out:json][timeout:20];\n(\n  ${clauses}\n);\nout center 30;`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), 25_000);
 
   try {
     const res = await fetch(OVERPASS_URL, {
