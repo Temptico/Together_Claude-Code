@@ -2,10 +2,16 @@ import { useEffect, useState } from "react";
 
 // iOS Safari has no `beforeinstallprompt` API at all — there's no
 // programmatic way to trigger the install flow there, only the manual
-// Share → Add to Home Screen path, so callers need to know to show
-// instructions instead of a button.
+// Share → Add to Home Screen path. Some Android browsers (and Chrome after
+// a prompt was already dismissed once) don't fire it either, so "no native
+// prompt" isn't reliably Android-vs-iOS — callers need explicit OS-aware
+// manual instructions as the fallback either way.
 function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function isAndroidDevice(): boolean {
+  return /android/i.test(navigator.userAgent);
 }
 
 function isStandaloneDisplay(): boolean {
@@ -16,6 +22,7 @@ export function usePwaInstall() {
   const [prompt, setPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
   const [isIos] = useState(isIosDevice);
+  const [isAndroid] = useState(isAndroidDevice);
   const [isStandalone] = useState(isStandaloneDisplay);
 
   useEffect(() => {
@@ -39,9 +46,11 @@ export function usePwaInstall() {
     setPrompt(null);
   };
 
-  return {
-    canInstall: !!prompt && !installed,
-    install,
-    showIosInstructions: isIos && !isStandalone,
-  };
+  const canInstall = !!prompt && !installed;
+  // One combined "how to install" card: a native button when the browser
+  // offers one, otherwise manual steps worded for whichever OS this is.
+  const showInstallCard = !isStandalone && !installed && (canInstall || isIos || isAndroid);
+  const instructionsKey = isIos ? "profile.installIosDesc" : "profile.installAndroidDesc";
+
+  return { canInstall, install, showInstallCard, instructionsKey };
 }

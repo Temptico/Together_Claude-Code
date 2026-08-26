@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, MessageCircle, Trophy, Smile, CalendarHeart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ReactionBar } from "@/components/ReactionBar";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -11,14 +13,20 @@ import { MOOD_LEVELS } from "@shared/schema";
 
 type MemoriesData = {
   stats: { moodCount: number; answeredCount: number; completedCount: number; avgMood: number };
-  timeline: any[];
+  activity: any[];
+  pastDates: any[];
   onThisDay: any[];
   partnerName: string | null;
 };
 
+const PAST_DATES_PREVIEW = 3;
+const ACTIVITY_PREVIEW = 5;
+
 export default function Memories() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [showAllPastDates, setShowAllPastDates] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const { data, isLoading } = useQuery<MemoriesData>({ queryKey: ["/api/memories", user!.id] });
 
@@ -53,9 +61,31 @@ export default function Memories() {
             </div>
           )}
 
+          <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.pastDatesSection")}</h2>
+          {data.pastDates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("memories.noPastDates")}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(showAllPastDates ? data.pastDates : data.pastDates.slice(0, PAST_DATES_PREVIEW)).map((entry, i) => (
+                <TimelineEntryCard
+                  key={i}
+                  entry={entry}
+                  isMe={entry.userId === user!.id}
+                  viewerId={user!.id}
+                  partnerName={data.partnerName}
+                />
+              ))}
+              {!showAllPastDates && data.pastDates.length > PAST_DATES_PREVIEW && (
+                <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAllPastDates(true)}>
+                  {t("memories.seeMore")}
+                </Button>
+              )}
+            </div>
+          )}
+
           <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.recentMemories")}</h2>
 
-          {data.timeline.length === 0 ? (
+          {data.activity.length === 0 ? (
             <Card className="border-2 border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
                 <div className="text-4xl">🌱</div>
@@ -65,7 +95,7 @@ export default function Memories() {
             </Card>
           ) : (
             <div className="flex flex-col gap-3">
-              {data.timeline.map((entry, i) => (
+              {(showAllActivity ? data.activity : data.activity.slice(0, ACTIVITY_PREVIEW)).map((entry, i) => (
                 <TimelineEntryCard
                   key={i}
                   entry={entry}
@@ -74,6 +104,11 @@ export default function Memories() {
                   partnerName={data.partnerName}
                 />
               ))}
+              {!showAllActivity && data.activity.length > ACTIVITY_PREVIEW && (
+                <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAllActivity(true)}>
+                  {t("memories.seeMore")}
+                </Button>
+              )}
             </div>
           )}
         </>

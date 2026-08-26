@@ -63,7 +63,7 @@ export default function Home() {
     <div className="flex flex-col gap-4 px-4 pt-4">
       <HomeHeader data={data} />
       {!data.partner && <ConnectBanner />}
-      {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} />}
+      {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
       <DailyChallengeCard
@@ -119,14 +119,15 @@ function ConnectBanner() {
   );
 }
 
-function PartnerMoodCard({ mood, userId }: { mood: any; userId: string }) {
+function PartnerMoodCard({ mood, userId, partnerName }: { mood: any; userId: string; partnerName: string }) {
   const { t, lang } = useTranslation();
   const level = mood ? MOOD_LEVELS.find((m) => m.level === mood.level) : null;
+  const title = t("home.partnerMoodTitleFor").replace("{name}", partnerName);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("home.partnerMoodTitle")}</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {level ? (

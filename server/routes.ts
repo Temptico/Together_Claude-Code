@@ -525,11 +525,12 @@ export function registerRoutes(app: Express) {
       const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
       const stats = await storage.getStats(user.id);
       const ids = user.partnerId ? [user.id, user.partnerId] : [user.id];
-      const [timeline, onThisDay] = await Promise.all([
-        storage.getTimeline(ids, 20),
+      const [activity, pastDates, onThisDay] = await Promise.all([
+        storage.getActivityTimeline(ids, 20),
+        storage.getPastDatesTimeline(ids, 20),
         storage.getOnThisDayMemories(ids),
       ]);
-      const all = [...timeline, ...onThisDay];
+      const all = [...activity, ...pastDates, ...onThisDay];
 
       // enrich entries with question/challenge text where relevant
       const [questions, challenges, customQs, customChs] = await Promise.all([
@@ -577,7 +578,8 @@ export function registerRoutes(app: Express) {
 
       res.json({
         stats,
-        timeline: timeline.map(enrich),
+        activity: activity.map(enrich),
+        pastDates: pastDates.map(enrich),
         onThisDay: onThisDay.map(enrich),
         partnerName: partner?.name || null,
       });

@@ -555,18 +555,30 @@ async function getRecentCompletedDates(userId: string, limit: number) {
   );
 }
 
-export async function getTimeline(userIds: string[], limit = 20): Promise<TimelineEntry[]> {
+// Moods/answers/challenges — the "Recent" section of Memories.
+export async function getActivityTimeline(userIds: string[], limit = 20): Promise<TimelineEntry[]> {
   const entries: TimelineEntry[] = [];
   for (const userId of userIds) {
-    const [m, a, c, d] = await Promise.all([
+    const [m, a, c] = await Promise.all([
       getRecentMoods(userId, limit),
       getRecentAnswers(userId, limit),
       getRecentCompletions(userId, limit),
-      getRecentCompletedDates(userId, limit),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
     for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+  }
+  entries.sort((a, b) => (a.date < b.date ? 1 : -1));
+  return entries.slice(0, limit);
+}
+
+// Completed planned dates — the "Past dates" section of Memories, kept
+// separate so busy mood/challenge activity can't crowd dates out of a
+// shared limit.
+export async function getPastDatesTimeline(userIds: string[], limit = 20): Promise<TimelineEntry[]> {
+  const entries: TimelineEntry[] = [];
+  for (const userId of userIds) {
+    const d = await getRecentCompletedDates(userId, limit);
     for (const planned of d)
       entries.push({ type: "date", date: dateKeyFromTimestamp(new Date(planned.scheduledAt)), userId, detail: planned });
   }

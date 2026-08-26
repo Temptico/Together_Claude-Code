@@ -37,6 +37,18 @@ import type { User } from "@shared/schema";
 
 const REMINDER_TIMES = ["random", "08:00", "09:00", "10:00", "11:00", "12:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
 
+function computeAnniversaryCountdown(anniversaryDate: string) {
+  const anniv = new Date(anniversaryDate);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), anniv.getMonth(), anniv.getDate());
+  if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, anniv.getMonth(), anniv.getDate());
+  const daysUntil = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const isToday = daysUntil === 0;
+  const years = next.getFullYear() - anniv.getFullYear();
+  return { daysUntil, isToday, years };
+}
+
 export default function Profile() {
   const { t, lang, setLang } = useTranslation();
   const { user, setUser, logout } = useAuth();
@@ -44,7 +56,7 @@ export default function Profile() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
-  const { canInstall, install, showIosInstructions } = usePwaInstall();
+  const { canInstall, install, showInstallCard, instructionsKey } = usePwaInstall();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [anniversary, setAnniversary] = useState(user!.anniversaryDate || "");
@@ -93,9 +105,7 @@ export default function Profile() {
     updateMutation.mutate({ language: value });
   };
 
-  const anniversaryDisplay = user!.anniversaryDate
-    ? new Date(user!.anniversaryDate).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long", year: "numeric" })
-    : null;
+  const anniversaryCountdown = user!.anniversaryDate ? computeAnniversaryCountdown(user!.anniversaryDate) : null;
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-6">
@@ -138,7 +148,15 @@ export default function Profile() {
             </Button>
           </div>
           {anniversaryError && <p className="text-xs font-semibold text-destructive">{anniversaryError}</p>}
-          {anniversaryDisplay && <p className="text-sm text-muted-foreground">💕 {anniversaryDisplay}</p>}
+          {anniversaryCountdown &&
+            (anniversaryCountdown.isToday ? (
+              <p className="text-sm font-bold text-primary">{t("home.anniversaryToday")}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                💕 {anniversaryCountdown.daysUntil} {t("home.days")} {t("home.anniversaryIn")} ·{" "}
+                {anniversaryCountdown.years} {t("home.anniversaryYears")}
+              </p>
+            ))}
         </CardContent>
       </Card>
 
@@ -201,31 +219,27 @@ export default function Profile() {
         </CardContent>
       </Card>
 
-      {canInstall && (
+      {showInstallCard && (
         <Card>
           <CardContent className="flex items-center justify-between gap-3 py-4">
             <div className="flex items-center gap-2">
-              <Download className="h-5 w-5 text-primary" />
+              {canInstall ? (
+                <Download className="h-5 w-5 shrink-0 text-primary" />
+              ) : (
+                <Share className="h-5 w-5 shrink-0 text-primary" />
+              )}
               <div>
                 <p className="font-extrabold">{t("profile.installApp")}</p>
-                <p className="text-xs text-muted-foreground">{t("profile.installDesc")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {canInstall ? t("profile.installDesc") : t(instructionsKey)}
+                </p>
               </div>
             </div>
-            <Button size="sm" onClick={install}>
-              {t("profile.install")}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {showIosInstructions && (
-        <Card>
-          <CardContent className="flex items-center gap-3 py-4">
-            <Share className="h-5 w-5 shrink-0 text-primary" />
-            <div>
-              <p className="font-extrabold">{t("profile.installApp")}</p>
-              <p className="text-xs text-muted-foreground">{t("profile.installIosDesc")}</p>
-            </div>
+            {canInstall && (
+              <Button size="sm" onClick={install}>
+                {t("profile.install")}
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

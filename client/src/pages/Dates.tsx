@@ -400,7 +400,7 @@ function PlannedTab() {
   );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 pb-6">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="rounded-full p-2 hover:bg-muted">
