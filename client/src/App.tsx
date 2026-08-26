@@ -70,7 +70,7 @@ function Shell() {
 
   return (
     <div className="app-shell bg-background safe-top">
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="content-scroll-pad flex-1 overflow-y-auto">
         <Suspense fallback={<RouteLoading />}>
           <Switch>
             <Route path="/" component={Home} />

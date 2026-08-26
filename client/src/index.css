@@ -79,6 +79,15 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Scrollable page content sits behind the fixed BottomNav, so it needs
+   bottom padding that clears the nav's own height (~4.75rem of icon +
+   label + padding) plus whatever safe-area inset the device adds under
+   it (e.g. the home-indicator bar on notched phones) — pb-24 alone only
+   covered the first part, so content overlapped the nav on those devices. */
+.content-scroll-pad {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
