@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { getPushSubscriptionsForUser, getUserById } from "./storage.js";
+import { getPushSubscriptionsForUser, getUserById, getAllUsers } from "./storage.js";
 
 let configured = false;
 
@@ -49,4 +49,36 @@ export async function notifyUser(
         })
     )
   );
+}
+
+// Manual broadcast tool (used by the admin dashboard) — sends the same
+// title/body to every user who has notifications enabled, regardless of
+// their language, since the admin composes the exact text themselves.
+export async function notifyAllWithNotifications(payload: { title: string; body: string; tag?: string }): Promise<{
+  recipients: number;
+}> {
+  ensureConfigured();
+  const allUsers = await getAllUsers();
+  const targets = allUsers.filter((u) => u.notificationsEnabled);
+  await Promise.all(
+    targets.map(async (user) => {
+      const subs = await getPushSubscriptionsForUser(user.id);
+      await Promise.all(
+        subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>
+          webpush
+            .sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth },
+              },
+              JSON.stringify(payload)
+            )
+            .catch((err) => {
+              console.warn("[push] broadcast failed for one subscription:", err?.message || err);
+            })
+        )
+      );
+    })
+  );
+  return { recipients: targets.length };
 }

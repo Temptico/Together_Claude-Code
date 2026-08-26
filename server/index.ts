@@ -5,6 +5,7 @@ import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 import { registerRoutes } from "./routes.js";
 import { getUserByConnectCode, getAdminStats, resetPinByEmail } from "./storage.js";
+import { notifyAllWithNotifications } from "./push.js";
 import { startScheduler } from "./scheduler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,25 @@ async function main() {
       return;
     }
     res.json({ ok: true, name: user.name, email: user.email });
+  });
+
+  app.post("/api/admin/broadcast", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    const { key, title, body } = req.body || {};
+    if (!secret || key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (typeof body !== "string" || !body.trim()) {
+      res.status(400).json({ error: "Manjka besedilo obvestila" });
+      return;
+    }
+    const result = await notifyAllWithNotifications({
+      title: typeof title === "string" && title.trim() ? title.trim() : "Together",
+      body: body.trim(),
+      tag: "admin-broadcast",
+    });
+    res.json({ ok: true, recipients: result.recipients });
   });
 
   app.get("/admin", async (req, res) => {
@@ -103,6 +123,15 @@ async function main() {
     </form>
     <p id="reset-result"></p>
   </div>
+  <div class="tool">
+    <h2>Pošlji obvestilo vsem</h2>
+    <form id="broadcast-form" style="flex-direction: column; align-items: stretch;">
+      <input type="text" id="broadcast-title" placeholder="Naslov (privzeto: Together)" style="margin-bottom: 0.5rem;" />
+      <textarea id="broadcast-body" placeholder="Besedilo obvestila..." required rows="3" style="padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; margin-bottom: 0.5rem; resize: vertical;"></textarea>
+      <button type="submit">Pošlji vsem (${stats.notificationsOptedIn})</button>
+    </form>
+    <p id="broadcast-result"></p>
+  </div>
   <h2>Zadnji registrirani</h2>
   <table>
     <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th></tr></thead>
@@ -127,6 +156,38 @@ async function main() {
         if (res.ok) {
           result.textContent = 'PIN ponastavljen za ' + data.name + ' (' + data.email + '). Ob naslednji prijavi lahko izbere novega.';
           result.className = 'ok';
+        } else {
+          result.textContent = data.error || 'Napaka';
+          result.className = 'err';
+        }
+      } catch {
+        result.textContent = 'Napaka pri povezavi';
+        result.className = 'err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    document.getElementById('broadcast-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('broadcast-title').value;
+      const body = document.getElementById('broadcast-body').value;
+      if (!confirm('Poslati obvestilo vsem uporabnikom z omogočenimi obvestili?\\n\\n"' + (title || 'Together') + '"\\n' + body)) return;
+      const btn = e.target.querySelector('button');
+      const result = document.getElementById('broadcast-result');
+      btn.disabled = true;
+      result.textContent = '';
+      result.className = '';
+      try {
+        const res = await fetch('/api/admin/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: ${JSON.stringify(key)}, title, body }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result.textContent = 'Poslano ' + data.recipients + ' uporabnikom.';
+          result.className = 'ok';
+          e.target.reset();
         } else {
           result.textContent = data.error || 'Napaka';
           result.className = 'err';
