@@ -80,7 +80,20 @@ async function main() {
     <div class="card"><div class="value">${stats.totalUsers}</div><div class="label">Uporabnikov</div></div>
     <div class="card"><div class="value">${stats.connectedCouples}</div><div class="label">Povezanih parov</div></div>
     <div class="card"><div class="value">${stats.activeToday}</div><div class="label">Aktivnih danes</div></div>
+    <div class="card"><div class="value">${stats.activeThisWeek}</div><div class="label">Aktivnih ta teden</div></div>
     <div class="card"><div class="value">${stats.newThisWeek}</div><div class="label">Novih ta teden</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="value">${stats.totals.moods}</div><div class="label">Razpoloženj skupaj</div></div>
+    <div class="card"><div class="value">${stats.totals.answers}</div><div class="label">Odgovorov skupaj</div></div>
+    <div class="card"><div class="value">${stats.totals.completions}</div><div class="label">Izzivov opravljenih</div></div>
+    <div class="card"><div class="value">${stats.totals.completedDates}/${stats.totals.plannedDates}</div><div class="label">Zmenkov opravljenih/načrtovanih</div></div>
+    <div class="card"><div class="value">${stats.totals.wishlistItems}</div><div class="label">Želja na seznamih</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="value">${stats.notificationsOptedIn}/${stats.totalUsers}</div><div class="label">Obvestila omogočena</div></div>
+    <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Z aktivno naročnino</div></div>
+    <div class="card"><div class="value" style="font-size:1.15rem">${Object.entries(stats.languageCounts).map(([l, n]) => `${l.toUpperCase()}: ${n}`).join(" · ") || "–"}</div><div class="label">Po jeziku</div></div>
   </div>
   <div class="tool">
     <h2>Ponastavi PIN</h2>

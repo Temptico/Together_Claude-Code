@@ -834,25 +834,63 @@ export async function markReminderSent(userId: string, date: string, type: strin
 export async function getAdminStats() {
   const allUsers = await db.select().from(users);
   const today = todayStr();
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekAgoStr = weekAgoDate.toISOString().slice(0, 10);
 
   const totalUsers = allUsers.length;
   const connectedUsers = allUsers.filter((u: User) => u.partnerId).length;
   const connectedCouples = Math.round(connectedUsers / 2);
-  const newThisWeek = allUsers.filter((u: User) => u.createdAt >= weekAgo).length;
+  const newThisWeek = allUsers.filter((u: User) => u.createdAt >= weekAgoDate).length;
 
-  const activeTodaySet = new Set<string>();
-  const [todayMoods, todayAnswers, todayCompletions] = await Promise.all([
+  const [
+    todayMoods,
+    todayAnswers,
+    todayCompletions,
+    weekMoods,
+    weekAnswers,
+    weekCompletions,
+    allMoods,
+    allAnswers,
+    allCompletions,
+    allPlanned,
+    allWishlist,
+    subs,
+  ] = await Promise.all([
     db.select().from(moods).where(eq(moods.date, today)),
     db.select().from(questionAnswers).where(eq(questionAnswers.date, today)),
     db
       .select()
       .from(challengeCompletions)
       .where(and(eq(challengeCompletions.date, today), isNotNull(challengeCompletions.completedAt))),
+    db.select().from(moods).where(gte(moods.date, weekAgoStr)),
+    db.select().from(questionAnswers).where(gte(questionAnswers.date, weekAgoStr)),
+    db
+      .select()
+      .from(challengeCompletions)
+      .where(and(gte(challengeCompletions.date, weekAgoStr), isNotNull(challengeCompletions.completedAt))),
+    db.select().from(moods),
+    db.select().from(questionAnswers),
+    db.select().from(challengeCompletions).where(isNotNull(challengeCompletions.completedAt)),
+    db.select().from(plannedDates),
+    db.select().from(wishlistItems),
+    db.select().from(pushSubscriptions),
   ]);
+
+  const activeTodaySet = new Set<string>();
   for (const m of todayMoods) activeTodaySet.add(m.userId);
   for (const a of todayAnswers) activeTodaySet.add(a.userId);
   for (const c of todayCompletions) activeTodaySet.add(c.userId);
+
+  const activeThisWeekSet = new Set<string>();
+  for (const m of weekMoods) activeThisWeekSet.add(m.userId);
+  for (const a of weekAnswers) activeThisWeekSet.add(a.userId);
+  for (const c of weekCompletions) activeThisWeekSet.add(c.userId);
+
+  const notificationsOptedIn = allUsers.filter((u: User) => u.notificationsEnabled).length;
+  const usersWithPushSub = new Set(subs.map((s: { userId: string }) => s.userId)).size;
+
+  const languageCounts: Record<string, number> = {};
+  for (const u of allUsers as User[]) languageCounts[u.language] = (languageCounts[u.language] || 0) + 1;
 
   const recentUsers = [...allUsers]
     .sort((a: User, b: User) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -864,6 +902,18 @@ export async function getAdminStats() {
     connectedCouples,
     newThisWeek,
     activeToday: activeTodaySet.size,
+    activeThisWeek: activeThisWeekSet.size,
+    notificationsOptedIn,
+    usersWithPushSub,
+    languageCounts,
+    totals: {
+      moods: allMoods.length,
+      answers: allAnswers.length,
+      completions: allCompletions.length,
+      plannedDates: allPlanned.length,
+      completedDates: allPlanned.filter((d: { completed: boolean }) => d.completed).length,
+      wishlistItems: allWishlist.length,
+    },
     recentUsers,
   };
 }
