@@ -906,7 +906,7 @@ export async function getAdminStats() {
 
   const recentUsers = [...allUsers]
     .sort((a: User, b: User) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 15)
+    .slice(0, 500) // effectively "all users" for this app's scale — admin table doubles as the account-management list
     .map((u: User) => ({ name: u.name, email: u.email, connected: !!u.partnerId, createdAt: u.createdAt }));
 
   return {

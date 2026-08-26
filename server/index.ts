@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 import { registerRoutes } from "./routes.js";
-import { getUserByConnectCode, getAdminStats, resetPinByEmail } from "./storage.js";
+import { getUserByConnectCode, getAdminStats, resetPinByEmail, getUserByEmail, deleteUserAccount } from "./storage.js";
 import { notifyAllWithNotifications } from "./push.js";
 import { startScheduler } from "./scheduler.js";
 
@@ -57,6 +57,26 @@ async function main() {
     res.json({ ok: true, recipients: result.recipients });
   });
 
+  app.post("/api/admin/delete-user", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    const { key, email } = req.body || {};
+    if (!secret || key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (typeof email !== "string" || !email) {
+      res.status(400).json({ error: "Manjka e-poštni naslov" });
+      return;
+    }
+    const user = await getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo" });
+      return;
+    }
+    await deleteUserAccount(user);
+    res.json({ ok: true, name: user.name, email: user.email });
+  });
+
   app.get("/admin", async (req, res) => {
     const secret = process.env.ADMIN_SECRET;
     if (!secret || req.query.key !== secret) {
@@ -69,7 +89,7 @@ async function main() {
     const rows = stats.recentUsers
       .map(
         (u) =>
-          `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.connected ? "✅" : "—"}</td><td>${new Date(u.createdAt).toLocaleDateString("sl-SI")}</td></tr>`
+          `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.connected ? "✅" : "—"}</td><td>${new Date(u.createdAt).toLocaleDateString("sl-SI")}</td><td><button class="del-btn" data-email="${esc(u.email)}" data-name="${esc(u.name)}">Izbriši</button></td></tr>`
       )
       .join("");
     res.set("Content-Type", "text/html").send(`<!doctype html>
@@ -93,6 +113,8 @@ async function main() {
   .tool p { font-size: 0.85rem; margin: 0.75rem 0 0; }
   .tool p.ok { color: #2a7a4a; }
   .tool p.err { color: #c0392b; }
+  .del-btn { padding: 0.3rem 0.7rem; border: none; border-radius: 6px; background: #c0392b; color: white; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+  .del-btn:disabled { opacity: 0.6; cursor: default; }
 </style></head>
 <body>
   <h1>💗 Together — Admin</h1>
@@ -132,9 +154,9 @@ async function main() {
     </form>
     <p id="broadcast-result"></p>
   </div>
-  <h2>Zadnji registrirani</h2>
+  <h2>Vsi računi</h2>
   <table>
-    <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th></tr></thead>
+    <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th><th>Dejanja</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <script>
@@ -197,6 +219,34 @@ async function main() {
         result.className = 'err';
       } finally {
         btn.disabled = false;
+      }
+    });
+    document.querySelector('table tbody').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.del-btn');
+      if (!btn) return;
+      const email = btn.dataset.email;
+      const name = btn.dataset.name;
+      if (!confirm('Trajno izbrišem račun "' + name + '" (' + email + ')?\\n\\nTega dejanja ni mogoče razveljaviti.')) return;
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        const res = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: ${JSON.stringify(key)}, email }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          btn.closest('tr').remove();
+        } else {
+          alert(data.error || 'Napaka');
+          btn.disabled = false;
+          btn.textContent = 'Izbriši';
+        }
+      } catch {
+        alert('Napaka pri povezavi');
+        btn.disabled = false;
+        btn.textContent = 'Izbriši';
       }
     });
   </script>
