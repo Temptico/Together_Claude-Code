@@ -154,7 +154,10 @@ async function main() {
     </form>
     <p id="broadcast-result"></p>
   </div>
-  <h2>Vsi računi</h2>
+  <h2 style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+    Vsi računi
+    <button id="export-csv" style="padding: 0.4rem 0.9rem; border: none; border-radius: 8px; background: #2a2320; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem;">⬇ Izvozi CSV</button>
+  </h2>
   <table>
     <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th><th>Dejanja</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -248,6 +251,26 @@ async function main() {
         btn.disabled = false;
         btn.textContent = 'Izbriši';
       }
+    });
+    document.getElementById('export-csv').addEventListener('click', () => {
+      const csvEscape = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+      const lines = ['Ime,E-pošta'];
+      document.querySelectorAll('table tbody tr').forEach((tr) => {
+        const cells = tr.querySelectorAll('td');
+        const name = cells[0] ? cells[0].textContent.trim() : '';
+        const email = cells[1] ? cells[1].textContent.trim() : '';
+        lines.push(csvEscape(name) + ',' + csvEscape(email));
+      });
+      // Leading BOM so Excel opens the UTF-8 file with šumniki intact instead of mangling them.
+      const blob = new Blob(['\\uFEFF' + lines.join('\\r\\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'together-racuni-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     });
   </script>
 </body></html>`);
