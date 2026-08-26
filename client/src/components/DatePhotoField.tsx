@@ -44,11 +44,13 @@ export function DatePhotoField({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* No `capture` attribute — that forces the camera straight open on
+          mobile, skipping the native picker's option to choose from the
+          photo library instead. */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />

@@ -47,7 +47,6 @@ export default function Dates() {
           <TabsTrigger value="catalog" className="flex-none">{t("dates.catalog")}</TabsTrigger>
           <TabsTrigger value="nearby" className="flex-none">{t("dates.nearby")}</TabsTrigger>
           <TabsTrigger value="planned" className="flex-none">{t("dates.planned")}</TabsTrigger>
-          <TabsTrigger value="calendar" className="flex-none">{t("dates.calendar")}</TabsTrigger>
           <TabsTrigger value="wishlist" className="flex-none">{t("dates.wishlist")}</TabsTrigger>
         </TabsList>
         <TabsContent value="catalog" className="mt-4">
@@ -58,9 +57,6 @@ export default function Dates() {
         </TabsContent>
         <TabsContent value="planned" className="mt-4">
           <PlannedTab />
-        </TabsContent>
-        <TabsContent value="calendar" className="mt-4">
-          <CalendarTab />
         </TabsContent>
         <TabsContent value="wishlist" className="mt-4">
           <WishlistTab />
@@ -308,11 +304,17 @@ function NearbyTab() {
   );
 }
 
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function PlannedTab() {
   const { t, lang } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const { data: planned = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/dates/planned", user!.id],
@@ -323,6 +325,7 @@ function PlannedTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dates/planned", user!.id] });
       qc.invalidateQueries({ queryKey: ["/api/home", user!.id] });
+      qc.invalidateQueries({ queryKey: ["/api/memories", user!.id] });
       toast({ title: t("dates.markComplete") + " ✓" });
     },
   });
@@ -335,11 +338,29 @@ function PlannedTab() {
     },
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
-  if (planned.length === 0) return <p className="text-sm text-muted-foreground">{t("home.noUpcomingDates")}</p>;
+  const byDay = new Map<string, any[]>();
+  for (const d of planned) {
+    const key = dateKey(new Date(d.scheduledAt));
+    byDay.set(key, [...(byDay.get(key) || []), d]);
+  }
 
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first grid
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const cells: (Date | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const todayKey = dateKey(new Date());
+  const monthLabel = viewDate.toLocaleDateString(bcp47(lang), { month: "long", year: "numeric" });
+  const weekdayLabels = translations[lang].dates.weekdays;
+  const selectedItems = selectedDate ? byDay.get(selectedDate) || [] : [];
   const upcoming = planned.filter((d) => !d.completed);
-  const past = planned.filter((d) => d.completed);
 
   const renderCard = (d: any) => (
     <Card key={d.id}>
@@ -380,140 +401,68 @@ function PlannedTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      {upcoming.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.upcomingSection")}</h2>
-          {upcoming.map(renderCard)}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="rounded-full p-2 hover:bg-muted">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <p className="font-extrabold capitalize">{monthLabel}</p>
+          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="rounded-full p-2 hover:bg-muted">
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
-      )}
-      {past.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.pastSection")}</h2>
-          {past.map(renderCard)}
+
+        <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground">
+          {weekdayLabels.map((w) => (
+            <div key={w}>{w}</div>
+          ))}
         </div>
-      )}
-    </div>
-  );
-}
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function CalendarTab() {
-  const { t, lang } = useTranslation();
-  const { user } = useAuth();
-  const [viewDate, setViewDate] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-  const { data: planned = [] } = useQuery<any[]>({
-    queryKey: ["/api/dates/planned", user!.id],
-  });
-
-  const byDay = new Map<string, any[]>();
-  for (const d of planned) {
-    const key = dateKey(new Date(d.scheduledAt));
-    byDay.set(key, [...(byDay.get(key) || []), d]);
-  }
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const firstOfMonth = new Date(year, month, 1);
-  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first grid
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const cells: (Date | null)[] = [
-    ...Array(startOffset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const todayKey = dateKey(new Date());
-  const monthLabel = viewDate.toLocaleDateString(bcp47(lang), {
-    month: "long",
-    year: "numeric",
-  });
-  const weekdayLabels = translations[lang].dates.weekdays;
-
-  const selectedItems = selectedDate ? byDay.get(selectedDate) || [] : [];
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setViewDate(new Date(year, month - 1, 1))}
-          className="rounded-full p-2 hover:bg-muted"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <p className="font-extrabold capitalize">{monthLabel}</p>
-        <button
-          onClick={() => setViewDate(new Date(year, month + 1, 1))}
-          className="rounded-full p-2 hover:bg-muted"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground">
-        {weekdayLabels.map((w) => (
-          <div key={w}>{w}</div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((d, i) => {
-          if (!d) return <div key={i} />;
-          const key = dateKey(d);
-          const hasPlans = byDay.has(key);
-          const isToday = key === todayKey;
-          const isSelected = key === selectedDate;
-          return (
-            <button
-              key={i}
-              onClick={() => setSelectedDate(key)}
-              className={cn(
-                "flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-sm font-semibold",
-                isSelected ? "bg-primary text-primary-foreground" : isToday ? "bg-muted" : "hover:bg-muted"
-              )}
-            >
-              {d.getDate()}
-              {hasPlans && (
-                <span className={cn("h-1.5 w-1.5 rounded-full", isSelected ? "bg-primary-foreground" : "bg-primary")} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {selectedDate && selectedItems.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t("dates.noPlansThisDay")}</p>
-        )}
-        {selectedItems.map((d) => (
-          <Card key={d.id}>
-            <CardContent className="flex flex-col gap-2 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-bold">{d.idea?.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(d.scheduledAt).toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </div>
-                {d.completed ? (
-                  <Badge>{t("dates.completed")}</Badge>
-                ) : (
-                  <Badge variant="secondary">{d.idea?.category ? categoryLabel(t, d.idea.category) : ""}</Badge>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} />;
+            const key = dateKey(d);
+            const hasPlans = byDay.has(key);
+            const isToday = key === todayKey;
+            const isSelected = key === selectedDate;
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDate(key)}
+                className={cn(
+                  "flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-sm font-semibold",
+                  isSelected ? "bg-primary text-primary-foreground" : isToday ? "bg-muted" : "hover:bg-muted"
                 )}
-              </div>
-              <DatePhotoField
-                plannedDateId={d.id}
-                photo={d.photo}
-                invalidateKeys={[["/api/dates/planned", user!.id]]}
-              />
-            </CardContent>
-          </Card>
-        ))}
+              >
+                {d.getDate()}
+                {hasPlans && (
+                  <span className={cn("h-1.5 w-1.5 rounded-full", isSelected ? "bg-primary-foreground" : "bg-primary")} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedDate && (
+          <div className="flex flex-col gap-2">
+            {selectedItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("dates.noPlansThisDay")}</p>
+            ) : (
+              selectedItems.map(renderCard)
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.upcomingSection")}</h2>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : upcoming.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("home.noUpcomingDates")}</p>
+        ) : (
+          upcoming.map(renderCard)
+        )}
       </div>
     </div>
   );

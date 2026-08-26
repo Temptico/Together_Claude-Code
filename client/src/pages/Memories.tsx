@@ -110,6 +110,9 @@ function TimelineEntryCard({
   const { t, lang } = useTranslation();
   const dateLabel = new Date(entry.date).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" });
   const who = isMe ? t("memories.you") : partnerName || t("memories.partner");
+  // Slovenian/Croatian conjugate the "is/are" auxiliary differently for
+  // "you" vs a third person's name ("si" vs "je") — English doesn't need it.
+  const verb = isMe ? t("memories.verbYou") : t("memories.verbPartner");
 
   let icon = <Smile className="h-5 w-5 text-primary" />;
   let content: ReactNode = null;
@@ -119,7 +122,7 @@ function TimelineEntryCard({
     icon = <span className="text-xl">{level?.emoji}</span>;
     content = (
       <p className="text-sm">
-        <strong>{who}</strong> {t("memories.sharedMood")}: {level ? t("mood.level" + level.level) : ""}
+        <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.sharedMood")}: {level ? t("mood.level" + level.level) : ""}
       </p>
     );
   } else if (entry.type === "answer") {
@@ -127,7 +130,7 @@ function TimelineEntryCard({
     content = (
       <div>
         <p className="text-sm">
-          <strong>{who}</strong> {t("memories.answeredQuestion")}
+          <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.answeredQuestion")}
           {entry.questionText ? `: „${entry.questionText}“` : ""}
         </p>
         <p className={cn("mt-1 text-sm", light ? "text-white/85" : "text-muted-foreground")}>{entry.detail.answer}</p>
@@ -137,7 +140,7 @@ function TimelineEntryCard({
     icon = <Trophy className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
       <p className="text-sm">
-        <strong>{who}</strong> {t("memories.completedChallenge")}
+        <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.completedChallenge")}
         {entry.challengeText ? `: ${entry.challengeText}` : ""}
       </p>
     );
@@ -145,7 +148,7 @@ function TimelineEntryCard({
     icon = <CalendarHeart className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
       <p className="text-sm">
-        <strong>{who}</strong> {t("memories.completedDate")}
+        <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.completedDate")}
         {entry.detail.idea?.title ? `: ${entry.detail.idea.title}` : ""}
       </p>
     );

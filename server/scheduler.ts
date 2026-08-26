@@ -1,9 +1,22 @@
 import * as storage from "./storage.js";
 import { notifyUser } from "./push.js";
-import { dailyReminderNotification, anniversaryNotification, streakFreezeNotification } from "./notificationText.js";
+import {
+  dailyReminderNotification,
+  anniversaryNotification,
+  anniversaryUpcomingNotification,
+  streakFreezeNotification,
+} from "./notificationText.js";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
+}
+
+function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
+  const anniv = new Date(anniversaryDate);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), anniv.getMonth(), anniv.getDate());
+  if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, anniv.getMonth(), anniv.getDate());
+  return Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 async function tick() {
@@ -48,6 +61,25 @@ async function tick() {
             }));
           }
           await storage.markReminderSent(user.id, date, "anniversary");
+        }
+      }
+
+      // Advance anniversary heads-up, 30 and 14 days out — also checked once
+      // a day at 09:00.
+      if (hhmm === "09:00" && user.anniversaryDate) {
+        const daysUntil = daysUntilAnniversary(user.anniversaryDate, now);
+        for (const milestone of [30, 14] as const) {
+          if (daysUntil !== milestone) continue;
+          const type = `anniversary_${milestone}d`;
+          const alreadySent = await storage.wasReminderSent(user.id, date, type);
+          if (!alreadySent) {
+            await notifyUser(user.id, (lang) => ({
+              title: "Together",
+              body: anniversaryUpcomingNotification(lang, milestone),
+              tag: type,
+            }));
+            await storage.markReminderSent(user.id, date, type);
+          }
         }
       }
 

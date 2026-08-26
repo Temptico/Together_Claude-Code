@@ -10,6 +10,7 @@ import {
   challengeNotification,
   reactionNotification,
   planDateNotification,
+  photoAddedNotification,
 } from "./notificationText.js";
 import {
   insertUserSchema,
@@ -486,6 +487,16 @@ export function registerRoutes(app: Express) {
         res.status(404).json({ error: "Zmenek ne obstaja" });
         return;
       }
+
+      if (parsed.data.photo && user.partnerId) {
+        const idea = await storage.getDateIdeaById(row.ideaId);
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: photoAddedNotification(lang, idea?.title || ""),
+          tag: "date-photo",
+        })).catch(() => {});
+      }
+
       res.json(row);
     })
   );

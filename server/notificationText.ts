@@ -83,6 +83,33 @@ export function anniversaryNotification(lang: string, years: number): string {
   return bodies[l];
 }
 
+export function anniversaryUpcomingNotification(lang: string, daysUntil: 30 | 14): string {
+  const bodies: Record<Lang, Record<30 | 14, string>> = {
+    sl: {
+      30: "Vajina obletnica je čez mesec dni — čas je za načrtovanje! 💕",
+      14: "Vajina obletnica je čez 14 dni! 💕",
+    },
+    en: {
+      30: "Your anniversary is a month away — time to start planning! 💕",
+      14: "Your anniversary is in 14 days! 💕",
+    },
+    hr: {
+      30: "Vaša godišnjica je za mjesec dana — vrijeme je za planiranje! 💕",
+      14: "Vaša godišnjica je za 14 dana! 💕",
+    },
+  };
+  return bodies[normLang(lang)][daysUntil];
+}
+
+export function photoAddedNotification(lang: string, title: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `Partner je dodal/a fotografijo k zmenku: ${title} 📸`,
+    en: `Your partner added a photo to your date: ${title} 📸`,
+    hr: `Partner je dodao/la fotografiju spoju: ${title} 📸`,
+  };
+  return bodies[normLang(lang)];
+}
+
 export function streakFreezeNotification(lang: string, streak: number): string {
   const bodies: Record<Lang, string> = {
     sl: `🔥 Tvoj niz ${streak} dni bo prekinjen, če danes ne opravita vsaj ene aktivnosti!`,

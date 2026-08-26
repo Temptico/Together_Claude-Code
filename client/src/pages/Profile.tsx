@@ -15,6 +15,8 @@ import {
   Sun,
   Sparkles,
   Trash2,
+  Share,
+  PlayCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +44,7 @@ export default function Profile() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
-  const { canInstall, install } = usePwaInstall();
+  const { canInstall, install, showIosInstructions } = usePwaInstall();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [anniversary, setAnniversary] = useState(user!.anniversaryDate || "");
@@ -216,8 +218,26 @@ export default function Profile() {
         </Card>
       )}
 
+      {showIosInstructions && (
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4">
+            <Share className="h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <p className="font-extrabold">{t("profile.installApp")}</p>
+              <p className="text-xs text-muted-foreground">{t("profile.installIosDesc")}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="flex flex-col divide-y divide-border py-0">
+          <Link href="/onboarding" className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-2 font-bold">
+              <PlayCircle className="h-5 w-5 text-primary" /> {t("profile.replayTour")}
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
           <Link href="/custom-content" className="flex items-center justify-between py-4">
             <div className="flex items-center gap-2 font-bold">
               <Sparkles className="h-5 w-5 text-primary" /> {t("profile.customContent")}
