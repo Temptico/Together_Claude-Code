@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { initSentry, Sentry } from "./sentry.js";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 import { registerRoutes } from "./routes.js";
@@ -11,6 +12,7 @@ import { startScheduler } from "./scheduler.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
+  initSentry();
   await runMigrations();
   await runSeed();
 
@@ -276,6 +278,11 @@ async function main() {
 </body></html>`);
   });
 
+  // Reports anything that reaches Express's error pipeline to Sentry (a
+  // no-op chain when SENTRY_DSN isn't set), then falls through to our own
+  // handler below so the client still gets the same JSON error response.
+  Sentry.setupExpressErrorHandler(app);
+
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error(err);
     res.status(500).json({ error: "Prišlo je do napake na strežniku" });
@@ -318,7 +325,9 @@ async function main() {
   startScheduler();
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error("Fatal startup error:", err);
+  Sentry.captureException(err);
+  await Sentry.flush(2000).catch(() => {}); // give the event a moment to actually send before the process dies
   process.exit(1);
 });
