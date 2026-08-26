@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Check, Share2, ChevronLeft, Camera, X } from "lucide-react";
@@ -6,11 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QrCodeDisplay } from "@/components/QrCodeDisplay";
-import { QrScanner } from "@/components/QrScanner";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+// html5-qrcode is the single biggest dependency in this page's bundle, but
+// most visits never touch the scan-QR tab (entering the code by hand is the
+// default path) — loading it lazily, only once scanning actually starts,
+// keeps it out of ConnectPartner's initial chunk entirely.
+const QrScanner = lazy(() => import("@/components/QrScanner").then((m) => ({ default: m.QrScanner })));
 
 function extractConnectCode(scannedText: string): string | null {
   const urlMatch = scannedText.match(/\/invite\/([A-Za-z0-9]{8})/);
@@ -129,14 +134,16 @@ export default function ConnectPartner() {
           {scanning ? (
             <div className="flex flex-col gap-3">
               <p className="text-center text-xs text-muted-foreground">{t("partner.scanHint")}</p>
-              <QrScanner
-                active={scanning}
-                onScan={handleScan}
-                onError={() => {
-                  setScanError(t("partner.cameraError"));
-                  setScanning(false);
-                }}
-              />
+              <Suspense fallback={<div className="flex h-48 items-center justify-center text-3xl animate-pulse">📷</div>}>
+                <QrScanner
+                  active={scanning}
+                  onScan={handleScan}
+                  onError={() => {
+                    setScanError(t("partner.cameraError"));
+                    setScanning(false);
+                  }}
+                />
+              </Suspense>
               <Button variant="ghost" onClick={() => setScanning(false)}>
                 <X className="h-4 w-4" /> {t("profile.cancel")}
               </Button>
