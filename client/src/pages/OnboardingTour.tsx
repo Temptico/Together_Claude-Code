@@ -1,27 +1,46 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/i18n";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { cn } from "@/lib/utils";
 
-const STEPS = [
+const FEATURE_STEPS = [
   { emoji: "🥰", key: "mood" },
   { emoji: "💬", key: "question" },
   { emoji: "🏆", key: "challenge" },
-  { emoji: "💌", key: "connect" },
 ] as const;
+
+const CONNECT_STEP = { emoji: "💌", key: "connect" } as const;
+const INSTALL_STEP = { emoji: "📲", key: "install" } as const;
 
 export default function OnboardingTour() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();
   const [step, setStep] = useState(0);
+  const { showInstallCard, canInstall, install, instructionsKey } = usePwaInstall();
 
-  const isLast = step === STEPS.length - 1;
-  const current = STEPS[step];
+  // The install step only makes sense where installing is actually possible
+  // (skipped entirely if already installed, or on a desktop browser with no
+  // relevant install path) — this is the same gate Profile's install card uses.
+  const steps = useMemo(
+    () => (showInstallCard ? [...FEATURE_STEPS, INSTALL_STEP, CONNECT_STEP] : [...FEATURE_STEPS, CONNECT_STEP]),
+    [showInstallCard]
+  );
+
+  const isLast = step === steps.length - 1;
+  const current = steps[step];
+  const isInstallStep = current.key === "install";
 
   const finish = (goTo: string) => {
     localStorage.setItem("together:onboardingDone", "1");
     navigate(goTo);
+  };
+
+  const advance = async () => {
+    if (isInstallStep && canInstall) await install();
+    if (isLast) finish("/connect");
+    else setStep((s) => s + 1);
   };
 
   return (
@@ -35,13 +54,22 @@ export default function OnboardingTour() {
 
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <div className="text-7xl">{current.emoji}</div>
-        <h1 className="text-2xl font-extrabold">{t(`onboarding.${current.key}Title`)}</h1>
-        <p className="max-w-xs text-white/90">{t(`onboarding.${current.key}Body`)}</p>
+        {isInstallStep ? (
+          <>
+            <h1 className="text-2xl font-extrabold">{t("profile.installApp")}</h1>
+            <p className="max-w-xs text-white/90">{canInstall ? t("profile.installDesc") : t(instructionsKey)}</p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-extrabold">{t(`onboarding.${current.key}Title`)}</h1>
+            <p className="max-w-xs text-white/90">{t(`onboarding.${current.key}Body`)}</p>
+          </>
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-6">
         <div className="flex gap-2">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <div
               key={s.key}
               className={cn("h-1.5 rounded-full transition-all", i === step ? "w-6 bg-white" : "w-1.5 bg-white/40")}
@@ -49,15 +77,9 @@ export default function OnboardingTour() {
           ))}
         </div>
 
-        {isLast ? (
-          <Button size="lg" className="w-full bg-white text-primary hover:bg-white/90" onClick={() => finish("/connect")}>
-            {t("onboarding.connectCta")}
-          </Button>
-        ) : (
-          <Button size="lg" className="w-full bg-white text-primary hover:bg-white/90" onClick={() => setStep((s) => s + 1)}>
-            {t("onboarding.next")}
-          </Button>
-        )}
+        <Button size="lg" className="w-full bg-white text-primary hover:bg-white/90" onClick={advance}>
+          {isLast ? t("onboarding.connectCta") : isInstallStep && canInstall ? t("profile.install") : t("onboarding.next")}
+        </Button>
       </div>
     </div>
   );

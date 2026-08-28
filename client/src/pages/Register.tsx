@@ -34,7 +34,11 @@ export default function Register() {
     try {
       const user = await apiRequest<User>("POST", "/api/auth/register", data);
       setUser(user);
-      navigate(sessionStorage.getItem("together:pendingInviteCode") ? "/connect" : "/onboarding");
+      // Always show onboarding, even for someone registering via a partner's
+      // invite link — it's the only place install instructions are shown,
+      // and OnboardingTour's final step already routes to /connect, which
+      // still auto-fills any pending invite code from sessionStorage.
+      navigate("/onboarding");
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setServerError(t("auth.emailInUse"));
