@@ -35,8 +35,11 @@ async function tick() {
       if (reminderTime === hhmm) {
         const alreadySent = await storage.wasReminderSent(user.id, date, "daily");
         if (!alreadySent) {
-          const activeToday = await storage.hasActivityToday(user.id, date);
-          if (!activeToday) {
+          // Nudges specifically toward the mood check-in, not "any activity" —
+          // answering a question or finishing a challenge no longer silences
+          // this reminder, since the point is to catch a missed mood.
+          const mood = await storage.getMoodForDate(user.id, date);
+          if (!mood) {
             await notifyUser(user.id, (lang) => ({
               title: "Together",
               body: dailyReminderNotification(lang),

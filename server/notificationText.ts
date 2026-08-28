@@ -63,9 +63,9 @@ export function planDateNotification(lang: string, title: string): string {
 
 export function dailyReminderNotification(lang: string): string {
   const bodies: Record<Lang, string> = {
-    sl: "Ne pozabi na današnje razpoloženje, vprašanje ali izziv! 💗",
-    en: "Don't forget today's mood, question, or challenge! 💗",
-    hr: "Ne zaboravi današnje raspoloženje, pitanje ili izazov! 💗",
+    sl: "Ne pozabi izbrati današnjega razpoloženja! 💗",
+    en: "Don't forget to pick today's mood! 💗",
+    hr: "Ne zaboravi odabrati današnje raspoloženje! 💗",
   };
   return bodies[normLang(lang)];
 }
