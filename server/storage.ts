@@ -791,7 +791,11 @@ export async function getReactionsForTargets(targetType: "mood" | "answer" | "ch
 // ---------------- Random idea ----------------
 export async function getRandomDateIdea(excludeId?: number) {
   const all = await db.select().from(dateIdeas);
-  const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null);
+  // "Surprise me" must work for every user regardless of where they live, so
+  // it only draws from curated ideas with no city tied to them (not sourced
+  // from OSM either) — most of the curated catalog is Ljubljana-specific,
+  // which made this feature useless for anyone testing from elsewhere.
+  const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null && i.city == null);
   const pool = excludeId ? curated.filter((i: typeof dateIdeas.$inferSelect) => i.id !== excludeId) : curated;
   if (pool.length === 0) return undefined;
   return pool[Math.floor(Math.random() * pool.length)];

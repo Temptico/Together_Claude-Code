@@ -318,6 +318,26 @@ const DATE_IDEAS: Array<{
   { title: "Let z balonom nad Ljubljano", description: "Doživita mesto z drugačne perspektive na nepozabnem poletu z balonom.", category: "aktivno", cost: "eur3", duration: "2h+", city: "Ljubljana" },
   { title: "Degustacija vin v vinski kleti", description: "Odkrijta okuse slovenskih vin ob vodenem pokušanju z lokalnim sommelierjem.", category: "kulturno", cost: "eur3", duration: "2h", locationType: "vinarije", city: "Ljubljana" },
   { title: "Zasebna kuharska delavnica", description: "Pod vodstvom kuharja skupaj pripravita večerni meni po meri.", category: "aktivno", cost: "eur3", duration: "2h", city: "Ljubljana" },
+  // Splošne ideje brez vezane lokacije — delujejo kjer koli, ne samo v Ljubljani.
+  // Namenoma brez "city", da jih "Presenetí me" lahko predlaga vsem uporabnikom.
+  { title: "Piknik na balkonu ali terasi", description: "Postelita odejo, pripravita prigrizke in uživajta v večeru na svežem zraku doma.", category: "doma", cost: "brezplacno", duration: "1h" },
+  { title: "Skupno pisanje zgodbe", description: "Vsak izmenoma napiše en stavek in skupaj ustvarita smešno ali romantično zgodbo.", category: "doma", cost: "brezplacno", duration: "30min" },
+  { title: "Degustacija doma", description: "Pripravita majhno degustacijo sirov, čokolad ali vin, ki jih še nista poskusila.", category: "doma", cost: "eur", duration: "1h" },
+  { title: "Karaoke večer", description: "Izberita najljubše pesmi in zapojta na glas, kot da vaju nihče ne posluša.", category: "doma", cost: "brezplacno", duration: "1h" },
+  { title: "Sprehod v bližnjem parku", description: "Poiščita najbližji park ali zeleno površino in se sprostita ob sprehodu.", category: "na-prostem", cost: "brezplacno", duration: "1h" },
+  { title: "Kolesarjenje po okolici", description: "Odkrijta nove kolesarske poti v svoji okolici.", category: "na-prostem", cost: "brezplacno", duration: "2h" },
+  { title: "Opazovanje zvezd", description: "Poiščita temno mesto stran od mestnih luči in opazujta nočno nebo.", category: "na-prostem", cost: "brezplacno", duration: "1h" },
+  { title: "Piknik v naravi", description: "Vzemita odejo in malico ter poiščita lepo mesto v naravi za piknik.", category: "na-prostem", cost: "eur", duration: "2h+" },
+  { title: "Tek ali hitra hoja skupaj", description: "Preteczita ali prehoditva svojo najljubšo traso v okolici.", category: "aktivno", cost: "brezplacno", duration: "1h" },
+  { title: "Joga v dvoje", description: "Poiščita spletno vadbo joge za pare in jo skupaj preizkusita.", category: "aktivno", cost: "brezplacno", duration: "1h" },
+  { title: "Obisk bližnjega plezalnega centra", description: "Preizkusita se v športnem plezanju v najbližjem plezalnem centru.", category: "aktivno", cost: "eur2", duration: "2h" },
+  { title: "Kolesarski izlet", description: "Odpravita se na daljši kolesarski izlet v okolico.", category: "aktivno", cost: "brezplacno", duration: "2h+" },
+  { title: "Kava v novi kavarni", description: "Poiščita kavarno v svoji bližini, ki je še nista obiskala.", category: "sprosceno", cost: "eur", duration: "30min" },
+  { title: "Nakupovalni popoldan", description: "Sproščen dan brskanja po trgovinah v svojem mestu, brez pritiska po nakupu.", category: "sprosceno", cost: "eur2", duration: "2h" },
+  { title: "Sladoled v bližini", description: "Poiščita najboljšo sladoledarno v svoji okolici.", category: "sprosceno", cost: "eur", duration: "30min" },
+  { title: "Obisk lokalnega muzeja ali galerije", description: "Preverita, kateri muzej ali galerija je v vajini bližini, in jo obiščita skupaj.", category: "kulturno", cost: "eur", duration: "2h" },
+  { title: "Ogled predstave v lokalnem gledališču", description: "Preverita repertoar najbližjega gledališča in si izberita predstavo.", category: "kulturno", cost: "eur2", duration: "2h+" },
+  { title: "Obisk lokalne knjižnice", description: "Poiščita si knjigo v svoji mestni knjižnici, ki jo bosta prebrala vsak zase ali na glas.", category: "kulturno", cost: "brezplacno", duration: "1h" },
 ];
 
 export async function runSeed() {
