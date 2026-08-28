@@ -214,6 +214,8 @@ export const translations = {
       challengeBody: "Majhen skupen izziv vsak dan — od plesa v dnevni sobi do načrtovanja potovanja.",
       connectTitle: "Povežita se",
       connectBody: "Deli svojo kodo ali QR s partnerjem, da začneta skupno pot.",
+      installHint: "Večina parov aplikacijo namesti na začetni zaslon za hitrejši dostop in obvestila.",
+      done: "Končano",
     },
     category: {
       vsakdan: "Vsakdan",
@@ -534,6 +536,8 @@ export const translations = {
       challengeBody: "A small shared challenge every day — from dancing in the living room to planning a trip.",
       connectTitle: "Connect",
       connectBody: "Share your code or QR with your partner to start your journey together.",
+      installHint: "Most couples install the app to their home screen for quicker access and notifications.",
+      done: "Done",
     },
     category: {
       vsakdan: "Everyday",
@@ -854,6 +858,8 @@ export const translations = {
       challengeBody: "Mali zajednički izazov svaki dan — od plesa u dnevnoj sobi do planiranja putovanja.",
       connectTitle: "Povežite se",
       connectBody: "Podijeli svoj kod ili QR s partnerom da započnete zajedničko putovanje.",
+      installHint: "Većina parova instalira aplikaciju na početni zaslon za brži pristup i obavijesti.",
+      done: "Gotovo",
     },
     category: {
       vsakdan: "Svakodnevica",
