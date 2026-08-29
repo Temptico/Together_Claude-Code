@@ -338,6 +338,17 @@ const DATE_IDEAS: Array<{
   { title: "Obisk lokalnega muzeja ali galerije", description: "Preverita, kateri muzej ali galerija je v vajini bližini, in jo obiščita skupaj.", category: "kulturno", cost: "eur", duration: "2h" },
   { title: "Ogled predstave v lokalnem gledališču", description: "Preverita repertoar najbližjega gledališča in si izberita predstavo.", category: "kulturno", cost: "eur2", duration: "2h+" },
   { title: "Obisk lokalne knjižnice", description: "Poiščita si knjigo v svoji mestni knjižnici, ki jo bosta prebrala vsak zase ali na glas.", category: "kulturno", cost: "brezplacno", duration: "1h" },
+  // Sponzorirana ideja — jasno označena kot Temptico v naslovu/opisu (ne skrita),
+  // v skladu z zahtevo po razpoznavnem, a nevpadljivem oglaševanju.
+  {
+    title: "Temptico čokolada za dva",
+    description: "Presenetita drug drugega s čutno Temptico čokolado za pare in uživajta v posebnem večeru. Uporabita kodo TOGETHER10 za 10 % popust.",
+    category: "sprosceno",
+    cost: "eur2",
+    duration: "1h",
+    website: "https://www.temptico.com/products/temptico_tablica?utm_source=together_app&utm_medium=in_app&utm_campaign=date_idea&discount=TOGETHER10",
+    tags: ["temptico"],
+  },
 ];
 
 export async function runSeed() {
