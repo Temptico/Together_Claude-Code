@@ -217,6 +217,10 @@ export const translations = {
       installHint: "Večina parov aplikacijo namesti na začetni zaslon za hitrejši dostop in obvestila.",
       done: "Končano",
     },
+    installReminder: {
+      body: "Za boljšo uporabniško izkušnjo priporočamo, da si Together namestiš na začetni zaslon.",
+      later: "Morda kasneje",
+    },
     category: {
       vsakdan: "Vsakdan",
       hvaleznost: "Hvaležnost",
@@ -539,6 +543,10 @@ export const translations = {
       installHint: "Most couples install the app to their home screen for quicker access and notifications.",
       done: "Done",
     },
+    installReminder: {
+      body: "For a better experience, we recommend installing Together to your home screen.",
+      later: "Maybe later",
+    },
     category: {
       vsakdan: "Everyday",
       hvaleznost: "Gratitude",
@@ -860,6 +868,10 @@ export const translations = {
       connectBody: "Podijeli svoj kod ili QR s partnerom da započnete zajedničko putovanje.",
       installHint: "Većina parova instalira aplikaciju na početni zaslon za brži pristup i obavijesti.",
       done: "Gotovo",
+    },
+    installReminder: {
+      body: "Za bolje korisničko iskustvo preporučamo da Together instaliraš na početni zaslon.",
+      later: "Možda kasnije",
     },
     category: {
       vsakdan: "Svakodnevica",

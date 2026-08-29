@@ -8,6 +8,7 @@ import { I18nProvider } from "@/i18n/i18n";
 import { ToastContextProvider } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { BottomNav } from "@/components/BottomNav";
+import { InstallReminderDialog } from "@/components/InstallReminderDialog";
 
 import Welcome from "@/pages/Welcome";
 
@@ -93,6 +94,7 @@ function Shell() {
         </Suspense>
       </div>
       <BottomNav />
+      <InstallReminderDialog />
     </div>
   );
 }
