@@ -609,6 +609,7 @@ export function registerRoutes(app: Express) {
         language: z.enum(["sl", "en", "hr"]).optional(),
         pin: z.string().regex(/^\d{4,6}$/, "PIN mora imeti 4-6 številk").optional(),
         currentPin: z.string().optional(),
+        pwaInstalled: z.literal(true).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -624,8 +625,11 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const { currentPin, pin, ...rest } = parsed.data;
+      const { currentPin, pin, pwaInstalled, ...rest } = parsed.data;
       const patch: any = { ...rest };
+      // Only ever moves forward — never overwrite an existing install
+      // timestamp with a later one from, say, a second device installing.
+      if (pwaInstalled && !user.pwaInstalledAt) patch.pwaInstalledAt = new Date();
 
       if (pin) {
         if (user.pin) {
@@ -635,6 +639,14 @@ export function registerRoutes(app: Express) {
           }
         }
         patch.pin = await storage.hashPin(pin);
+      }
+
+      // An empty patch (e.g. { pwaInstalled: true } sent again after the
+      // timestamp is already set, with nothing else in the body) would
+      // otherwise reach the DB as `UPDATE users SET WHERE ...` — invalid SQL.
+      if (Object.keys(patch).length === 0) {
+        res.json(storage.omitPin(user));
+        return;
       }
 
       const updated = await storage.updateUser(user.id, patch);

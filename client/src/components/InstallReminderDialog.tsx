@@ -7,6 +7,16 @@ import { useTranslation } from "@/i18n/i18n";
 const LAST_SHOWN_KEY = "together:installReminderLastShown";
 const REPEAT_INTERVAL_MS = 48 * 60 * 60 * 1000; // 48h
 
+// One-day broadcast override, requested explicitly: show the popup to every
+// user today regardless of install status or the 48h cooldown, to maximize
+// visibility right after shipping this feature. Remove this block (and the
+// forceToday checks below) once today has passed — it's a deliberate,
+// temporary exception to the normal targeting, not a permanent behavior.
+const FORCE_SHOW_ALL_DATE = "2026-08-29";
+function isForceShowDay(): boolean {
+  return new Date().toISOString().slice(0, 10) === FORCE_SHOW_ALL_DATE;
+}
+
 // Gently nudges users who haven't installed the PWA yet toward doing so —
 // mounted once at the authenticated app shell level so it can surface on
 // any page, at most once per 48h, and is always dismissible (the Dialog's
@@ -16,9 +26,10 @@ export function InstallReminderDialog() {
   const { t } = useTranslation();
   const { showInstallCard, canInstall, install, instructionsKey } = usePwaInstall();
   const [open, setOpen] = useState(false);
+  const forceToday = isForceShowDay();
 
   useEffect(() => {
-    if (!showInstallCard) return;
+    if (!showInstallCard && !forceToday) return;
     let last = 0;
     try {
       last = Number(localStorage.getItem(LAST_SHOWN_KEY) || "0");
@@ -26,16 +37,21 @@ export function InstallReminderDialog() {
       /* localStorage unavailable (private mode etc.) — just skip nagging this session */
       return;
     }
-    if (Date.now() - last < REPEAT_INTERVAL_MS) return;
+    // The forced broadcast still only shows once per browser (not once per
+    // page nav) — it ignores the 48h cooldown, not "has this device already
+    // seen today's broadcast".
+    const alreadyShownToday = forceToday && new Date(last).toISOString().slice(0, 10) === FORCE_SHOW_ALL_DATE;
+    if (!forceToday && Date.now() - last < REPEAT_INTERVAL_MS) return;
+    if (alreadyShownToday) return;
     setOpen(true);
     try {
       localStorage.setItem(LAST_SHOWN_KEY, String(Date.now()));
     } catch {
       /* ignore */
     }
-  }, [showInstallCard]);
+  }, [showInstallCard, forceToday]);
 
-  if (!showInstallCard) return null;
+  if (!showInstallCard && !forceToday) return null;
 
   const handleInstall = async () => {
     await install();

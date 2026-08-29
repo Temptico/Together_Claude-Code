@@ -24,6 +24,7 @@ export const users = pgTable("users", {
   reminderTime: text("reminder_time").notNull().default("random"),
   language: varchar("language", { length: 2 }).notNull().default("sl"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  pwaInstalledAt: timestamp("pwa_installed_at"), // set the first time the client detects standalone/installed mode
 });
 
 export const PIN_REGEX = /^\d{4,6}$/;

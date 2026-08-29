@@ -904,6 +904,7 @@ export async function getAdminStats() {
 
   const notificationsOptedIn = allUsers.filter((u: User) => u.notificationsEnabled).length;
   const usersWithPushSub = new Set(subs.map((s: { userId: string }) => s.userId)).size;
+  const pwaInstalledCount = allUsers.filter((u: User) => u.pwaInstalledAt).length;
 
   const languageCounts: Record<string, number> = {};
   for (const u of allUsers as User[]) languageCounts[u.language] = (languageCounts[u.language] || 0) + 1;
@@ -921,6 +922,7 @@ export async function getAdminStats() {
     activeThisWeek: activeThisWeekSet.size,
     notificationsOptedIn,
     usersWithPushSub,
+    pwaInstalledCount,
     languageCounts,
     totals: {
       moods: allMoods.length,

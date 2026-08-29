@@ -136,7 +136,8 @@ async function main() {
   </div>
   <div class="cards">
     <div class="card"><div class="value">${stats.notificationsOptedIn}/${stats.totalUsers}</div><div class="label">Obvestila omogočena</div></div>
-    <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Z aktivno naročnino</div></div>
+    <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Naprave z obvestili</div></div>
+    <div class="card"><div class="value">${stats.pwaInstalledCount}/${stats.totalUsers}</div><div class="label">Namestili na telefon</div></div>
     <div class="card"><div class="value" style="font-size:1.15rem">${Object.entries(stats.languageCounts).map(([l, n]) => `${l.toUpperCase()}: ${n}`).join(" · ") || "–"}</div><div class="label">Po jeziku</div></div>
   </div>
   <div class="tool">

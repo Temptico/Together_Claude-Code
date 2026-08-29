@@ -16,7 +16,8 @@ const STATEMENTS = [
       notifications_enabled boolean NOT NULL DEFAULT true,
       reminder_time text NOT NULL DEFAULT 'random',
       language varchar(2) NOT NULL DEFAULT 'sl',
-      created_at timestamp NOT NULL DEFAULT now()
+      created_at timestamp NOT NULL DEFAULT now(),
+      pwa_installed_at timestamp
     )`,
   `CREATE TABLE IF NOT EXISTS moods (
       id serial PRIMARY KEY,
@@ -165,6 +166,7 @@ const STATEMENTS = [
   `ALTER TABLE questions ADD COLUMN IF NOT EXISTS text_hr text`,
   `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_en text`,
   `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_hr text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS pwa_installed_at timestamp`,
 ];
 
 export async function runMigrations() {
