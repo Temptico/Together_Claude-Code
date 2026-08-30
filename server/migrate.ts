@@ -147,6 +147,13 @@ const STATEMENTS = [
       dismissed_at timestamp
     )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS milestone_events_user_type_idx ON milestone_events (user_id, type)`,
+  `CREATE TABLE IF NOT EXISTS feedback (
+      id serial PRIMARY KEY,
+      user_id varchar(24) NOT NULL,
+      category varchar(16) NOT NULL,
+      text text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   `CREATE TABLE IF NOT EXISTS wishlist_items (
       id serial PRIMARY KEY,
       couple_key varchar(49) NOT NULL,

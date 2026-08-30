@@ -22,6 +22,7 @@ import {
   insertCustomQuestionSchema,
   insertCustomChallengeSchema,
   insertWishlistItemSchema,
+  insertFeedbackSchema,
   REACTION_EMOJIS,
 } from "../shared/schema.js";
 
@@ -914,6 +915,23 @@ export function registerRoutes(app: Express) {
       if (!user) return;
       await storage.deleteWishlistItem(Number(req.params.id), user);
       res.status(204).end();
+    })
+  );
+
+  // ---------------- Feedback ----------------
+  app.post(
+    "/api/feedback",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string() }).and(insertFeedbackSchema);
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const row = await storage.createFeedback(user.id, parsed.data.category, parsed.data.text);
+      res.status(201).json(row);
     })
   );
 }

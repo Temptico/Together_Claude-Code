@@ -5,7 +5,14 @@ import { initSentry, Sentry } from "./sentry.js";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 import { registerRoutes } from "./routes.js";
-import { getUserByConnectCode, getAdminStats, resetPinByEmail, getUserByEmail, deleteUserAccount } from "./storage.js";
+import {
+  getUserByConnectCode,
+  getAdminStats,
+  resetPinByEmail,
+  getUserByEmail,
+  deleteUserAccount,
+  getAllFeedbackWithUsers,
+} from "./storage.js";
 import { notifyAllWithNotifications } from "./push.js";
 import { startScheduler } from "./scheduler.js";
 
@@ -94,6 +101,20 @@ async function main() {
           `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.connected ? "✅" : "—"}</td><td>${new Date(u.createdAt).toLocaleDateString("sl-SI")}</td><td><button class="del-btn" data-email="${esc(u.email)}" data-name="${esc(u.name)}">Izbriši</button></td></tr>`
       )
       .join("");
+
+    const FEEDBACK_LABELS: Record<string, string> = {
+      praise: "💛 Pohvala",
+      suggestion: "💡 Predlog",
+      problem: "⚠️ Težava",
+      other: "💬 Drugo",
+    };
+    const allFeedback = await getAllFeedbackWithUsers();
+    const feedbackRows = allFeedback
+      .map(
+        (f: { category: string; userName: string | null; userEmail: string | null; text: string; createdAt: Date }) =>
+          `<tr><td>${FEEDBACK_LABELS[f.category] || esc(f.category)}</td><td>${esc(f.userName || "?")}<br><span style="color:#7a6f68;font-size:0.8rem">${esc(f.userEmail || "")}</span></td><td>${esc(f.text)}</td><td>${new Date(f.createdAt).toLocaleDateString("sl-SI")}</td></tr>`
+      )
+      .join("");
     res.set("Content-Type", "text/html").send(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Together — Admin</title>
 <style>
@@ -164,6 +185,11 @@ async function main() {
   <table>
     <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th><th>Dejanja</th></tr></thead>
     <tbody>${rows}</tbody>
+  </table>
+  <h2 style="margin-top: 2rem;">Povratne informacije (${allFeedback.length})</h2>
+  <table>
+    <thead><tr><th>Kategorija</th><th>Od</th><th>Besedilo</th><th>Datum</th></tr></thead>
+    <tbody>${feedbackRows || `<tr><td colspan="4" style="color:#7a6f68">Še ni povratnih informacij.</td></tr>`}</tbody>
   </table>
   <script>
     document.getElementById('reset-form').addEventListener('submit', async (e) => {

@@ -17,6 +17,7 @@ import {
   reminderLog,
   wishlistItems,
   milestoneEvents,
+  feedback,
   type User,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
@@ -884,6 +885,30 @@ export async function wasReminderSent(userId: string, date: string, type: string
 
 export async function markReminderSent(userId: string, date: string, type: string) {
   await db.insert(reminderLog).values({ userId, date, type }).onConflictDoNothing();
+}
+
+// ---------------- Feedback ----------------
+export async function createFeedback(userId: string, category: string, text: string) {
+  const [row] = await db.insert(feedback).values({ userId, category, text }).returning();
+  return row;
+}
+
+// Admin-only read: joins in the author's name/email so the dashboard doesn't
+// need a second round trip per row.
+export async function getAllFeedbackWithUsers() {
+  const rows = await db
+    .select({
+      id: feedback.id,
+      category: feedback.category,
+      text: feedback.text,
+      createdAt: feedback.createdAt,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(feedback)
+    .leftJoin(users, eq(feedback.userId, users.id))
+    .orderBy(desc(feedback.createdAt));
+  return rows;
 }
 
 // ---------------- Admin ----------------

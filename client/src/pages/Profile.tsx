@@ -17,6 +17,7 @@ import {
   Trash2,
   Share,
   PlayCircle,
+  MessageSquareHeart,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { DeleteAccountDialog } from "@/components/DeleteAccountDialog";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
@@ -59,6 +61,7 @@ export default function Profile() {
   const { canInstall, install, showInstallCard, instructionsKey } = usePwaInstall();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [anniversary, setAnniversary] = useState(user!.anniversaryDate || "");
   const [anniversaryError, setAnniversaryError] = useState<string | null>(null);
 
@@ -264,6 +267,12 @@ export default function Profile() {
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
+          <button onClick={() => setFeedbackOpen(true)} className="flex items-center justify-between py-4 text-left">
+            <div className="flex items-center gap-2 font-bold">
+              <MessageSquareHeart className="h-5 w-5 text-primary" /> {t("profile.feedback")}
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
           <a href="mailto:info@temptico.com" className="flex items-center justify-between py-4">
             <div className="flex items-center gap-2 font-bold">
               <HelpCircle className="h-5 w-5 text-primary" /> {t("profile.help")}
@@ -293,6 +302,7 @@ export default function Profile() {
 
       <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
       <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 }

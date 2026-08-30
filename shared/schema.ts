@@ -226,6 +226,22 @@ export const milestoneEvents = pgTable("milestone_events", {
   dismissedAt: timestamp("dismissed_at"),
 });
 
+// ---------- Feedback ----------
+export const FEEDBACK_CATEGORIES = ["praise", "suggestion", "problem", "other"] as const;
+
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  category: varchar("category", { length: 16 }).notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedback, {
+  category: z.enum(FEEDBACK_CATEGORIES),
+  text: z.string().min(1, "Besedilo ne sme biti prazno").max(2000, "Besedilo je predolgo"),
+}).pick({ category: true, text: true });
+
 // ---------- Push subscriptions ----------
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),

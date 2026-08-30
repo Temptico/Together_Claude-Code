@@ -177,6 +177,7 @@ export const translations = {
       language: "Jezik",
       logout: "Odjava",
       terms: "Pogoji uporabe in zasebnost",
+      feedback: "Pošlji povratno informacijo",
       help: "Pomoč in podpora",
       save: "Shrani",
       cancel: "Prekliči",
@@ -223,6 +224,18 @@ export const translations = {
     installReminder: {
       body: "Za boljšo uporabniško izkušnjo priporočamo, da si Together namestiš na začetni zaslon.",
       later: "Morda kasneje",
+    },
+    feedback: {
+      title: "Pošlji povratno informacijo",
+      placeholder: "Napiši pohvalo, predlog ali težavo, na katero si naletel/a...",
+      submit: "Pošlji",
+      thanks: "Hvala za povratno informacijo! 💗",
+      category: {
+        praise: "💛 Pohvala",
+        suggestion: "💡 Predlog",
+        problem: "⚠️ Težava",
+        other: "💬 Drugo",
+      },
     },
     category: {
       vsakdan: "Vsakdan",
@@ -506,6 +519,7 @@ export const translations = {
       language: "Language",
       logout: "Log out",
       terms: "Terms of use & privacy",
+      feedback: "Send feedback",
       help: "Help & support",
       save: "Save",
       cancel: "Cancel",
@@ -552,6 +566,18 @@ export const translations = {
     installReminder: {
       body: "For a better experience, we recommend installing Together to your home screen.",
       later: "Maybe later",
+    },
+    feedback: {
+      title: "Send feedback",
+      placeholder: "Write a compliment, suggestion, or a problem you ran into...",
+      submit: "Send",
+      thanks: "Thanks for the feedback! 💗",
+      category: {
+        praise: "💛 Praise",
+        suggestion: "💡 Suggestion",
+        problem: "⚠️ Problem",
+        other: "💬 Other",
+      },
     },
     category: {
       vsakdan: "Everyday",
@@ -835,6 +861,7 @@ export const translations = {
       language: "Jezik",
       logout: "Odjava",
       terms: "Uvjeti korištenja i privatnost",
+      feedback: "Pošalji povratnu informaciju",
       help: "Pomoć i podrška",
       save: "Spremi",
       cancel: "Odustani",
@@ -881,6 +908,18 @@ export const translations = {
     installReminder: {
       body: "Za bolje korisničko iskustvo preporučamo da Together instaliraš na početni zaslon.",
       later: "Možda kasnije",
+    },
+    feedback: {
+      title: "Pošalji povratnu informaciju",
+      placeholder: "Napiši pohvalu, prijedlog ili problem na koji si naišao/naišla...",
+      submit: "Pošalji",
+      thanks: "Hvala na povratnoj informaciji! 💗",
+      category: {
+        praise: "💛 Pohvala",
+        suggestion: "💡 Prijedlog",
+        problem: "⚠️ Problem",
+        other: "💬 Ostalo",
+      },
     },
     category: {
       vsakdan: "Svakodnevica",
