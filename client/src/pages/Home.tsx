@@ -142,7 +142,10 @@ function MilestoneCard({ milestone, userId }: { milestone: { id: number; value: 
           asChild
           variant="secondary"
           className="self-start bg-white text-primary hover:bg-white/90"
-          onClick={() => dismissMutation.mutate()}
+          onClick={() => {
+            apiRequest("POST", "/api/track/temptico-click", { userId, source: "milestone" }).catch(() => {});
+            dismissMutation.mutate();
+          }}
         >
           <a href={TEMPTICO_MILESTONE_URL} target="_blank" rel="noopener noreferrer">
             {t("home.milestoneCta")}

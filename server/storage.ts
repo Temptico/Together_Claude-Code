@@ -18,6 +18,7 @@ import {
   wishlistItems,
   milestoneEvents,
   feedback,
+  tempticoClicks,
   type User,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
@@ -683,6 +684,11 @@ export async function dismissMilestone(id: number, userId: string) {
     .where(and(eq(milestoneEvents.id, id), eq(milestoneEvents.userId, userId)));
 }
 
+// ---------------- Temptico click tracking ----------------
+export async function recordTempticoClick(userId: string, source: string) {
+  await db.insert(tempticoClicks).values({ userId, source });
+}
+
 // ---------------- Push subscriptions ----------------
 export async function savePushSubscription(
   userId: string,
@@ -957,6 +963,29 @@ export async function getAdminStats() {
     db.select().from(pushSubscriptions),
   ]);
 
+  const [allMilestones, allTempticoClicks, streaks] = await Promise.all([
+    db.select().from(milestoneEvents),
+    db.select().from(tempticoClicks),
+    Promise.all(allUsers.map((u: User) => calculateStreak(u.id))),
+  ]);
+
+  const streakDistribution = { zero: 0, d1to6: 0, d7to29: 0, d30to59: 0, d60to99: 0, d100plus: 0 };
+  for (const s of streaks) {
+    if (s === 0) streakDistribution.zero++;
+    else if (s < 7) streakDistribution.d1to6++;
+    else if (s < 30) streakDistribution.d7to29++;
+    else if (s < 60) streakDistribution.d30to59++;
+    else if (s < 100) streakDistribution.d60to99++;
+    else streakDistribution.d100plus++;
+  }
+
+  const milestonesByType: Record<string, number> = {};
+  for (const m of allMilestones as { type: string }[]) milestonesByType[m.type] = (milestonesByType[m.type] || 0) + 1;
+
+  const tempticoClicksBySource: Record<string, number> = {};
+  for (const c of allTempticoClicks as { source: string }[])
+    tempticoClicksBySource[c.source] = (tempticoClicksBySource[c.source] || 0) + 1;
+
   const activeTodaySet = new Set<string>();
   for (const m of todayMoods) activeTodaySet.add(m.userId);
   for (const a of todayAnswers) activeTodaySet.add(a.userId);
@@ -989,6 +1018,11 @@ export async function getAdminStats() {
     usersWithPushSub,
     pwaInstalledCount,
     languageCounts,
+    streakDistribution,
+    milestonesTotal: allMilestones.length,
+    milestonesByType,
+    tempticoClicksTotal: allTempticoClicks.length,
+    tempticoClicksBySource,
     totals: {
       moods: allMoods.length,
       answers: allAnswers.length,

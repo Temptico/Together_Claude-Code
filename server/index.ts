@@ -115,6 +115,16 @@ async function main() {
           `<tr><td>${FEEDBACK_LABELS[f.category] || esc(f.category)}</td><td>${esc(f.userName || "?")}<br><span style="color:#7a6f68;font-size:0.8rem">${esc(f.userEmail || "")}</span></td><td>${esc(f.text)}</td><td>${new Date(f.createdAt).toLocaleDateString("sl-SI")}</td></tr>`
       )
       .join("");
+
+    const milestoneBreakdown = Object.entries(stats.milestonesByType)
+      .sort(([a], [b]) => Number(a.replace("streak_", "")) - Number(b.replace("streak_", "")))
+      .map(([type, n]) => `${type.replace("streak_", "")}d: ${n}`)
+      .join(" · ");
+    const CLICK_SOURCE_LABELS: Record<string, string> = { date_idea: "ideja", milestone: "mejnik" };
+    const clicksBreakdown = Object.entries(stats.tempticoClicksBySource)
+      .map(([source, n]) => `${CLICK_SOURCE_LABELS[source] || source}: ${n}`)
+      .join(" · ");
+
     res.set("Content-Type", "text/html").send(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Together — Admin</title>
 <style>
@@ -160,6 +170,20 @@ async function main() {
     <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Naprave z obvestili</div></div>
     <div class="card"><div class="value">${stats.pwaInstalledCount}/${stats.totalUsers}</div><div class="label">Namestili na telefon</div></div>
     <div class="card"><div class="value" style="font-size:1.15rem">${Object.entries(stats.languageCounts).map(([l, n]) => `${l.toUpperCase()}: ${n}`).join(" · ") || "–"}</div><div class="label">Po jeziku</div></div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="value" style="font-size:1rem">0: ${stats.streakDistribution.zero} · 1-6: ${stats.streakDistribution.d1to6} · 7-29: ${stats.streakDistribution.d7to29} · 30-59: ${stats.streakDistribution.d30to59} · 60-99: ${stats.streakDistribution.d60to99} · 100+: ${stats.streakDistribution.d100plus}</div>
+      <div class="label">Porazdelitev nizov (dni)</div>
+    </div>
+    <div class="card">
+      <div class="value">${stats.milestonesTotal}</div>
+      <div class="label">Doseženih mejnikov${milestoneBreakdown ? ` <span style="font-weight:400">(${milestoneBreakdown})</span>` : ""}</div>
+    </div>
+    <div class="card">
+      <div class="value">${stats.tempticoClicksTotal}</div>
+      <div class="label">Kliki na Temptico ponudbo${clicksBreakdown ? ` <span style="font-weight:400">(${clicksBreakdown})</span>` : ""}</div>
+    </div>
   </div>
   <div class="tool">
     <h2>Ponastavi PIN</h2>

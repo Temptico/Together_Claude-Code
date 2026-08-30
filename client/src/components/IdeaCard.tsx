@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { costLabel, durationLabel, categoryLabel } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
+import { useAuth } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 
 export function IdeaCard({
   idea,
@@ -13,6 +15,12 @@ export function IdeaCard({
   onPlan: (idea: any) => void;
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isTemptico = idea.tags?.includes("temptico");
+  const trackClick = () => {
+    if (!isTemptico || !user) return;
+    apiRequest("POST", "/api/track/temptico-click", { userId: user.id, source: "date_idea" }).catch(() => {});
+  };
   return (
     <Card>
       <CardContent className="flex flex-col gap-2 py-4">
@@ -57,6 +65,7 @@ export function IdeaCard({
               href={idea.website}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={trackClick}
               className="flex items-center gap-1 text-xs font-bold text-primary"
             >
               <ExternalLink className="h-3.5 w-3.5" /> {t("dates.website")}

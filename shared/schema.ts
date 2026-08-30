@@ -226,6 +226,18 @@ export const milestoneEvents = pgTable("milestone_events", {
   dismissedAt: timestamp("dismissed_at"),
 });
 
+// Click-through tracking for the Temptico CTAs (date-idea catalog entry,
+// milestone celebration card) — Shopify's TOGETHER10 code usage shows
+// completed purchases, but not how many people saw/clicked the offer
+// without buying, so this fills that funnel gap.
+export const TEMPTICO_CLICK_SOURCES = ["date_idea", "milestone"] as const;
+export const tempticoClicks = pgTable("temptico_clicks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  source: varchar("source", { length: 16 }).notNull(), // 'date_idea' | 'milestone'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ---------- Feedback ----------
 export const FEEDBACK_CATEGORIES = ["praise", "suggestion", "problem", "other"] as const;
 

@@ -23,6 +23,7 @@ import {
   insertCustomChallengeSchema,
   insertWishlistItemSchema,
   insertFeedbackSchema,
+  TEMPTICO_CLICK_SOURCES,
   REACTION_EMOJIS,
 } from "../shared/schema.js";
 
@@ -932,6 +933,23 @@ export function registerRoutes(app: Express) {
       if (!user) return;
       const row = await storage.createFeedback(user.id, parsed.data.category, parsed.data.text);
       res.status(201).json(row);
+    })
+  );
+
+  // ---------------- Analytics ----------------
+  app.post(
+    "/api/track/temptico-click",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string(), source: z.enum(TEMPTICO_CLICK_SOURCES) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      await storage.recordTempticoClick(user.id, parsed.data.source);
+      res.status(204).end();
     })
   );
 }
