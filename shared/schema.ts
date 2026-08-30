@@ -34,7 +34,15 @@ export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Neveljaven e-poštni naslov"),
 })
   .pick({ name: true, email: true })
-  .extend({ pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk") });
+  .extend({
+    pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk"),
+    // Optional — the client sends whatever language the registration page is
+    // currently showing (device-detected or explicitly chosen there), so the
+    // welcome email and the rest of the app start in the right language from
+    // the first screen rather than defaulting to Slovenian until the user
+    // finds the switcher in Profile.
+    language: z.enum(["sl", "en", "hr"]).optional(),
+  });
 
 export const loginSchema = z.object({
   email: z.string().email("Neveljaven e-poštni naslov"),

@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as storage from "./storage.js";
 import { getVapidPublicKey, notifyUser } from "./push.js";
+import { sendWelcomeEmail } from "./email.js";
 import { fetchNearbyPlaces } from "./places.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
@@ -75,7 +76,8 @@ export function registerRoutes(app: Express) {
         return;
       }
       const pinHash = await storage.hashPin(parsed.data.pin);
-      const user = await storage.createUser(parsed.data.name, parsed.data.email, pinHash);
+      const user = await storage.createUser(parsed.data.name, parsed.data.email, pinHash, parsed.data.language);
+      sendWelcomeEmail(user.email, user.name, user.language).catch(() => {});
       res.status(201).json(storage.omitPin(user));
     })
   );

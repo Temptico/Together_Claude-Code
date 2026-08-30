@@ -11,7 +11,7 @@ import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useState } from "react";
 
 export default function Register() {
-  const { t } = useTranslation();
+  const { t, lang, setLang } = useTranslation();
   const { setUser } = useAuth();
   const [, navigate] = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function Register() {
       return;
     }
     try {
-      const user = await apiRequest<User>("POST", "/api/auth/register", data);
+      const user = await apiRequest<User>("POST", "/api/auth/register", { ...data, language: lang });
       setUser(user);
       // Always show onboarding, even for someone registering via a partner's
       // invite link — it's the only place install instructions are shown,
@@ -53,6 +53,20 @@ export default function Register() {
       <div className="mb-8 text-center">
         <div className="text-5xl mb-2">💞</div>
         <h1 className="text-2xl font-extrabold">{t("auth.createAccount")}</h1>
+        <div className="mt-3 flex justify-center gap-1 rounded-full bg-white/20 p-1 w-fit mx-auto">
+          {(["sl", "en", "hr"] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              className={`rounded-full px-3 py-1 text-xs font-bold ${
+                lang === l ? "bg-white text-primary" : "text-white/80"
+              }`}
+            >
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <form

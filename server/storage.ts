@@ -60,14 +60,13 @@ export function coupleKeyFor(user: User): string {
 }
 
 // ---------------- Users ----------------
-export async function createUser(name: string, email: string, pinHash: string): Promise<User> {
+export async function createUser(name: string, email: string, pinHash: string, language?: string): Promise<User> {
   let connectCode = codeGen();
   // extremely unlikely collision, but guard anyway
   while (await getUserByConnectCode(connectCode)) connectCode = codeGen();
-  const [user] = await db
-    .insert(users)
-    .values({ id: idGen(), name, email, pin: pinHash, connectCode })
-    .returning();
+  const values: typeof users.$inferInsert = { id: idGen(), name, email, pin: pinHash, connectCode };
+  if (language) values.language = language;
+  const [user] = await db.insert(users).values(values).returning();
   return user;
 }
 
