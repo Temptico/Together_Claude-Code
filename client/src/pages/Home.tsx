@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Heart, Flame, Settings, Trophy, MessageCircle, CalendarHeart, ChevronRight, Check } from "lucide-react";
+import { Heart, Flame, Settings, Trophy, MessageCircle, CalendarHeart, ChevronRight, Check, X, PartyPopper } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,14 @@ type HomeData = {
   challengeAccepted: boolean;
   challengeCompleted: boolean;
   upcomingDates: any[];
+  pendingMilestone: { id: number; type: string; value: number } | null;
 };
+
+// Same product + discount code used in the Temptico catalog date-idea,
+// tagged with a separate utm_campaign so Shopify/analytics can tell
+// milestone-driven clicks apart from date-idea browsing.
+const TEMPTICO_MILESTONE_URL =
+  "https://www.temptico.com/products/temptico_tablica?utm_source=together_app&utm_medium=in_app&utm_campaign=milestone&discount=TOGETHER10";
 
 export default function Home() {
   const { user } = useAuth();
@@ -62,6 +69,7 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
       <HomeHeader data={data} />
+      {data.pendingMilestone && <MilestoneCard milestone={data.pendingMilestone} userId={data.user.id} />}
       {!data.partner && <ConnectBanner />}
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
@@ -99,6 +107,49 @@ function HomeHeader({ data }: { data: HomeData }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+function MilestoneCard({ milestone, userId }: { milestone: { id: number; value: number }; userId: string }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+
+  const dismissMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/milestones/${milestone.id}/dismiss`, { userId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/home", userId] }),
+  });
+
+  return (
+    <Card className="border-none bg-together-warm text-white shadow-md">
+      <CardContent className="flex flex-col gap-3 py-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <PartyPopper className="h-5 w-5 shrink-0" />
+            <p className="text-lg font-extrabold">
+              {milestone.value} {t("home.days")} {t("home.milestoneInARow")} 🎉
+            </p>
+          </div>
+          <button
+            onClick={() => dismissMutation.mutate()}
+            aria-label={t("common.close")}
+            className="shrink-0 rounded-full bg-white/25 p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="text-sm text-white/90">{t("home.milestoneBody")}</p>
+        <Button
+          asChild
+          variant="secondary"
+          className="self-start bg-white text-primary hover:bg-white/90"
+          onClick={() => dismissMutation.mutate()}
+        >
+          <a href={TEMPTICO_MILESTONE_URL} target="_blank" rel="noopener noreferrer">
+            {t("home.milestoneCta")}
+          </a>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

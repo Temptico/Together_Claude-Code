@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, asc, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, or, desc, gte, asc, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "./db.js";
 import {
   users,
@@ -16,6 +16,7 @@ import {
   dailyAssignments,
   reminderLog,
   wishlistItems,
+  milestoneEvents,
   type User,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
@@ -640,6 +641,45 @@ export async function calculateStreak(userId: string): Promise<number> {
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+// ---------------- Milestones ----------------
+const MILESTONE_STREAK_THRESHOLDS = [7, 30, 60, 100, 365];
+
+// Called right after any activity that can move the streak (mood, answer,
+// challenge completion) — checks whether that action just pushed the streak
+// to exactly one of the thresholds, and if this user has never hit that
+// particular one before, records it. Returns the newly-crossed milestone so
+// the caller can fire a push notification, or undefined if nothing new
+// happened (the vastly more common case — most activity doesn't land on a
+// round number).
+export async function checkStreakMilestone(userId: string): Promise<{ id: number; type: string; value: number } | undefined> {
+  const streak = await calculateStreak(userId);
+  if (!MILESTONE_STREAK_THRESHOLDS.includes(streak)) return undefined;
+  const type = `streak_${streak}`;
+  const [inserted] = await db
+    .insert(milestoneEvents)
+    .values({ userId, type, value: streak })
+    .onConflictDoNothing({ target: [milestoneEvents.userId, milestoneEvents.type] })
+    .returning();
+  return inserted;
+}
+
+export async function getPendingMilestone(userId: string) {
+  const [row] = await db
+    .select()
+    .from(milestoneEvents)
+    .where(and(eq(milestoneEvents.userId, userId), isNull(milestoneEvents.dismissedAt)))
+    .orderBy(desc(milestoneEvents.createdAt))
+    .limit(1);
+  return row;
+}
+
+export async function dismissMilestone(id: number, userId: string) {
+  await db
+    .update(milestoneEvents)
+    .set({ dismissedAt: new Date() })
+    .where(and(eq(milestoneEvents.id, id), eq(milestoneEvents.userId, userId)));
 }
 
 // ---------------- Push subscriptions ----------------

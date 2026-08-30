@@ -118,3 +118,12 @@ export function streakFreezeNotification(lang: string, streak: number): string {
   };
   return bodies[normLang(lang)];
 }
+
+export function milestoneNotification(lang: string, days: number): string {
+  const bodies: Record<Lang, string> = {
+    sl: `🎉 ${days} dni zapored! Odprita Together in praznujta ta mejnik.`,
+    en: `🎉 ${days} days in a row! Open Together and celebrate this milestone.`,
+    hr: `🎉 ${days} dana zaredom! Otvorite Together i proslavite ovu prekretnicu.`,
+  };
+  return bodies[normLang(lang)];
+}

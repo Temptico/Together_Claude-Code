@@ -11,6 +11,7 @@ import {
   reactionNotification,
   planDateNotification,
   photoAddedNotification,
+  milestoneNotification,
 } from "./notificationText.js";
 import {
   insertUserSchema,
@@ -35,6 +36,25 @@ async function requireUser(req: Request, res: Response, id: string) {
     return null;
   }
   return user;
+}
+
+// Called after any activity that can move the streak (mood/answer/challenge
+// completion). Cheap no-op the vast majority of the time — only does
+// anything on the exact tick the streak lands on a round number. Errors are
+// swallowed: a missed celebration is not worth failing the user's actual
+// action over.
+async function checkAndNotifyMilestone(user: { id: string }) {
+  try {
+    const milestone = await storage.checkStreakMilestone(user.id);
+    if (!milestone) return;
+    await notifyUser(user.id, (lang) => ({
+      title: "Together",
+      body: milestoneNotification(lang, milestone.value),
+      tag: "milestone",
+    }));
+  } catch (err) {
+    console.warn("[milestone] check failed for user", user.id, err);
+  }
 }
 
 export function registerRoutes(app: Express) {
@@ -152,13 +172,14 @@ export function registerRoutes(app: Express) {
       const date = storage.todayStr();
       const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
 
-      const [myMood, partnerMood, question, challenge, streak, upcomingDates] = await Promise.all([
+      const [myMood, partnerMood, question, challenge, streak, upcomingDates, pendingMilestone] = await Promise.all([
         storage.getMoodForDate(user.id, date),
         partner ? storage.getMoodForDate(partner.id, date) : Promise.resolve(undefined),
         storage.resolveDailyQuestion(user, date),
         storage.resolveDailyChallenge(user, date),
         storage.calculateStreak(user.id),
         storage.getUpcomingPlannedDates(user, 3),
+        storage.getPendingMilestone(user.id),
       ]);
 
       const myAnswer = question ? await storage.getAnswerForDate(user.id, question.id, date) : undefined;
@@ -183,6 +204,7 @@ export function registerRoutes(app: Express) {
         challengeAccepted: !!completion,
         challengeCompleted: !!completion?.completedAt,
         upcomingDates: upcomingWithIdeas,
+        pendingMilestone: pendingMilestone || null,
       });
     })
   );
@@ -209,6 +231,7 @@ export function registerRoutes(app: Express) {
           tag: "mood",
         })).catch(() => {});
       }
+      checkAndNotifyMilestone(user).catch(() => {});
       res.status(201).json(mood);
     })
   );
@@ -248,6 +271,7 @@ export function registerRoutes(app: Express) {
           tag: "question",
         })).catch(() => {});
       }
+      checkAndNotifyMilestone(user).catch(() => {});
       res.status(201).json(answer);
     })
   );
@@ -308,7 +332,29 @@ export function registerRoutes(app: Express) {
           tag: "challenge",
         })).catch(() => {});
       }
+      checkAndNotifyMilestone(user).catch(() => {});
       res.status(200).json(completion);
+    })
+  );
+
+  app.patch(
+    "/api/milestones/:id/dismiss",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        res.status(400).json({ error: "Neveljaven mejnik" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      await storage.dismissMilestone(id, user.id);
+      res.status(204).end();
     })
   );
 

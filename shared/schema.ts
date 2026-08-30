@@ -212,6 +212,20 @@ export const reminderLog = pgTable("reminder_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ---------- Milestones ----------
+// Fires once per (user, type) — e.g. type "streak_30" — the moment a couple's
+// streak first crosses a meaningful threshold. Surfaces as both a push
+// notification and a dismissible celebration card on Home until the user
+// dismisses it.
+export const milestoneEvents = pgTable("milestone_events", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  type: varchar("type", { length: 32 }).notNull(), // e.g. 'streak_7', 'streak_30'
+  value: integer("value").notNull(), // the raw number, e.g. 30 — kept alongside type so the UI doesn't need to parse it back out
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  dismissedAt: timestamp("dismissed_at"),
+});
+
 // ---------- Push subscriptions ----------
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
