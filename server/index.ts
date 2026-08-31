@@ -13,6 +13,7 @@ import {
   deleteUserAccount,
   getAllFeedbackWithUsers,
   getAllUsers,
+  getPlannedDatesDebug,
 } from "./storage.js";
 import { notifyAllWithNotifications } from "./push.js";
 import { sendWelcomeEmail } from "./email.js";
@@ -101,6 +102,29 @@ async function main() {
     }
     await deleteUserAccount(user);
     res.json({ ok: true, name: user.name, email: user.email });
+  });
+
+  // Read-only diagnostic used to investigate "my date photos disappeared"
+  // reports — returns whether each planned date has a photo, not the photo
+  // data itself. Temporary tool, safe to leave in place.
+  app.get("/api/admin/planned-dates-debug", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    if (!secret || req.query.key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const email = String(req.query.email || "").trim().toLowerCase();
+    if (!email) {
+      res.status(400).json({ error: "Manjka e-poštni naslov" });
+      return;
+    }
+    const user = await getUserByEmail(email);
+    if (!user) {
+      res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo" });
+      return;
+    }
+    const rows = await getPlannedDatesDebug(user);
+    res.json({ ok: true, name: user.name, email: user.email, count: rows.length, rows });
   });
 
   app.get("/admin", async (req, res) => {

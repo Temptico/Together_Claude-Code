@@ -514,6 +514,23 @@ export async function getPlannedDates(user: User) {
     .orderBy(plannedDates.scheduledAt);
 }
 
+// Admin-only diagnostic: summarizes a user's planned dates without returning
+// the (potentially large) base64 photo payloads themselves — just whether
+// each row has one. Used to investigate "my photos disappeared" reports.
+export async function getPlannedDatesDebug(user: User) {
+  const rows = await getPlannedDates(user);
+  return rows.map((d: typeof plannedDates.$inferSelect) => ({
+    id: d.id,
+    userId: d.userId,
+    ideaId: d.ideaId,
+    scheduledAt: d.scheduledAt,
+    completed: d.completed,
+    hasPhoto: !!d.photo,
+    photoLength: d.photo ? d.photo.length : 0,
+    createdAt: d.createdAt,
+  }));
+}
+
 export async function getUpcomingPlannedDates(user: User, limit = 3) {
   const all = await getPlannedDates(user);
   const now = new Date();
@@ -1053,6 +1070,7 @@ export async function getAdminStats() {
       completions: allCompletions.length,
       plannedDates: allPlanned.length,
       completedDates: allPlanned.filter((d: { completed: boolean }) => d.completed).length,
+      datesWithPhotos: allPlanned.filter((d: { photo: string | null }) => !!d.photo).length,
       wishlistItems: allWishlist.length,
     },
     recentUsers,
