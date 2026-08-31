@@ -310,6 +310,8 @@ function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const PAST_DATES_PREVIEW = 3;
+
 function PlannedTab() {
   const { t, lang } = useTranslation();
   const { user } = useAuth();
@@ -317,6 +319,7 @@ function PlannedTab() {
   const qc = useQueryClient();
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showAllPast, setShowAllPast] = useState(false);
 
   const { data: planned = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/dates/planned", user!.id],
@@ -363,6 +366,12 @@ function PlannedTab() {
   const weekdayLabels = translations[lang].dates.weekdays;
   const selectedItems = selectedDate ? byDay.get(selectedDate) || [] : [];
   const upcoming = planned.filter((d) => !d.completed);
+  // Completed dates used to be visible only by clicking their exact day in
+  // the calendar above — easy to lose track of, especially the memory photo
+  // attached to them. Surface them as their own section, newest first.
+  const past = planned
+    .filter((d) => d.completed)
+    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
 
   const renderCard = (d: any) => (
     <Card key={d.id}>
@@ -466,6 +475,18 @@ function PlannedTab() {
           upcoming.map(renderCard)
         )}
       </div>
+
+      {!isLoading && past.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-extrabold text-muted-foreground">{t("dates.pastSection")}</h2>
+          {(showAllPast ? past : past.slice(0, PAST_DATES_PREVIEW)).map(renderCard)}
+          {!showAllPast && past.length > PAST_DATES_PREVIEW && (
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAllPast(true)}>
+              {t("memories.seeMore")}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

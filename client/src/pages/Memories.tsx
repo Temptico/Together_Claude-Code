@@ -182,10 +182,20 @@ function TimelineEntryCard({
   } else if (entry.type === "date") {
     icon = <CalendarHeart className={cn("h-5 w-5", light ? "text-white" : "text-primary")} />;
     content = (
-      <p className="text-sm">
-        <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.completedDate")}
-        {entry.detail.idea?.title ? `: ${entry.detail.idea.title}` : ""}
-      </p>
+      <div>
+        <p className="text-sm">
+          <strong>{who}</strong>{verb && ` ${verb}`} {t("memories.completedDate")}
+          {entry.detail.idea?.title ? `: ${entry.detail.idea.title}` : ""}
+        </p>
+        {entry.detail.photo && (
+          <img
+            src={entry.detail.photo}
+            alt={t("dates.photoAlt")}
+            className="mt-2 w-full rounded-2xl object-cover"
+            style={{ maxHeight: 220 }}
+          />
+        )}
+      </div>
     );
   }
 
