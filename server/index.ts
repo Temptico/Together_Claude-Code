@@ -12,8 +12,10 @@ import {
   getUserByEmail,
   deleteUserAccount,
   getAllFeedbackWithUsers,
+  getAllUsers,
 } from "./storage.js";
 import { notifyAllWithNotifications } from "./push.js";
+import { sendWelcomeEmail } from "./email.js";
 import { startScheduler } from "./scheduler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +66,21 @@ async function main() {
       tag: "admin-broadcast",
     });
     res.json({ ok: true, recipients: result.recipients });
+  });
+
+  app.post("/api/admin/send-welcome-emails", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    const { key } = req.body || {};
+    if (!secret || key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const allUsers = await getAllUsers();
+    // Each send is already localized to that user's own language and
+    // fire-and-forget internally (sendWelcomeEmail never throws), so a
+    // simple Promise.all is safe — one bad address can't take down the rest.
+    await Promise.all(allUsers.map((u) => sendWelcomeEmail(u.email, u.name, u.language)));
+    res.json({ ok: true, recipients: allUsers.length });
   });
 
   app.post("/api/admin/delete-user", async (req, res) => {
@@ -202,6 +219,12 @@ async function main() {
     </form>
     <p id="broadcast-result"></p>
   </div>
+  <div class="tool">
+    <h2>Pošlji welcome email vsem</h2>
+    <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#7a6f68;">Vsak uporabnik ga dobi v svojem jeziku (SL/EN/HR). Uporabno za obstoječe račune, ki so se registrirali pred to funkcijo.</p>
+    <button id="send-welcome-emails" type="button">Pošlji vsem (${stats.totalUsers})</button>
+    <p id="welcome-email-result"></p>
+  </div>
   <h2 style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
     Vsi računi
     <button id="export-csv" style="padding: 0.4rem 0.9rem; border: none; border-radius: 8px; background: #2a2320; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem;">⬇ Izvozi CSV</button>
@@ -266,6 +289,34 @@ async function main() {
           result.textContent = 'Poslano ' + data.recipients + ' uporabnikom.';
           result.className = 'ok';
           e.target.reset();
+        } else {
+          result.textContent = data.error || 'Napaka';
+          result.className = 'err';
+        }
+      } catch {
+        result.textContent = 'Napaka pri povezavi';
+        result.className = 'err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    document.getElementById('send-welcome-emails').addEventListener('click', async (e) => {
+      if (!confirm('Poslati welcome email VSEM ${stats.totalUsers} registriranim uporabnikom, vsakemu v njegovem jeziku? Tega ni mogoče preklicati.')) return;
+      const btn = e.target;
+      const result = document.getElementById('welcome-email-result');
+      btn.disabled = true;
+      result.textContent = '';
+      result.className = '';
+      try {
+        const res = await fetch('/api/admin/send-welcome-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: ${JSON.stringify(key)} }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result.textContent = 'Poslano ' + data.recipients + ' uporabnikom.';
+          result.className = 'ok';
         } else {
           result.textContent = data.error || 'Napaka';
           result.className = 'err';
