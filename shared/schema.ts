@@ -110,8 +110,12 @@ export const challengeCompletions = pgTable("challenge_completions", {
 // ---------- Date ideas ----------
 export const dateIdeas = pgTable("date_ideas", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(),
+  title: text("title").notNull(), // Slovenian, the fallback for any language
+  titleEn: text("title_en"),
+  titleHr: text("title_hr"),
   description: text("description").notNull(),
+  descriptionEn: text("description_en"),
+  descriptionHr: text("description_hr"),
   category: varchar("category", { length: 24 }).notNull(), // doma, na-prostem, kulturno, aktivno, sprosceno
   cost: varchar("cost", { length: 16 }).notNull(), // brezplacno, eur, eur2, eur3
   duration: varchar("duration", { length: 24 }).notNull(), // 30min, 1h, 2h, 2h+

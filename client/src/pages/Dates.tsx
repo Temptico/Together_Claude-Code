@@ -67,7 +67,7 @@ export default function Dates() {
 }
 
 function CatalogTab() {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [category, setCategory] = useState("vse");
   const [duration, setDuration] = useState<string>("");
   const [cost, setCost] = useState<string>("");
@@ -75,12 +75,13 @@ function CatalogTab() {
   const [surpriseOpen, setSurpriseOpen] = useState(false);
 
   const { data: ideas = [], isLoading } = useQuery({
-    queryKey: ["/api/dates/ideas", category, duration, cost],
+    queryKey: ["/api/dates/ideas", category, duration, cost, lang],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (category) params.set("category", category);
       if (duration) params.set("duration", duration);
       if (cost) params.set("cost", cost);
+      params.set("lang", lang);
       return apiRequest("GET", `/api/dates/ideas?${params.toString()}`);
     },
   });
@@ -162,11 +163,12 @@ function SurpriseDialog({
   onOpenChange: (o: boolean) => void;
   onPlan: (idea: any) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [idea, setIdea] = useState<any>(null);
 
   const rollMutation = useMutation({
-    mutationFn: () => apiRequest("GET", `/api/dates/ideas/random${idea ? `?exclude=${idea.id}` : ""}`),
+    mutationFn: () =>
+      apiRequest("GET", `/api/dates/ideas/random?lang=${lang}${idea ? `&exclude=${idea.id}` : ""}`),
     onSuccess: (result) => setIdea(result),
   });
 
@@ -219,16 +221,16 @@ function SurpriseDialog({
 }
 
 function NearbyTab() {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
   const [planIdea, setPlanIdea] = useState<any>(null);
 
   const { data, isFetching, refetch } = useQuery<{ results: any[]; searchFailed: boolean }>({
-    queryKey: ["/api/dates/nearby", coords?.lat, coords?.lng, selectedTypes.join(",")],
+    queryKey: ["/api/dates/nearby", coords?.lat, coords?.lng, selectedTypes.join(","), lang],
     queryFn: async () => {
-      const params = new URLSearchParams({ lat: String(coords!.lat), lng: String(coords!.lng) });
+      const params = new URLSearchParams({ lat: String(coords!.lat), lng: String(coords!.lng), lang });
       if (selectedTypes.length) params.set("types", selectedTypes.join(","));
       return apiRequest("GET", `/api/dates/nearby?${params.toString()}`);
     },

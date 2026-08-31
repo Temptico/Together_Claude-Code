@@ -190,7 +190,7 @@ export function registerRoutes(app: Express) {
       const completion = challenge ? await storage.getCompletionForDate(user.id, challenge.id, date) : undefined;
 
       const upcomingWithIdeas = await Promise.all(
-        upcomingDates.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId) }))
+        upcomingDates.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId, user.language) }))
       );
 
       const moodTargetIds = [myMood?.id, partnerMood?.id].filter((id): id is number => id != null);
@@ -366,8 +366,8 @@ export function registerRoutes(app: Express) {
   app.get(
     "/api/dates/ideas",
     ah(async (req, res) => {
-      const { category, duration, cost } = req.query as Record<string, string | undefined>;
-      const ideas = await storage.getDateIdeas({ category, duration, cost });
+      const { category, duration, cost, lang } = req.query as Record<string, string | undefined>;
+      const ideas = await storage.getDateIdeas({ category, duration, cost }, lang);
       res.json(ideas);
     })
   );
@@ -376,7 +376,8 @@ export function registerRoutes(app: Express) {
     "/api/dates/ideas/random",
     ah(async (req, res) => {
       const excludeId = req.query.exclude ? Number(req.query.exclude) : undefined;
-      const idea = await storage.getRandomDateIdea(excludeId);
+      const lang = req.query.lang as string | undefined;
+      const idea = await storage.getRandomDateIdea(excludeId, lang);
       if (!idea) {
         res.status(404).json({ error: "Ni idej za zmenek" });
         return;
@@ -396,8 +397,9 @@ export function registerRoutes(app: Express) {
       }
       const types = ((req.query.types as string) || "").split(",").filter(Boolean);
       const radiusKm = 5;
+      const lang = req.query.lang as string | undefined;
 
-      const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm);
+      const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm, lang);
 
       const withDistance = async (items: { lat: number; lng: number; externalId: string }[] | null) => {
         if (!items) return [] as any[];
@@ -441,7 +443,7 @@ export function registerRoutes(app: Express) {
       if (!user) return;
       const rows = await storage.getPlannedDates(user);
       const withIdeas = await Promise.all(
-        rows.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId) }))
+        rows.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId, user.language) }))
       );
       res.json(withIdeas);
     })
@@ -542,7 +544,7 @@ export function registerRoutes(app: Express) {
         const idea = await storage.getDateIdeaById(row.ideaId);
         notifyUser(user.partnerId, (lang) => ({
           title: "Together",
-          body: photoAddedNotification(lang, idea?.title || ""),
+          body: photoAddedNotification(lang, (idea && storage.pickDateIdea(idea, lang).title) || ""),
           tag: "date-photo",
         })).catch(() => {});
       }

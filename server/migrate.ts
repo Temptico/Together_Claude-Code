@@ -64,7 +64,11 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS date_ideas (
       id serial PRIMARY KEY,
       title text NOT NULL,
+      title_en text,
+      title_hr text,
       description text NOT NULL,
+      description_en text,
+      description_hr text,
       category varchar(24) NOT NULL,
       cost varchar(16) NOT NULL,
       duration varchar(24) NOT NULL,
@@ -189,6 +193,10 @@ const STATEMENTS = [
   `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_en text`,
   `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS text_hr text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS pwa_installed_at timestamp`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS title_en text`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS title_hr text`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS description_en text`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS description_hr text`,
 ];
 
 export async function runMigrations() {

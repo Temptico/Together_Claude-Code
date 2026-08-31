@@ -182,6 +182,21 @@ export function pickLocalizedText(row: { text: string; textEn: string | null; te
   return row.text;
 }
 
+// Date ideas are authored in Slovenian with optional EN/HR translations,
+// same pattern as questions/challenges but across two fields (title +
+// description) instead of one. Externally-sourced entries (OSM/Google) never
+// have translations — this just falls back to the raw scraped text for those.
+export function pickDateIdea<T extends { title: string; titleEn: string | null; titleHr: string | null; description: string; descriptionEn: string | null; descriptionHr: string | null }>(
+  idea: T,
+  language?: string
+): T {
+  if (!language || language === "sl") return idea;
+  const title = language === "en" ? idea.titleEn || idea.title : language === "hr" ? idea.titleHr || idea.title : idea.title;
+  const description =
+    language === "en" ? idea.descriptionEn || idea.description : language === "hr" ? idea.descriptionHr || idea.description : idea.description;
+  return { ...idea, title, description };
+}
+
 export type ResolvedQuestion = { id: number; text: string; category: string; isCustom: boolean };
 
 export async function resolveDailyQuestion(user: User, date: string): Promise<ResolvedQuestion | undefined> {
@@ -395,9 +410,9 @@ export async function getRecentCompletions(userId: string, limit = 30) {
 }
 
 // ---------------- Date ideas ----------------
-export async function getDateIdeas(filters: { category?: string; duration?: string; cost?: string }) {
+export async function getDateIdeas(filters: { category?: string; duration?: string; cost?: string }, language?: string) {
   const all = await db.select().from(dateIdeas);
-  return all.filter((idea: typeof dateIdeas.$inferSelect) => {
+  const filtered = all.filter((idea: typeof dateIdeas.$inferSelect) => {
     // Externally-sourced entries (OSM/Google, upserted from nearby search)
     // only belong in "Najdi v bližini" results — they lack a real
     // description/duration/cost and would look out of place mixed into the
@@ -408,11 +423,21 @@ export async function getDateIdeas(filters: { category?: string; duration?: stri
     if (filters.cost && idea.cost !== filters.cost) return false;
     return true;
   });
+  // Ideas tied to a specific city (currently all Ljubljana) sort after the
+  // location-agnostic ones, so someone browsing from anywhere else sees
+  // relevant content first instead of a screen full of "Ljubljana" badges —
+  // Ljubljana-based users still see them, just after the universal ones.
+  const sorted = [...filtered].sort((a: typeof dateIdeas.$inferSelect, b: typeof dateIdeas.$inferSelect) => {
+    const aCity = a.city ? 1 : 0;
+    const bCity = b.city ? 1 : 0;
+    return aCity - bCity;
+  });
+  return sorted.map((idea) => pickDateIdea(idea, language));
 }
 
-export async function getDateIdeaById(id: number) {
+export async function getDateIdeaById(id: number, language?: string) {
   const [idea] = await db.select().from(dateIdeas).where(eq(dateIdeas.id, id));
-  return idea;
+  return idea ? pickDateIdea(idea, language) : idea;
 }
 
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -448,7 +473,7 @@ export async function upsertExternalIdea(idea: {
   return fallback;
 }
 
-export async function getNearbyIdeas(lat: number, lng: number, types: string[], radiusKm = 5) {
+export async function getNearbyIdeas(lat: number, lng: number, types: string[], radiusKm = 5, language?: string) {
   const all = await db.select().from(dateIdeas);
   return all
     .filter((idea: typeof dateIdeas.$inferSelect) => idea.lat != null && idea.lng != null)
@@ -456,7 +481,7 @@ export async function getNearbyIdeas(lat: number, lng: number, types: string[], 
       types.length === 0 ? true : types.includes(idea.locationType || "")
     )
     .map((idea: typeof dateIdeas.$inferSelect) => ({
-      ...idea,
+      ...pickDateIdea(idea, language),
       distanceKm: haversineKm(lat, lng, idea.lat!, idea.lng!),
     }))
     .filter((idea: { distanceKm: number }) => idea.distanceKm <= radiusKm)
@@ -835,7 +860,7 @@ export async function getReactionsForTargets(targetType: "mood" | "answer" | "ch
 }
 
 // ---------------- Random idea ----------------
-export async function getRandomDateIdea(excludeId?: number) {
+export async function getRandomDateIdea(excludeId?: number, language?: string) {
   const all = await db.select().from(dateIdeas);
   // "Surprise me" must work for every user regardless of where they live, so
   // it only draws from curated ideas with no city tied to them (not sourced
@@ -844,7 +869,7 @@ export async function getRandomDateIdea(excludeId?: number) {
   const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null && i.city == null);
   const pool = excludeId ? curated.filter((i: typeof dateIdeas.$inferSelect) => i.id !== excludeId) : curated;
   if (pool.length === 0) return undefined;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return pickDateIdea(pool[Math.floor(Math.random() * pool.length)], language);
 }
 
 // ---------------- Scheduler helpers ----------------
