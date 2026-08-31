@@ -5,7 +5,12 @@
 // behave exactly as before.
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const FROM_ADDRESS = "Together <info@temptico.com>";
+// The domain actually verified in Resend is the "together" subdomain, not
+// bare temptico.com (DKIM/SPF records are published under
+// resend._domainkey.together.temptico.com and send.together.temptico.com) —
+// sending from the root domain gets rejected with a "domain not verified"
+// error even though DNS looks fine, because Resend treats them as distinct.
+const FROM_ADDRESS = "Together <hello@together.temptico.com>";
 const APP_URL = "https://together.temptico.com";
 
 type Lang = "sl" | "en" | "hr";
