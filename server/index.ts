@@ -131,6 +131,18 @@ async function main() {
     res.json({ ok: true, name: user.name, email: user.email, count: rows.length, rows });
   });
 
+  // Temporary diagnostic for tuning the login/register rate limiter's IP
+  // detection behind Render's proxy — remove once trust-proxy is confirmed
+  // correct in production.
+  app.get("/api/admin/ip-debug", (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    if (!secret || req.query.key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.json({ ip: req.ip, ips: req.ips, xForwardedFor: req.headers["x-forwarded-for"] });
+  });
+
   app.get("/admin", async (req, res) => {
     const secret = process.env.ADMIN_SECRET;
     if (!secret || req.query.key !== secret) {
