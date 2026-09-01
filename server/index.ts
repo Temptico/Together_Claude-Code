@@ -27,10 +27,13 @@ async function main() {
   await runSeed();
 
   const app = express();
-  // Render sits in front of the app as a single reverse-proxy hop — without
-  // this, req.ip resolves to Render's internal edge IP for every request,
-  // which would make the login rate limiter treat all users as one caller.
-  app.set("trust proxy", 1);
+  // The custom domain routes through two proxy hops before reaching the app
+  // — Cloudflare's edge, then Render's own internal load balancer (confirmed
+  // via a one-off /api/admin/ip-debug check: X-Forwarded-For carried the
+  // real client IP followed by Cloudflare's edge IP). trust proxy: 1 would
+  // stop at Cloudflare's edge and treat every visitor as the same "client",
+  // which would make the login rate limiter lock everyone out together.
+  app.set("trust proxy", 2);
   app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
 
   registerRoutes(app);
@@ -129,18 +132,6 @@ async function main() {
     }
     const rows = await getPlannedDatesDebug(user);
     res.json({ ok: true, name: user.name, email: user.email, count: rows.length, rows });
-  });
-
-  // Temporary diagnostic for tuning the login/register rate limiter's IP
-  // detection behind Render's proxy — remove once trust-proxy is confirmed
-  // correct in production.
-  app.get("/api/admin/ip-debug", (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    if (!secret || req.query.key !== secret) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    res.json({ ip: req.ip, ips: req.ips, xForwardedFor: req.headers["x-forwarded-for"] });
   });
 
   app.get("/admin", async (req, res) => {
