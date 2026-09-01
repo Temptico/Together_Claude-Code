@@ -20,15 +20,19 @@ const OSM_TYPE_MAP: Record<string, OsmMapping> = {
 };
 
 const DEFAULT_TYPES = ["kavarne", "restavracije", "parki", "muzeji"];
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// Two independently-hosted Overpass instances, tried in order. Each enforces
+// a fair-use concurrent-slot limit per source IP — since every user's
+// request comes from this one server's IP, a burst of people tapping "Find
+// nearby" close together (e.g. right after a mass email) can get each other
+// rate-limited on whichever instance they land on. overpass.osm.ch is a
+// separate deployment (not just a load-balanced alias of overpass-api.de),
+// so it isn't sharing the same rate-limit bucket when the primary is under
+// pressure.
+const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.osm.ch/api/interpreter"];
 
-// The public Overpass instance enforces a fair-use concurrent-slot limit per
-// source IP — since every user's request comes from this one server's IP,
-// a burst of people tapping "Find nearby" around the same time (e.g. right
-// after a mass email) can get each other rate-limited. Two mitigations:
-// a short cache so many people asking about the same area within a few
-// minutes share one lookup, and one retry so a single transient hiccup
-// doesn't surface as "search failed" to the user.
+// Two more mitigations beyond the dual endpoints: a short cache so many
+// people asking about the same area within a few minutes share one lookup,
+// and caching only successful results so a failure never "sticks".
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const resultCache = new Map<string, { results: OsmNearbyResult[]; expiresAt: number }>();
 
@@ -73,33 +77,41 @@ export async function fetchNearbyOsmPlaces(
   const cached = resultCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.results;
 
-  let results = await fetchOnce(lat, lng, requestedTypes, radiusKm);
-  if (results === null) {
-    // One retry on a short delay — enough to ride out a momentary rate-limit
-    // or blip without meaningfully slowing down the common (already working)
-    // case, which never reaches this branch.
-    await sleep(1500);
-    results = await fetchOnce(lat, lng, requestedTypes, radiusKm);
+  let results: OsmNearbyResult[] | null = null;
+  for (let i = 0; i < OVERPASS_URLS.length; i++) {
+    results = await fetchOnce(OVERPASS_URLS[i], lat, lng, requestedTypes, radiusKm);
+    if (results !== null) break;
+    // A short delay before falling through to the next endpoint (or retrying
+    // the last one) — enough to ride out a momentary blip without meaningfully
+    // slowing down the common (already working) case, which never reaches
+    // this branch.
+    if (i < OVERPASS_URLS.length - 1) await sleep(800);
   }
 
   if (results !== null) resultCache.set(key, { results, expiresAt: Date.now() + CACHE_TTL_MS });
   return results;
 }
 
-async function fetchOnce(lat: number, lng: number, requestedTypes: string[], radiusKm: number): Promise<OsmNearbyResult[] | null> {
+async function fetchOnce(
+  url: string,
+  lat: number,
+  lng: number,
+  requestedTypes: string[],
+  radiusKm: number
+): Promise<OsmNearbyResult[] | null> {
   const radiusMeters = Math.round(radiusKm * 1000);
   const around = `(around:${radiusMeters},${lat},${lng})`;
   const clauses = requestedTypes.map((t) => `${OSM_TYPE_MAP[t].query}${around};`).join("\n  ");
-  // A densely-mapped area (most of Western Europe) can have far more matching
-  // nodes within the same radius than Ljubljana does, so the query needs real
-  // headroom — a short timeout here silently looked like "nothing nearby".
-  const query = `[out:json][timeout:20];\n(\n  ${clauses}\n);\nout center 30;`;
+  // Now that a failed attempt falls through to a second endpoint rather than
+  // being the only shot, each individual attempt gets a shorter budget so a
+  // stuck first endpoint doesn't eat the whole request.
+  const query = `[out:json][timeout:12];\n(\n  ${clauses}\n);\nout center 30;`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const res = await fetch(OVERPASS_URL, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
