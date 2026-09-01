@@ -3,6 +3,13 @@ import { z } from "zod";
 import * as storage from "./storage.js";
 import { getVapidPublicKey, notifyUser } from "./push.js";
 import { sendWelcomeEmail } from "./email.js";
+import {
+  checkLoginIpLimit,
+  checkRegisterIpLimit,
+  isEmailLockedOut,
+  recordLoginFailure,
+  clearLoginFailures,
+} from "./rateLimit.js";
 import { fetchNearbyPlaces } from "./places.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
@@ -65,6 +72,11 @@ export function registerRoutes(app: Express) {
   app.post(
     "/api/auth/register",
     ah(async (req, res) => {
+      const { allowed, retryAfterSec } = checkRegisterIpLimit(req.ip || "unknown");
+      if (!allowed) {
+        res.status(429).set("Retry-After", String(retryAfterSec)).json({ error: "Preveč poskusov. Poskusi znova čez nekaj minut." });
+        return;
+      }
       const parsed = insertUserSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
@@ -85,11 +97,30 @@ export function registerRoutes(app: Express) {
   app.post(
     "/api/auth/login",
     ah(async (req, res) => {
+      const ipLimit = checkLoginIpLimit(req.ip || "unknown");
+      if (!ipLimit.allowed) {
+        res.status(429).set("Retry-After", String(ipLimit.retryAfterSec)).json({ error: "Preveč poskusov. Poskusi znova čez nekaj minut." });
+        return;
+      }
+
       const parsed = loginSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
         return;
       }
+
+      // Per-email lockout, independent of the IP limiter above — stops a
+      // targeted brute-force of one account's 4-6 digit PIN even if the
+      // attacker spreads attempts across IPs.
+      const lockout = isEmailLockedOut(parsed.data.email);
+      if (lockout.lockedOut) {
+        res
+          .status(429)
+          .set("Retry-After", String(lockout.retryAfterSec))
+          .json({ error: "Preveč neuspešnih poskusov za ta račun. Poskusi znova pozneje." });
+        return;
+      }
+
       const user = await storage.getUserByEmail(parsed.data.email);
       if (!user) {
         res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo. Ustvari nov račun." });
@@ -110,15 +141,18 @@ export function registerRoutes(app: Express) {
         // anyone out.
         const pinHash = await storage.hashPin(parsed.data.pin);
         const updated = await storage.updateUser(user.id, { pin: pinHash });
+        clearLoginFailures(parsed.data.email);
         res.json(storage.omitPin(updated));
         return;
       }
 
       const valid = await storage.verifyPin(parsed.data.pin, user.pin);
       if (!valid) {
+        recordLoginFailure(parsed.data.email);
         res.status(401).json({ error: "Napačen PIN" });
         return;
       }
+      clearLoginFailures(parsed.data.email);
       res.json(storage.omitPin(user));
     })
   );

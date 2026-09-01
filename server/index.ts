@@ -27,6 +27,10 @@ async function main() {
   await runSeed();
 
   const app = express();
+  // Render sits in front of the app as a single reverse-proxy hop — without
+  // this, req.ip resolves to Render's internal edge IP for every request,
+  // which would make the login rate limiter treat all users as one caller.
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
 
   registerRoutes(app);
