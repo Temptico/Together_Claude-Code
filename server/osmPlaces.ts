@@ -22,6 +22,28 @@ const OSM_TYPE_MAP: Record<string, OsmMapping> = {
 const DEFAULT_TYPES = ["kavarne", "restavracije", "parki", "muzeji"];
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
+// The public Overpass instance enforces a fair-use concurrent-slot limit per
+// source IP — since every user's request comes from this one server's IP,
+// a burst of people tapping "Find nearby" around the same time (e.g. right
+// after a mass email) can get each other rate-limited. Two mitigations:
+// a short cache so many people asking about the same area within a few
+// minutes share one lookup, and one retry so a single transient hiccup
+// doesn't surface as "search failed" to the user.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const resultCache = new Map<string, { results: OsmNearbyResult[]; expiresAt: number }>();
+
+function cacheKey(lat: number, lng: number, types: string[], radiusKm: number): string {
+  // Round to ~1.1km so nearby requests for the same neighborhood share a
+  // cache entry instead of each getting a slightly different grid cell.
+  const rLat = Math.round(lat * 100) / 100;
+  const rLng = Math.round(lng * 100) / 100;
+  return `${rLat},${rLng}|${[...types].sort().join(",")}|${radiusKm}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export type OsmNearbyResult = {
   externalId: string;
   title: string;
@@ -47,6 +69,24 @@ export async function fetchNearbyOsmPlaces(
   const requestedTypes = (types.length > 0 ? types : DEFAULT_TYPES).filter((t) => OSM_TYPE_MAP[t]);
   if (requestedTypes.length === 0) return null;
 
+  const key = cacheKey(lat, lng, requestedTypes, radiusKm);
+  const cached = resultCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.results;
+
+  let results = await fetchOnce(lat, lng, requestedTypes, radiusKm);
+  if (results === null) {
+    // One retry on a short delay — enough to ride out a momentary rate-limit
+    // or blip without meaningfully slowing down the common (already working)
+    // case, which never reaches this branch.
+    await sleep(1500);
+    results = await fetchOnce(lat, lng, requestedTypes, radiusKm);
+  }
+
+  if (results !== null) resultCache.set(key, { results, expiresAt: Date.now() + CACHE_TTL_MS });
+  return results;
+}
+
+async function fetchOnce(lat: number, lng: number, requestedTypes: string[], radiusKm: number): Promise<OsmNearbyResult[] | null> {
   const radiusMeters = Math.round(radiusKm * 1000);
   const around = `(around:${radiusMeters},${lat},${lng})`;
   const clauses = requestedTypes.map((t) => `${OSM_TYPE_MAP[t].query}${around};`).join("\n  ");
