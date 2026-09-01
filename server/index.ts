@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { initSentry, Sentry } from "./sentry.js";
+import { initSentry, Sentry, isSentryEnabled } from "./sentry.js";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 import { registerRoutes } from "./routes.js";
@@ -109,6 +109,20 @@ async function main() {
     }
     await deleteUserAccount(user);
     res.json({ ok: true, name: user.name, email: user.email });
+  });
+
+  // Temporary: confirms SENTRY_DSN was picked up and fires one harmless test
+  // event so it can be verified in the Sentry dashboard. Remove after use.
+  app.get("/api/admin/sentry-check", (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    if (!secret || req.query.key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (isSentryEnabled()) {
+      Sentry.captureMessage("Together: Sentry test event (safe to ignore)", "info");
+    }
+    res.json({ sentryEnabled: isSentryEnabled() });
   });
 
   // Read-only diagnostic used to investigate "my date photos disappeared"
