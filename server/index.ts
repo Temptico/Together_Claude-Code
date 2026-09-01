@@ -111,6 +111,37 @@ async function main() {
     res.json({ ok: true, name: user.name, email: user.email });
   });
 
+  // Temporary: shows exactly what Overpass returns from this server's own
+  // outbound IP, to diagnose "Find nearby search failed" reports. Remove
+  // after use.
+  app.get("/api/admin/overpass-debug", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    if (!secret || req.query.key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const r = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "*/*",
+          "User-Agent": "Together-App/1.0 (contact: info@temptico.com)",
+        },
+        body: `data=${encodeURIComponent('[out:json][timeout:10];node["amenity"="cafe"](around:2000,46.05,14.5);out 1;')}`,
+        signal: controller.signal,
+      });
+      const text = await r.text();
+      res.json({ ok: true, status: r.status, statusText: r.statusText, bodySnippet: text.slice(0, 500) });
+    } catch (err) {
+      res.json({ ok: false, error: err instanceof Error ? `${err.name}: ${err.message}` : String(err) });
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
   // Read-only diagnostic used to investigate "my date photos disappeared"
   // reports — returns whether each planned date has a photo, not the photo
   // data itself. Temporary tool, safe to leave in place.
