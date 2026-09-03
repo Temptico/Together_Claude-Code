@@ -173,15 +173,47 @@ async function main() {
       .map(([source, n]) => `${CLICK_SOURCE_LABELS[source] || source}: ${n}`)
       .join(" · ");
 
+    // Small CSS-only bar chart for the streak-length distribution — reading
+    // "0: 12 · 1-6: 3 · 7-29: 1 ..." as plain text made it hard to see at a
+    // glance how the numbers relate to each other.
+    const streakBuckets: Array<[string, number]> = [
+      ["0", stats.streakDistribution.zero],
+      ["1-6", stats.streakDistribution.d1to6],
+      ["7-29", stats.streakDistribution.d7to29],
+      ["30-59", stats.streakDistribution.d30to59],
+      ["60-99", stats.streakDistribution.d60to99],
+      ["100+", stats.streakDistribution.d100plus],
+    ];
+    const streakMax = Math.max(1, ...streakBuckets.map(([, n]) => n));
+    const streakBarRows = streakBuckets
+      .map(
+        ([label, n]) =>
+          `<div class="bar-row"><span class="bar-label">${label}d</span><span class="bar-track"><span class="bar-fill" style="width:${Math.round((n / streakMax) * 100)}%"></span></span><span class="bar-count">${n}</span></div>`
+      )
+      .join("");
+
     res.set("Content-Type", "text/html").send(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Together — Admin</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #f8f5f2; color: #2a2320; padding: 2rem; }
   h1 { margin-bottom: 1.5rem; }
-  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+  .section { margin-bottom: 2rem; }
+  .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #a1948c; font-weight: 700; margin: 0 0 0.75rem; }
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; }
   .card { background: white; border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); min-width: 140px; }
-  .card .value { font-size: 2rem; font-weight: 800; }
+  .card .value { font-size: 1.5rem; font-weight: 800; }
   .card .label { font-size: 0.8rem; color: #7a6f68; }
+  .hero { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
+  .hero .card { min-width: 170px; background: #2a2320; }
+  .hero .card .value { font-size: 2.75rem; color: white; }
+  .hero .card .label { color: #cbbfb7; font-weight: 600; }
+  .barchart-card { background: white; border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-width: 480px; }
+  .bar-row { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; }
+  .bar-row + .bar-row { margin-top: 0.5rem; }
+  .bar-label { width: 42px; flex-shrink: 0; color: #7a6f68; }
+  .bar-track { flex: 1; background: #efe7e1; border-radius: 6px; height: 12px; overflow: hidden; }
+  .bar-fill { display: block; height: 100%; background: #d9635a; border-radius: 6px; }
+  .bar-count { width: 26px; flex-shrink: 0; text-align: right; font-weight: 700; }
   table { border-collapse: collapse; width: 100%; background: white; border-radius: 12px; overflow: hidden; }
   th, td { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid #eee; font-size: 0.9rem; }
   th { background: #efe7e1; }
@@ -199,39 +231,53 @@ async function main() {
 </style></head>
 <body>
   <h1>💗 Together — Admin</h1>
-  <div class="cards">
+
+  <div class="hero">
     <div class="card"><div class="value">${stats.totalUsers}</div><div class="label">Uporabnikov</div></div>
     <div class="card"><div class="value">${stats.connectedCouples}</div><div class="label">Povezanih parov</div></div>
-    <div class="card"><div class="value">${stats.activeToday}</div><div class="label">Aktivnih danes</div></div>
     <div class="card"><div class="value">${stats.activeThisWeek}</div><div class="label">Aktivnih ta teden</div></div>
-    <div class="card"><div class="value">${stats.newThisWeek}</div><div class="label">Novih ta teden</div></div>
-  </div>
-  <div class="cards">
-    <div class="card"><div class="value">${stats.totals.moods}</div><div class="label">Razpoloženj skupaj</div></div>
-    <div class="card"><div class="value">${stats.totals.answers}</div><div class="label">Odgovorov skupaj</div></div>
-    <div class="card"><div class="value">${stats.totals.completions}</div><div class="label">Izzivov opravljenih</div></div>
-    <div class="card"><div class="value">${stats.totals.completedDates}/${stats.totals.plannedDates}</div><div class="label">Zmenkov opravljenih/načrtovanih</div></div>
-    <div class="card"><div class="value">${stats.totals.wishlistItems}</div><div class="label">Želja na seznamih</div></div>
-  </div>
-  <div class="cards">
-    <div class="card"><div class="value">${stats.notificationsOptedIn}/${stats.totalUsers}</div><div class="label">Obvestila omogočena</div></div>
-    <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Naprave z obvestili</div></div>
     <div class="card"><div class="value">${stats.pwaInstalledCount}/${stats.totalUsers}</div><div class="label">Namestili na telefon</div></div>
-    <div class="card"><div class="value" style="font-size:1.15rem">${Object.entries(stats.languageCounts).map(([l, n]) => `${l.toUpperCase()}: ${n}`).join(" · ") || "–"}</div><div class="label">Po jeziku</div></div>
   </div>
-  <div class="cards">
-    <div class="card">
-      <div class="value" style="font-size:1rem">0: ${stats.streakDistribution.zero} · 1-6: ${stats.streakDistribution.d1to6} · 7-29: ${stats.streakDistribution.d7to29} · 30-59: ${stats.streakDistribution.d30to59} · 60-99: ${stats.streakDistribution.d60to99} · 100+: ${stats.streakDistribution.d100plus}</div>
-      <div class="label">Porazdelitev nizov (dni)</div>
+
+  <div class="section">
+    <h2 class="section-title">Angažiranost</h2>
+    <div class="cards">
+      <div class="card"><div class="value">${stats.activeToday}</div><div class="label">Aktivnih danes</div></div>
+      <div class="card"><div class="value">${stats.newThisWeek}</div><div class="label">Novih ta teden</div></div>
+      <div class="card"><div class="value">${stats.totals.moods}</div><div class="label">Razpoloženj skupaj</div></div>
+      <div class="card"><div class="value">${stats.totals.answers}</div><div class="label">Odgovorov skupaj</div></div>
+      <div class="card"><div class="value">${stats.totals.completions}</div><div class="label">Izzivov opravljenih</div></div>
+      <div class="card"><div class="value">${stats.totals.completedDates}/${stats.totals.plannedDates}</div><div class="label">Zmenkov opravljenih/načrtovanih</div></div>
+      <div class="card"><div class="value">${stats.totals.wishlistItems}</div><div class="label">Želja na seznamih</div></div>
     </div>
-    <div class="card">
-      <div class="value">${stats.milestonesTotal}</div>
-      <div class="label">Doseženih mejnikov${milestoneBreakdown ? ` <span style="font-weight:400">(${milestoneBreakdown})</span>` : ""}</div>
+  </div>
+
+  <div class="section">
+    <h2 class="section-title">Obvestila in jeziki</h2>
+    <div class="cards">
+      <div class="card"><div class="value">${stats.notificationsOptedIn}/${stats.totalUsers}</div><div class="label">Obvestila omogočena</div></div>
+      <div class="card"><div class="value">${stats.usersWithPushSub}</div><div class="label">Naprave z obvestili</div></div>
+      <div class="card"><div class="value" style="font-size:1.15rem">${Object.entries(stats.languageCounts).map(([l, n]) => `${l.toUpperCase()}: ${n}`).join(" · ") || "–"}</div><div class="label">Po jeziku</div></div>
     </div>
-    <div class="card">
-      <div class="value">${stats.tempticoClicksTotal}</div>
-      <div class="label">Kliki na Temptico ponudbo${clicksBreakdown ? ` <span style="font-weight:400">(${clicksBreakdown})</span>` : ""}</div>
+  </div>
+
+  <div class="section">
+    <h2 class="section-title">Rast in Temptico</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="value">${stats.milestonesTotal}</div>
+        <div class="label">Doseženih mejnikov${milestoneBreakdown ? ` <span style="font-weight:400">(${milestoneBreakdown})</span>` : ""}</div>
+      </div>
+      <div class="card">
+        <div class="value">${stats.tempticoClicksTotal}</div>
+        <div class="label">Kliki na Temptico ponudbo${clicksBreakdown ? ` <span style="font-weight:400">(${clicksBreakdown})</span>` : ""}</div>
+      </div>
     </div>
+  </div>
+
+  <div class="section">
+    <h2 class="section-title">Porazdelitev nizov (dni)</h2>
+    <div class="barchart-card">${streakBarRows}</div>
   </div>
   <div class="tool">
     <h2>Ponastavi PIN</h2>
