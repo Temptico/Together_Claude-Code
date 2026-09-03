@@ -217,7 +217,8 @@ async function main() {
   table { border-collapse: collapse; width: 100%; background: white; border-radius: 12px; overflow: hidden; }
   th, td { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid #eee; font-size: 0.9rem; }
   th { background: #efe7e1; }
-  .tool { background: white; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; max-width: 420px; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start; margin-bottom: 2rem; }
+  .tool { background: white; border-radius: 12px; padding: 1.25rem 1.5rem; }
   .tool h2 { margin-top: 0; }
   .tool form { display: flex; gap: 0.5rem; }
   .tool input { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; }
@@ -279,28 +280,33 @@ async function main() {
     <h2 class="section-title">Porazdelitev nizov (dni)</h2>
     <div class="barchart-card">${streakBarRows}</div>
   </div>
-  <div class="tool">
-    <h2>Ponastavi PIN</h2>
-    <form id="reset-form">
-      <input type="email" id="reset-email" placeholder="uporabnik@posta.si" required />
-      <button type="submit">Ponastavi</button>
-    </form>
-    <p id="reset-result"></p>
-  </div>
-  <div class="tool">
-    <h2>Pošlji obvestilo vsem</h2>
-    <form id="broadcast-form" style="flex-direction: column; align-items: stretch;">
-      <input type="text" id="broadcast-title" placeholder="Naslov (privzeto: Together)" style="margin-bottom: 0.5rem;" />
-      <textarea id="broadcast-body" placeholder="Besedilo obvestila..." required rows="3" style="padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; margin-bottom: 0.5rem; resize: vertical;"></textarea>
-      <button type="submit">Pošlji vsem (${stats.notificationsOptedIn})</button>
-    </form>
-    <p id="broadcast-result"></p>
-  </div>
-  <div class="tool">
-    <h2>Pošlji welcome email vsem</h2>
-    <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#7a6f68;">Vsak uporabnik ga dobi v svojem jeziku (SL/EN/HR). Uporabno za obstoječe račune, ki so se registrirali pred to funkcijo.</p>
-    <button id="send-welcome-emails" type="button">Pošlji vsem (${stats.totalUsers})</button>
-    <p id="welcome-email-result"></p>
+  <div class="section">
+    <h2 class="section-title">Orodja</h2>
+    <div class="tools">
+      <div class="tool">
+        <h2>Ponastavi PIN</h2>
+        <form id="reset-form">
+          <input type="email" id="reset-email" placeholder="uporabnik@posta.si" required />
+          <button type="submit">Ponastavi</button>
+        </form>
+        <p id="reset-result"></p>
+      </div>
+      <div class="tool">
+        <h2>Pošlji obvestilo vsem</h2>
+        <form id="broadcast-form" style="flex-direction: column; align-items: stretch;">
+          <input type="text" id="broadcast-title" placeholder="Naslov (privzeto: Together)" style="margin-bottom: 0.5rem;" />
+          <textarea id="broadcast-body" placeholder="Besedilo obvestila..." required rows="3" style="padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; margin-bottom: 0.5rem; resize: vertical;"></textarea>
+          <button type="submit">Pošlji vsem (${stats.notificationsOptedIn})</button>
+        </form>
+        <p id="broadcast-result"></p>
+      </div>
+      <div class="tool">
+        <h2>Pošlji welcome email vsem</h2>
+        <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#7a6f68;">Vsak uporabnik ga dobi v svojem jeziku (SL/EN/HR). Uporabno za obstoječe račune, ki so se registrirali pred to funkcijo.</p>
+        <button id="send-welcome-emails" type="button">Pošlji vsem (${stats.totalUsers})</button>
+        <p id="welcome-email-result"></p>
+      </div>
+    </div>
   </div>
   <h2 style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
     Vsi računi
