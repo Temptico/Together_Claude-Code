@@ -48,6 +48,18 @@ async function requireUser(req: Request, res: Response, id: string) {
   return user;
 }
 
+// Shared by both "plan a catalog idea" and "add your own date" — same date
+// rules either way (valid, sane year, not in the past).
+function parseScheduledAt(date: string, time: string): { scheduledAt: Date } | { error: string } {
+  const scheduledAt = new Date(`${date}T${time}`);
+  if (Number.isNaN(scheduledAt.getTime())) return { error: "Neveljaven datum ali ura" };
+  const year = scheduledAt.getFullYear();
+  if (year < 1900 || year > 9999) return { error: "Neveljavno leto" };
+  const now = new Date();
+  if (scheduledAt.getTime() < now.getTime() - 60_000) return { error: "Datum ne sme biti v preteklosti" };
+  return { scheduledAt };
+}
+
 // Called after any activity that can move the streak (mood/answer/challenge
 // completion). Cheap no-op the vast majority of the time — only does
 // anything on the exact tick the streak lands on a round number. Errors are
@@ -495,19 +507,9 @@ export function registerRoutes(app: Express) {
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
 
-      const scheduledAt = new Date(`${parsed.data.date}T${parsed.data.time}`);
-      if (Number.isNaN(scheduledAt.getTime())) {
-        res.status(400).json({ error: "Neveljaven datum ali ura" });
-        return;
-      }
-      const year = scheduledAt.getFullYear();
-      if (year < 1900 || year > 9999) {
-        res.status(400).json({ error: "Neveljavno leto" });
-        return;
-      }
-      const now = new Date();
-      if (scheduledAt.getTime() < now.getTime() - 60_000) {
-        res.status(400).json({ error: "Datum ne sme biti v preteklosti" });
+      const parsedDate = parseScheduledAt(parsed.data.date, parsed.data.time);
+      if ("error" in parsedDate) {
+        res.status(400).json({ error: parsedDate.error });
         return;
       }
 
@@ -517,7 +519,7 @@ export function registerRoutes(app: Express) {
         return;
       }
 
-      const row = await storage.createPlannedDate(user.id, parsed.data.ideaId, scheduledAt, parsed.data.notes);
+      const row = await storage.createPlannedDate(user.id, parsed.data.ideaId, parsedDate.scheduledAt, parsed.data.notes);
 
       if (user.partnerId) {
         notifyUser(user.partnerId, (lang) => ({
@@ -528,6 +530,54 @@ export function registerRoutes(app: Express) {
       }
 
       res.status(201).json({ ...row, idea });
+    })
+  );
+
+  // A date the couple typed in themselves, instead of picking from the
+  // catalog — same downstream behavior (photo, completion, reminders) as a
+  // catalog pick, see storage.createCustomPlannedDate.
+  app.post(
+    "/api/dates/planned/custom",
+    ah(async (req, res) => {
+      const schema = z.object({
+        userId: z.string(),
+        title: z.string().trim().min(1, "Naslov je obvezen").max(120, "Naslov je predolg"),
+        description: z.string().trim().max(500, "Opis je predolg").optional(),
+        date: z.string().min(1, "Datum je obvezen"),
+        time: z.string().min(1, "Ura je obvezna"),
+        notes: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+
+      const parsedDate = parseScheduledAt(parsed.data.date, parsed.data.time);
+      if ("error" in parsedDate) {
+        res.status(400).json({ error: parsedDate.error });
+        return;
+      }
+
+      const row = await storage.createCustomPlannedDate(
+        user.id,
+        parsed.data.title,
+        parsed.data.description || "",
+        parsedDate.scheduledAt,
+        parsed.data.notes
+      );
+
+      if (user.partnerId) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: planDateNotification(lang, row.idea.title),
+          tag: "plan-date",
+        })).catch(() => {});
+      }
+
+      res.status(201).json(row);
     })
   );
 

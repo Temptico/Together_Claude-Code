@@ -418,6 +418,10 @@ export async function getDateIdeas(filters: { category?: string; duration?: stri
     // description/duration/cost and would look out of place mixed into the
     // hand-curated catalog.
     if (idea.externalId != null) return false;
+    // A couple's own manually-typed date ideas are never shown to anyone
+    // else — they're only ever reached by id, through that couple's own
+    // planned date.
+    if (idea.custom) return false;
     if (filters.category && filters.category !== "vse" && idea.category !== filters.category) return false;
     if (filters.duration && idea.duration !== filters.duration) return false;
     if (filters.cost && idea.cost !== filters.cost) return false;
@@ -500,6 +504,38 @@ export async function createPlannedDate(
     .values({ userId, ideaId, scheduledAt, notes })
     .returning();
   return row;
+}
+
+// A user's own idea, typed in directly rather than picked from the catalog.
+// Modeled as a one-off `date_ideas` row flagged `custom` (so it never shows
+// up in anyone's browsing/search) that the new planned date then points at
+// — this reuses everything else planned dates already do (photos,
+// completion, reminders, idea title lookups) with no separate code path.
+export async function createCustomDateIdea(title: string, description: string) {
+  const [idea] = await db
+    .insert(dateIdeas)
+    .values({
+      title,
+      description: description || title,
+      category: "doma",
+      cost: "eur",
+      duration: "1h",
+      custom: true,
+    })
+    .returning();
+  return idea;
+}
+
+export async function createCustomPlannedDate(
+  userId: string,
+  title: string,
+  description: string,
+  scheduledAt: Date,
+  notes: string | undefined
+) {
+  const idea = await createCustomDateIdea(title, description);
+  const row = await createPlannedDate(userId, idea.id, scheduledAt, notes);
+  return { ...row, idea };
 }
 
 function coupleIds(user: User): string[] {

@@ -119,6 +119,24 @@ export function streakFreezeNotification(lang: string, streak: number): string {
   return bodies[normLang(lang)];
 }
 
+export function dateReminder3dNotification(lang: string, title: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `Čez 3 dni imata zmenek: ${title} 💕`,
+    en: `Your date is in 3 days: ${title} 💕`,
+    hr: `Za 3 dana imate spoj: ${title} 💕`,
+  };
+  return bodies[normLang(lang)];
+}
+
+export function dateReminderTodayNotification(lang: string, title: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `Danes imata zmenek: ${title}! 💕`,
+    en: `Your date is today: ${title}! 💕`,
+    hr: `Danas imate spoj: ${title}! 💕`,
+  };
+  return bodies[normLang(lang)];
+}
+
 export function milestoneNotification(lang: string, days: number): string {
   const bodies: Record<Lang, string> = {
     sl: `🎉 ${days} dni zapored! Odprita Together in praznujta ta mejnik.`,

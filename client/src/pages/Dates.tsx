@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
+import { AddCustomDateDialog } from "@/components/AddCustomDateDialog";
 import { DatePhotoField } from "@/components/DatePhotoField";
 import {
   categoryLabel,
@@ -320,6 +321,7 @@ function PlannedTab() {
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showAllPast, setShowAllPast] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   const { data: planned = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/dates/planned", user!.id],
@@ -412,6 +414,11 @@ function PlannedTab() {
 
   return (
     <div className="flex flex-col gap-5 pb-6">
+      <Button variant="secondary" onClick={() => setCustomOpen(true)} className="self-start">
+        <Plus className="h-4 w-4" /> {t("dates.addCustomDate")}
+      </Button>
+      <AddCustomDateDialog open={customOpen} onOpenChange={setCustomOpen} />
+
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="rounded-full p-2 hover:bg-muted">

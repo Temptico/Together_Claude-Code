@@ -5,6 +5,8 @@ import {
   anniversaryNotification,
   anniversaryUpcomingNotification,
   streakFreezeNotification,
+  dateReminder3dNotification,
+  dateReminderTodayNotification,
 } from "./notificationText.js";
 
 function pad(n: number) {
@@ -17,6 +19,15 @@ function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
   let next = new Date(now.getFullYear(), anniv.getMonth(), anniv.getDate());
   if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, anniv.getMonth(), anniv.getDate());
   return Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// Plain calendar-day difference (ignores time of day), unlike
+// daysUntilAnniversary which wraps to next year — a planned date is a single
+// fixed point in time, not a yearly-recurring one.
+function daysUntilDate(target: Date, now: Date): number {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  return Math.round((targetDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 async function tick() {
@@ -83,6 +94,32 @@ async function tick() {
             }));
             await storage.markReminderSent(user.id, date, type);
           }
+        }
+      }
+
+      // Planned-date reminders, 3 days before and on the day — checked once a
+      // day at 09:00. getPlannedDates returns the whole couple's dates (both
+      // partners' rows), so each partner naturally gets their own reminder in
+      // their own language when this loop reaches their user record.
+      if (hhmm === "09:00") {
+        const planned = await storage.getPlannedDates(user);
+        for (const pd of planned) {
+          if (pd.completed) continue;
+          const daysUntil = daysUntilDate(new Date(pd.scheduledAt), now);
+          if (daysUntil !== 3 && daysUntil !== 0) continue;
+          const type = daysUntil === 3 ? `date_reminder_3d_${pd.id}` : `date_reminder_today_${pd.id}`;
+          const alreadySent = await storage.wasReminderSent(user.id, date, type);
+          if (alreadySent) continue;
+          const idea = await storage.getDateIdeaById(pd.ideaId, user.language);
+          await notifyUser(user.id, (lang) => ({
+            title: "Together",
+            body:
+              daysUntil === 3
+                ? dateReminder3dNotification(lang, idea?.title || "")
+                : dateReminderTodayNotification(lang, idea?.title || ""),
+            tag: type,
+          }));
+          await storage.markReminderSent(user.id, date, type);
         }
       }
 

@@ -80,7 +80,8 @@ const STATEMENTS = [
       tags text[],
       lat double precision,
       lng double precision,
-      external_id text UNIQUE
+      external_id text UNIQUE,
+      custom boolean NOT NULL DEFAULT false
     )`,
   `CREATE TABLE IF NOT EXISTS planned_dates (
       id serial PRIMARY KEY,
@@ -139,7 +140,7 @@ const STATEMENTS = [
       id serial PRIMARY KEY,
       user_id varchar(24) NOT NULL,
       date text NOT NULL,
-      type varchar(24) NOT NULL,
+      type text NOT NULL,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
   `CREATE TABLE IF NOT EXISTS milestone_events (
@@ -197,6 +198,10 @@ const STATEMENTS = [
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS title_hr text`,
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS description_en text`,
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS description_hr text`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false`,
+  // reminder_log.type used to be varchar(24); per-planned-date reminder types
+  // embed the date's id and can run longer than that.
+  `ALTER TABLE reminder_log ALTER COLUMN type TYPE text`,
 ];
 
 export async function runMigrations() {

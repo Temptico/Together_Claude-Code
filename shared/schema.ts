@@ -128,6 +128,7 @@ export const dateIdeas = pgTable("date_ideas", {
   lat: doublePrecision("lat"),
   lng: doublePrecision("lng"),
   externalId: text("external_id").unique(), // Google Places place_id, when sourced live
+  custom: boolean("custom").notNull().default(false), // user-typed-in-app entry — never shown in the shared browsable catalog, only referenced by its own planned date
 });
 
 // ---------- Planned dates ----------
@@ -220,7 +221,7 @@ export const reminderLog = pgTable("reminder_log", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id", { length: 24 }).notNull(),
   date: text("date").notNull(),
-  type: varchar("type", { length: 24 }).notNull(), // 'daily' | 'streak_freeze' | 'anniversary'
+  type: text("type").notNull(), // 'daily' | 'streak_freeze' | 'anniversary' | 'date_reminder_3d_<plannedDateId>' | ... — was varchar(24), widened since per-row reminder types embed an id and can run long
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
