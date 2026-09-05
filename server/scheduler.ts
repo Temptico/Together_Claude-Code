@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { notifyUser } from "./push.js";
+import { sendConnectReminderEmail } from "./email.js";
 import {
   dailyReminderNotification,
   anniversaryNotification,
@@ -7,6 +8,7 @@ import {
   streakFreezeNotification,
   dateReminder3dNotification,
   dateReminderTodayNotification,
+  connectReminderNotification,
 } from "./notificationText.js";
 
 function pad(n: number) {
@@ -30,6 +32,12 @@ function daysUntilDate(target: Date, now: Date): number {
   return Math.round((targetDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function daysSince(past: Date, now: Date): number {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const pastDay = new Date(past.getFullYear(), past.getMonth(), past.getDate());
+  return Math.round((today.getTime() - pastDay.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 async function tick() {
   const now = new Date();
   const date = storage.todayStr();
@@ -38,9 +46,37 @@ async function tick() {
   const users = await storage.getAllUsers();
 
   for (const user of users) {
-    if (!user.notificationsEnabled) continue;
-
     try {
+      // Nudge to connect with a partner, 1 and 3 days after registering if
+      // still unconnected — checked once a day at 10:00. Unlike the other
+      // reminders below, this one always sends the email leg regardless of
+      // the user's push-notification preference (we always have their email,
+      // and a connect nudge is exactly the kind of one-off, high-intent
+      // message that's fine outside the push opt-in), while push is still
+      // gated by notificationsEnabled like everything else here.
+      if (hhmm === "10:00" && !user.partnerId) {
+        const ageDays = daysSince(new Date(user.createdAt), now);
+        for (const milestone of [1, 3] as const) {
+          if (ageDays !== milestone) continue;
+          const type = `connect_reminder_${milestone}d`;
+          const alreadySent = await storage.wasReminderSent(user.id, date, type);
+          if (alreadySent) continue;
+          await sendConnectReminderEmail(user.email, user.name, user.connectCode, user.language).catch((err) =>
+            console.warn("[scheduler] connect reminder email failed for user", user.id, err)
+          );
+          if (user.notificationsEnabled) {
+            await notifyUser(user.id, (lang) => ({
+              title: "Together",
+              body: connectReminderNotification(lang),
+              tag: type,
+            }));
+          }
+          await storage.markReminderSent(user.id, date, type);
+        }
+      }
+
+      if (!user.notificationsEnabled) continue;
+
       // Daily "don't forget to check in" reminder, at the user's chosen (or random) time.
       const reminderTime = storage.deriveReminderTime(user, date);
       if (reminderTime === hhmm) {

@@ -119,6 +119,15 @@ export function streakFreezeNotification(lang: string, streak: number): string {
   return bodies[normLang(lang)];
 }
 
+export function connectReminderNotification(lang: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: "Ne pozabi povabiti partnerja/ko! Tvoja koda za povezavo te čaka. 💕",
+    en: "Don't forget to invite your partner! Your connect code is waiting. 💕",
+    hr: "Ne zaboravi pozvati partnera/icu! Tvoj kod za povezivanje te čeka. 💕",
+  };
+  return bodies[normLang(lang)];
+}
+
 export function dateReminder3dNotification(lang: string, title: string): string {
   const bodies: Record<Lang, string> = {
     sl: `Čez 3 dni imata zmenek: ${title} 💕`,
