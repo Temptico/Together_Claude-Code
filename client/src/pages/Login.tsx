@@ -14,7 +14,7 @@ import { useState } from "react";
 type LoginData = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { t, setLang } = useTranslation();
   const { setUser } = useAuth();
   const [, navigate] = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -30,6 +30,13 @@ export default function Login() {
     try {
       const user = await apiRequest<User>("POST", "/api/auth/login", data);
       setUser(user);
+      // The display language otherwise lives purely in this device's
+      // localStorage — on a fresh device/session it falls back to browser
+      // locale detection, silently ignoring the language the account was
+      // actually set to (e.g. from Profile, or picked at registration).
+      // Syncing it here on login is what makes the choice actually follow
+      // the account across sessions/devices.
+      if (user.language === "sl" || user.language === "en" || user.language === "hr") setLang(user.language);
       navigate(sessionStorage.getItem("together:pendingInviteCode") ? "/connect" : "/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
