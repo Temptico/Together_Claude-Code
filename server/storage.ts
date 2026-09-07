@@ -2,6 +2,7 @@ import { eq, and, or, desc, gte, asc, inArray, isNotNull, isNull } from "drizzle
 import { db } from "./db.js";
 import {
   users,
+  loginCodes,
   moods,
   questions,
   questionAnswers,
@@ -23,6 +24,7 @@ import {
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
 import bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
 
 const idGen = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 20);
 const codeGen = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8);
@@ -60,14 +62,44 @@ export function coupleKeyFor(user: User): string {
 }
 
 // ---------------- Users ----------------
-export async function createUser(name: string, email: string, pinHash: string, language?: string): Promise<User> {
+export async function createUser(name: string, email: string, language?: string): Promise<User> {
   let connectCode = codeGen();
   // extremely unlikely collision, but guard anyway
   while (await getUserByConnectCode(connectCode)) connectCode = codeGen();
-  const values: typeof users.$inferInsert = { id: idGen(), name, email, pin: pinHash, connectCode };
+  const values: typeof users.$inferInsert = { id: idGen(), name, email, connectCode };
   if (language) values.language = language;
   const [user] = await db.insert(users).values(values).returning();
   return user;
+}
+
+const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
+
+// One-time login code, emailed to the user in place of a PIN. Any prior
+// unused code for this user is invalidated first, so only the most recently
+// requested one ever works — requesting a new code silently supersedes an
+// older, forgotten one instead of leaving both valid.
+export async function createLoginCode(userId: string): Promise<string> {
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const codeHash = await hashPin(code); // generic bcrypt hash — same helper the old PIN used
+  await db.delete(loginCodes).where(and(eq(loginCodes.userId, userId), isNull(loginCodes.usedAt)));
+  await db.insert(loginCodes).values({ userId, codeHash, expiresAt: new Date(Date.now() + LOGIN_CODE_TTL_MS) });
+  return code;
+}
+
+export async function verifyLoginCode(userId: string, code: string): Promise<boolean> {
+  const now = new Date();
+  const rows = await db
+    .select()
+    .from(loginCodes)
+    .where(and(eq(loginCodes.userId, userId), isNull(loginCodes.usedAt), gte(loginCodes.expiresAt, now)))
+    .orderBy(desc(loginCodes.createdAt));
+  for (const row of rows) {
+    if (await verifyPin(code, row.codeHash)) {
+      await db.update(loginCodes).set({ usedAt: now }).where(eq(loginCodes.id, row.id));
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
@@ -92,11 +124,6 @@ export async function updateUser(id: string, patch: Partial<User>): Promise<User
 
 // Clears a user's PIN so they can claim a new one on their next login —
 // the only recovery path since there's no email-based reset flow.
-export async function resetPinByEmail(email: string): Promise<User | undefined> {
-  const [user] = await db.update(users).set({ pin: null }).where(eq(users.email, email)).returning();
-  return user;
-}
-
 export async function deleteUserAccount(user: User): Promise<void> {
   // Right-to-erasure account deletion: removes every row that references
   // this user, unlinks them from their partner, and finally the account

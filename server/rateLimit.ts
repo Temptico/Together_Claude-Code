@@ -1,11 +1,15 @@
 // Minimal in-memory rate limiter — no extra dependency, fine for a single
-// Render instance. Two independent limiters are exposed:
-//  - checkLoginIpLimit()/checkRegisterIpLimit(): a plain sliding-window
-//    counter per IP, for blocking high-volume abuse regardless of outcome.
+// Render instance. Limiters exposed:
+//  - checkLoginIpLimit()/checkRegisterIpLimit()/checkRequestCodeIpLimit():
+//    plain sliding-window counters per IP, for blocking high-volume abuse
+//    regardless of outcome.
+//  - checkRequestCodeEmailLimit(): a per-email cap on how many login-code
+//    emails can be triggered, independent of IP — stops someone spamming one
+//    victim's inbox from rotating IPs.
 //  - isEmailLockedOut()/recordLoginFailure()/clearLoginFailures(): counts
-//    only failed PIN attempts per email, so legitimate repeated logins
-//    (multiple devices, a typo followed by the correct PIN) never trip it,
-//    while a targeted brute-force of one account's 4-6 digit PIN does, even
+//    only failed login-code attempts per email, so legitimate repeated
+//    logins (multiple devices, a typo followed by the correct code) never
+//    trip it, while a brute-force of one account's 6-digit code does, even
 //    if the attacker rotates IPs to dodge the IP limiter.
 // Entries are swept lazily as they're accessed so memory never grows
 // unbounded — fine at this app's scale, and avoids a background timer.
@@ -47,6 +51,8 @@ function makeStore() {
 
 const loginIpLimiter = makeStore();
 const registerIpLimiter = makeStore();
+const requestCodeIpLimiter = makeStore();
+const requestCodeEmailLimiter = makeStore();
 const emailFailureLimiter = makeStore();
 
 const FAILURE_WINDOW_MS = 30 * 60 * 1000;
@@ -62,6 +68,18 @@ export function checkRegisterIpLimit(ip: string) {
   // 8 new accounts / hour per IP is plenty for real signups (including
   // shared NAT/office wifi) and blocks bulk fake-account creation.
   return registerIpLimiter.hit(`ip:${ip}`, 60 * 60 * 1000, 8);
+}
+
+export function checkRequestCodeIpLimit(ip: string) {
+  // 10 code-request emails / 15 min per IP — each hit sends a real email, so
+  // this is a bit tighter than the plain login-attempt limit above.
+  return requestCodeIpLimiter.hit(`ip:${ip}`, 15 * 60 * 1000, 10);
+}
+
+export function checkRequestCodeEmailLimit(email: string) {
+  // 5 code emails / hour per address, regardless of which IP asked — stops
+  // someone spamming one victim's inbox by rotating IPs.
+  return requestCodeEmailLimiter.hit(`email:${email.toLowerCase()}`, 60 * 60 * 1000, 5);
 }
 
 export function isEmailLockedOut(email: string): { lockedOut: boolean; retryAfterSec: number } {

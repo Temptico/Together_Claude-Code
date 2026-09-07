@@ -8,7 +8,6 @@ import { registerRoutes } from "./routes.js";
 import {
   getUserByConnectCode,
   getAdminStats,
-  resetPinByEmail,
   getUserByEmail,
   deleteUserAccount,
   getAllFeedbackWithUsers,
@@ -37,25 +36,6 @@ async function main() {
   app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
 
   registerRoutes(app);
-
-  app.post("/api/admin/reset-pin", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key, email } = req.body || {};
-    if (!secret || key !== secret) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    if (typeof email !== "string" || !email) {
-      res.status(400).json({ error: "Manjka e-poštni naslov" });
-      return;
-    }
-    const user = await resetPinByEmail(email.trim().toLowerCase());
-    if (!user) {
-      res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo" });
-      return;
-    }
-    res.json({ ok: true, name: user.name, email: user.email });
-  });
 
   app.post("/api/admin/broadcast", async (req, res) => {
     const secret = process.env.ADMIN_SECRET;
@@ -284,14 +264,6 @@ async function main() {
     <h2 class="section-title">Orodja</h2>
     <div class="tools">
       <div class="tool">
-        <h2>Ponastavi PIN</h2>
-        <form id="reset-form">
-          <input type="email" id="reset-email" placeholder="uporabnik@posta.si" required />
-          <button type="submit">Ponastavi</button>
-        </form>
-        <p id="reset-result"></p>
-      </div>
-      <div class="tool">
         <h2>Pošlji obvestilo vsem</h2>
         <form id="broadcast-form" style="flex-direction: column; align-items: stretch;">
           <input type="text" id="broadcast-title" placeholder="Naslov (privzeto: Together)" style="margin-bottom: 0.5rem;" />
@@ -322,35 +294,6 @@ async function main() {
     <tbody>${feedbackRows || `<tr><td colspan="4" style="color:#7a6f68">Še ni povratnih informacij.</td></tr>`}</tbody>
   </table>
   <script>
-    document.getElementById('reset-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = e.target.querySelector('button');
-      const result = document.getElementById('reset-result');
-      const email = document.getElementById('reset-email').value;
-      btn.disabled = true;
-      result.textContent = '';
-      result.className = '';
-      try {
-        const res = await fetch('/api/admin/reset-pin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: ${JSON.stringify(key)}, email }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          result.textContent = 'PIN ponastavljen za ' + data.name + ' (' + data.email + '). Ob naslednji prijavi lahko izbere novega.';
-          result.className = 'ok';
-        } else {
-          result.textContent = data.error || 'Napaka';
-          result.className = 'err';
-        }
-      } catch {
-        result.textContent = 'Napaka pri povezavi';
-        result.className = 'err';
-      } finally {
-        btn.disabled = false;
-      }
-    });
     document.getElementById('broadcast-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const title = document.getElementById('broadcast-title').value;

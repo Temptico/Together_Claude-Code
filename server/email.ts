@@ -165,37 +165,40 @@ const CONNECT_REMINDER_COPY: Record<
   },
 };
 
-function connectReminderHtml(name: string, connectCode: string, lang: Lang): string {
-  const c = CONNECT_REMINDER_COPY[lang];
+type CodeEmailCopy = { greeting: string; intro: string; codeLabel: string; cta: string; tip: string; signoff: string };
+
+// Shared by both emails that show the recipient a prominent code (connect
+// reminder and login code) — same card, different copy/emoji/code.
+function codeEmailHtml(name: string, code: string, copy: CodeEmailCopy, emoji: string): string {
   const safeName = escapeHtml(name);
-  const safeCode = escapeHtml(connectCode);
+  const safeCode = escapeHtml(code);
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:#f8f5f2;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5f2;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;">
         <tr><td style="background:linear-gradient(135deg,#ff6b6b 0%,#ffa94d 100%);padding:40px 32px;text-align:center;">
-          <div style="font-size:40px;line-height:1;">💌</div>
+          <div style="font-size:40px;line-height:1;">${emoji}</div>
           <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;">Together</div>
         </td></tr>
         <tr><td style="padding:32px;">
-          <p style="margin:0 0 16px;font-size:18px;font-weight:800;color:#2a2320;">${c.greeting}, ${safeName}! 👋</p>
-          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#4a3f3a;">${c.intro}</p>
+          <p style="margin:0 0 16px;font-size:18px;font-weight:800;color:#2a2320;">${copy.greeting}, ${safeName}! 👋</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#4a3f3a;">${copy.intro}</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
             <tr><td style="padding:20px;background:#f8f5f2;border-radius:16px;text-align:center;">
-              <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#a1948c;margin-bottom:8px;">${c.codeLabel}</div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#a1948c;margin-bottom:8px;">${copy.codeLabel}</div>
               <div style="font-size:28px;font-weight:800;letter-spacing:0.1em;color:#2a2320;">${safeCode}</div>
             </td></tr>
           </table>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="border-radius:999px;background:#ff6b6b;">
-              <a href="${APP_URL}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${c.cta}</a>
+              <a href="${APP_URL}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${copy.cta}</a>
             </td></tr>
           </table>
-          <p style="margin:0;padding:16px;background:#f8f5f2;border-radius:16px;font-size:13px;line-height:1.5;color:#7a6f68;">${c.tip}</p>
+          <p style="margin:0;padding:16px;background:#f8f5f2;border-radius:16px;font-size:13px;line-height:1.5;color:#7a6f68;">${copy.tip}</p>
         </td></tr>
         <tr><td style="padding:24px 32px;border-top:1px solid #eee;">
-          <p style="margin:0;font-size:13px;line-height:1.6;color:#7a6f68;">${c.signoff}</p>
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#7a6f68;">${copy.signoff}</p>
           <p style="margin:12px 0 0;font-size:11px;color:#b0a59d;">Enigma 101 global j.d.o.o. · info@temptico.com</p>
         </td></tr>
       </table>
@@ -206,5 +209,45 @@ function connectReminderHtml(name: string, connectCode: string, lang: Lang): str
 
 export async function sendConnectReminderEmail(to: string, name: string, connectCode: string, language: string) {
   const lang = normLang(language);
-  await sendEmail(to, CONNECT_REMINDER_SUBJECTS[lang], connectReminderHtml(name, connectCode, lang), "connect-reminder");
+  const html = codeEmailHtml(name, connectCode, CONNECT_REMINDER_COPY[lang], "💌");
+  await sendEmail(to, CONNECT_REMINDER_SUBJECTS[lang], html, "connect-reminder");
+}
+
+const LOGIN_CODE_SUBJECTS: Record<Lang, string> = {
+  sl: "Tvoja koda za prijavo",
+  en: "Your login code",
+  hr: "Tvoj kod za prijavu",
+};
+
+const LOGIN_CODE_COPY: Record<Lang, CodeEmailCopy> = {
+  sl: {
+    greeting: "Pozdravljeni",
+    intro: "Tukaj je tvoja koda za prijavo v Together. Velja 10 minut in jo lahko uporabiš samo enkrat.",
+    codeLabel: "Koda za prijavo",
+    cta: "Odpri Together",
+    tip: "Če te prijave nisi zahteval/a ti, lahko to sporočilo brez skrbi prezreš — brez kode se nihče ne more prijaviti v tvoj račun.",
+    signoff: "Lep pozdrav,<br>ekipa Temptico",
+  },
+  en: {
+    greeting: "Hi",
+    intro: "Here's your login code for Together. It's valid for 10 minutes and can only be used once.",
+    codeLabel: "Login code",
+    cta: "Open Together",
+    tip: "If you didn't request this, you can safely ignore this email — no one can log into your account without the code.",
+    signoff: "Best,<br>the Temptico team",
+  },
+  hr: {
+    greeting: "Pozdrav",
+    intro: "Evo tvog koda za prijavu u Together. Vrijedi 10 minuta i može se koristiti samo jednom.",
+    codeLabel: "Kod za prijavu",
+    cta: "Otvori Together",
+    tip: "Ako ovu prijavu nisi zatražio/la ti, slobodno zanemari ovu poruku — nitko se ne može prijaviti u tvoj račun bez koda.",
+    signoff: "Lijep pozdrav,<br>tim Temptico",
+  },
+};
+
+export async function sendLoginCodeEmail(to: string, name: string, code: string, language: string) {
+  const lang = normLang(language);
+  const html = codeEmailHtml(name, code, LOGIN_CODE_COPY[lang], "🔐");
+  await sendEmail(to, LOGIN_CODE_SUBJECTS[lang], html, "login-code");
 }

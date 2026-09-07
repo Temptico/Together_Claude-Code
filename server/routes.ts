@@ -2,10 +2,12 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as storage from "./storage.js";
 import { getVapidPublicKey, notifyUser } from "./push.js";
-import { sendWelcomeEmail } from "./email.js";
+import { sendWelcomeEmail, sendLoginCodeEmail } from "./email.js";
 import {
   checkLoginIpLimit,
   checkRegisterIpLimit,
+  checkRequestCodeIpLimit,
+  checkRequestCodeEmailLimit,
   isEmailLockedOut,
   recordLoginFailure,
   clearLoginFailures,
@@ -23,7 +25,8 @@ import {
 } from "./notificationText.js";
 import {
   insertUserSchema,
-  loginSchema,
+  requestLoginCodeSchema,
+  verifyLoginCodeSchema,
   insertMoodSchema,
   insertAnswerSchema,
   insertPlannedDateSchema,
@@ -99,30 +102,66 @@ export function registerRoutes(app: Express) {
         res.status(409).json({ error: "Ta e-poštni naslov je že v uporabi. Prosimo, prijavi se." });
         return;
       }
-      const pinHash = await storage.hashPin(parsed.data.pin);
-      const user = await storage.createUser(parsed.data.name, parsed.data.email, pinHash, parsed.data.language);
+      const user = await storage.createUser(parsed.data.name, parsed.data.email, parsed.data.language);
       sendWelcomeEmail(user.email, user.name, user.language).catch(() => {});
       res.status(201).json(storage.omitPin(user));
     })
   );
 
+  // Login is a one-time code emailed to the account, in two steps: request a
+  // code, then verify it. Replaces the old PIN login — existing sessions
+  // (userId already in the client's localStorage) are untouched by this,
+  // since GET /api/auth/session/:id below never checked a PIN either way.
   app.post(
-    "/api/auth/login",
+    "/api/auth/login/request-code",
     ah(async (req, res) => {
+      const parsed = requestLoginCodeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+
+      const ipLimit = checkRequestCodeIpLimit(req.ip || "unknown");
+      if (!ipLimit.allowed) {
+        res.status(429).set("Retry-After", String(ipLimit.retryAfterSec)).json({ error: "Preveč poskusov. Poskusi znova čez nekaj minut." });
+        return;
+      }
+      const emailLimit = checkRequestCodeEmailLimit(parsed.data.email);
+      if (!emailLimit.allowed) {
+        res.status(429).set("Retry-After", String(emailLimit.retryAfterSec)).json({ error: "Preveč poskusov. Poskusi znova čez nekaj minut." });
+        return;
+      }
+
+      const user = await storage.getUserByEmail(parsed.data.email);
+      if (!user) {
+        res.status(404).json({ error: "Računa s tem e-poštnim naslovom ne najdemo. Ustvari nov račun." });
+        return;
+      }
+
+      const code = await storage.createLoginCode(user.id);
+      if (!process.env.RESEND_API_KEY) console.log(`[dev] login code for ${user.email}: ${code}`);
+      sendLoginCodeEmail(user.email, user.name, code, user.language).catch(() => {});
+      res.json({ ok: true });
+    })
+  );
+
+  app.post(
+    "/api/auth/login/verify-code",
+    ah(async (req, res) => {
+      const parsed = verifyLoginCodeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+
       const ipLimit = checkLoginIpLimit(req.ip || "unknown");
       if (!ipLimit.allowed) {
         res.status(429).set("Retry-After", String(ipLimit.retryAfterSec)).json({ error: "Preveč poskusov. Poskusi znova čez nekaj minut." });
         return;
       }
 
-      const parsed = loginSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
-        return;
-      }
-
       // Per-email lockout, independent of the IP limiter above — stops a
-      // targeted brute-force of one account's 4-6 digit PIN even if the
+      // targeted brute-force of one account's 6-digit code even if the
       // attacker spreads attempts across IPs.
       const lockout = isEmailLockedOut(parsed.data.email);
       if (lockout.lockedOut) {
@@ -139,29 +178,10 @@ export function registerRoutes(app: Express) {
         return;
       }
 
-      // TEMPORARY: set DISABLE_PIN_CHECK=1 in Render to let any known email
-      // log in regardless of PIN, for testing. Remove the env var to restore
-      // normal PIN verification — no code change needed either way.
-      if (process.env.DISABLE_PIN_CHECK === "1") {
-        res.json(storage.omitPin(user));
-        return;
-      }
-
-      if (!user.pin) {
-        // Legacy account created before PINs existed: the first PIN entered
-        // on login claims the account going forward, rather than locking
-        // anyone out.
-        const pinHash = await storage.hashPin(parsed.data.pin);
-        const updated = await storage.updateUser(user.id, { pin: pinHash });
-        clearLoginFailures(parsed.data.email);
-        res.json(storage.omitPin(updated));
-        return;
-      }
-
-      const valid = await storage.verifyPin(parsed.data.pin, user.pin);
+      const valid = await storage.verifyLoginCode(user.id, parsed.data.code);
       if (!valid) {
         recordLoginFailure(parsed.data.email);
-        res.status(401).json({ error: "Napačen PIN" });
+        res.status(401).json({ error: "Napačna ali potekla koda" });
         return;
       }
       clearLoginFailures(parsed.data.email);
@@ -743,8 +763,6 @@ export function registerRoutes(app: Express) {
         notificationsEnabled: z.boolean().optional(),
         reminderTime: z.string().optional(),
         language: z.enum(["sl", "en", "hr"]).optional(),
-        pin: z.string().regex(/^\d{4,6}$/, "PIN mora imeti 4-6 številk").optional(),
-        currentPin: z.string().optional(),
         pwaInstalled: z.literal(true).optional(),
       });
       const parsed = schema.safeParse(req.body);
@@ -761,21 +779,11 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const { currentPin, pin, pwaInstalled, ...rest } = parsed.data;
+      const { pwaInstalled, ...rest } = parsed.data;
       const patch: any = { ...rest };
       // Only ever moves forward — never overwrite an existing install
       // timestamp with a later one from, say, a second device installing.
       if (pwaInstalled && !user.pwaInstalledAt) patch.pwaInstalledAt = new Date();
-
-      if (pin) {
-        if (user.pin) {
-          if (!currentPin || !(await storage.verifyPin(currentPin, user.pin))) {
-            res.status(401).json({ error: "Napačen trenutni PIN" });
-            return;
-          }
-        }
-        patch.pin = await storage.hashPin(pin);
-      }
 
       // An empty patch (e.g. { pwaInstalled: true } sent again after the
       // timestamp is already set, with nothing else in the body) would

@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   pwaInstalledAt: timestamp("pwa_installed_at"), // set the first time the client detects standalone/installed mode
 });
 
+// PIN_REGEX/pin are legacy — login moved to an emailed one-time code (see
+// loginCodes below). The column and existing hashes are left in place
+// (harmless, unused) rather than migrated away; nothing writes a pin for new
+// accounts anymore.
 export const PIN_REGEX = /^\d{4,6}$/;
 
 export const insertUserSchema = createInsertSchema(users, {
@@ -35,7 +39,6 @@ export const insertUserSchema = createInsertSchema(users, {
 })
   .pick({ name: true, email: true })
   .extend({
-    pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk"),
     // Optional — the client sends whatever language the registration page is
     // currently showing (device-detected or explicitly chosen there), so the
     // welcome email and the rest of the app start in the right language from
@@ -44,9 +47,25 @@ export const insertUserSchema = createInsertSchema(users, {
     language: z.enum(["sl", "en", "hr"]).optional(),
   });
 
-export const loginSchema = z.object({
+export const requestLoginCodeSchema = z.object({
   email: z.string().email("Neveljaven e-poštni naslov"),
-  pin: z.string().regex(PIN_REGEX, "PIN mora imeti 4-6 številk"),
+});
+
+export const CODE_REGEX = /^\d{6}$/;
+
+export const verifyLoginCodeSchema = z.object({
+  email: z.string().email("Neveljaven e-poštni naslov"),
+  code: z.string().regex(CODE_REGEX, "Koda mora imeti 6 številk"),
+});
+
+// ---------- Login codes (one-time email codes, replace PIN login) ----------
+export const loginCodes = pgTable("login_codes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  codeHash: text("code_hash").notNull(), // bcrypt, same helper as the old PIN hash
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"), // set once consumed, so a code can't be replayed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ---------- Moods ----------

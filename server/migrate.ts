@@ -19,6 +19,14 @@ const STATEMENTS = [
       created_at timestamp NOT NULL DEFAULT now(),
       pwa_installed_at timestamp
     )`,
+  `CREATE TABLE IF NOT EXISTS login_codes (
+      id serial PRIMARY KEY,
+      user_id varchar(24) NOT NULL,
+      code_hash text NOT NULL,
+      expires_at timestamp NOT NULL,
+      used_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   `CREATE TABLE IF NOT EXISTS moods (
       id serial PRIMARY KEY,
       user_id varchar(24) NOT NULL,
