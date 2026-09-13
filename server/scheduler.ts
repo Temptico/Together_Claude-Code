@@ -11,8 +11,19 @@ import {
   connectReminderNotification,
 } from "./notificationText.js";
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
+const TICK_INTERVAL_MS = 15 * 60_000;
+
+// Every reminder time in this app lands on the hour (see REMINDER_TIMES in
+// Profile.tsx — random mode also derives an hour, never a minute). Checking
+// every 60 seconds for an exact "09:00" match kept Neon's database compute
+// permanently awake: it auto-suspends after a few minutes of no queries, but
+// a query every single minute never gave it the chance. A reminder landing
+// a few minutes into its target hour instead of exactly on it is
+// imperceptible here, so this window (matched to the tick interval, so no
+// hour can be skipped between ticks) trades that invisible precision for a
+// large drop in database wake-ups.
+function isTopOfHour(now: Date, targetHour: number): boolean {
+  return now.getHours() === targetHour && now.getMinutes() < TICK_INTERVAL_MS / 60_000;
 }
 
 function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
@@ -41,7 +52,6 @@ function daysSince(past: Date, now: Date): number {
 async function tick() {
   const now = new Date();
   const date = storage.todayStr();
-  const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   const users = await storage.getAllUsers();
 
@@ -54,7 +64,7 @@ async function tick() {
       // and a connect nudge is exactly the kind of one-off, high-intent
       // message that's fine outside the push opt-in), while push is still
       // gated by notificationsEnabled like everything else here.
-      if (hhmm === "10:00" && !user.partnerId) {
+      if (isTopOfHour(now, 10) && !user.partnerId) {
         const ageDays = daysSince(new Date(user.createdAt), now);
         for (const milestone of [1, 3] as const) {
           if (ageDays !== milestone) continue;
@@ -79,7 +89,8 @@ async function tick() {
 
       // Daily "don't forget to check in" reminder, at the user's chosen (or random) time.
       const reminderTime = storage.deriveReminderTime(user, date);
-      if (reminderTime === hhmm) {
+      const reminderHour = Number(reminderTime.split(":")[0]);
+      if (isTopOfHour(now, reminderHour)) {
         const alreadySent = await storage.wasReminderSent(user.id, date, "daily");
         if (!alreadySent) {
           // Nudges specifically toward the mood check-in, not "any activity" —
@@ -98,7 +109,7 @@ async function tick() {
       }
 
       // Anniversary notification, checked once a day at 09:00.
-      if (hhmm === "09:00" && user.anniversaryDate) {
+      if (isTopOfHour(now, 9) && user.anniversaryDate) {
         const alreadySent = await storage.wasReminderSent(user.id, date, "anniversary");
         if (!alreadySent) {
           const anniv = new Date(user.anniversaryDate);
@@ -116,7 +127,7 @@ async function tick() {
 
       // Advance anniversary heads-up, 30 and 14 days out — also checked once
       // a day at 09:00.
-      if (hhmm === "09:00" && user.anniversaryDate) {
+      if (isTopOfHour(now, 9) && user.anniversaryDate) {
         const daysUntil = daysUntilAnniversary(user.anniversaryDate, now);
         for (const milestone of [30, 14] as const) {
           if (daysUntil !== milestone) continue;
@@ -137,7 +148,7 @@ async function tick() {
       // day at 09:00. getPlannedDates returns the whole couple's dates (both
       // partners' rows), so each partner naturally gets their own reminder in
       // their own language when this loop reaches their user record.
-      if (hhmm === "09:00") {
+      if (isTopOfHour(now, 9)) {
         const planned = await storage.getPlannedDates(user);
         for (const pd of planned) {
           if (pd.completed) continue;
@@ -160,7 +171,7 @@ async function tick() {
       }
 
       // Streak-freeze warning in the evening, if there's an active streak at risk.
-      if (hhmm === "20:00") {
+      if (isTopOfHour(now, 20)) {
         const alreadySent = await storage.wasReminderSent(user.id, date, "streak_freeze");
         if (!alreadySent) {
           const activeToday = await storage.hasActivityToday(user.id, date);
@@ -186,6 +197,6 @@ async function tick() {
 export function startScheduler() {
   setInterval(() => {
     tick().catch((err) => console.warn("[scheduler] tick error:", err));
-  }, 60_000);
-  console.log("[scheduler] Reminder scheduler started (checks every minute)");
+  }, TICK_INTERVAL_MS);
+  console.log(`[scheduler] Reminder scheduler started (checks every ${TICK_INTERVAL_MS / 60_000} minutes)`);
 }
