@@ -54,6 +54,7 @@ const registerIpLimiter = makeStore();
 const requestCodeIpLimiter = makeStore();
 const requestCodeEmailLimiter = makeStore();
 const emailFailureLimiter = makeStore();
+const trackVisitIpLimiter = makeStore();
 
 const FAILURE_WINDOW_MS = 30 * 60 * 1000;
 const FAILURE_MAX = 8;
@@ -68,6 +69,13 @@ export function checkRegisterIpLimit(ip: string) {
   // 8 new accounts / hour per IP is plenty for real signups (including
   // shared NAT/office wifi) and blocks bulk fake-account creation.
   return registerIpLimiter.hit(`ip:${ip}`, 60 * 60 * 1000, 8);
+}
+
+export function checkTrackVisitIpLimit(ip: string) {
+  // 30 / 15 min per IP — a landing hit is cheap and one real visitor only
+  // ever fires it once per page load, so this only bites someone scripting
+  // the endpoint to inflate scan counts.
+  return trackVisitIpLimiter.hit(`ip:${ip}`, 15 * 60 * 1000, 30);
 }
 
 export function checkRequestCodeIpLimit(ip: string) {

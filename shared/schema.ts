@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   language: varchar("language", { length: 2 }).notNull().default("sl"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   pwaInstalledAt: timestamp("pwa_installed_at"), // set the first time the client detects standalone/installed mode
+  source: text("source"), // acquisition source at registration, e.g. "paket" — see landingVisits below
 });
 
 // PIN_REGEX/pin are legacy — login moved to an emailed one-time code (see
@@ -45,6 +46,10 @@ export const insertUserSchema = createInsertSchema(users, {
     // the first screen rather than defaulting to Slovenian until the user
     // finds the switcher in Profile.
     language: z.enum(["sl", "en", "hr"]).optional(),
+    // Optional — carried over from a tagged link/QR code (see landingVisits),
+    // so the admin dashboard can show actual signups per acquisition channel,
+    // not just raw landing visits.
+    source: z.string().max(64).optional(),
   });
 
 export const requestLoginCodeSchema = z.object({
@@ -268,6 +273,22 @@ export const tempticoClicks = pgTable("temptico_clicks", {
   userId: varchar("user_id", { length: 24 }).notNull(),
   source: varchar("source", { length: 16 }).notNull(), // 'date_idea' | 'milestone'
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ---------- Acquisition tracking (QR codes, marketing links) ----------
+// Records every landing visit that arrives tagged with ?src=, before we know
+// whether the visitor ever registers — pairs with users.source above so the
+// admin dashboard can show scans vs. actual signups per channel. `source` is
+// free text rather than a fixed enum since a new QR/link gets tagged
+// whenever one is made, without a code change.
+export const landingVisits = pgTable("landing_visits", {
+  id: serial("id").primaryKey(),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const trackVisitSchema = z.object({
+  source: z.string().min(1, "Manjka vir").max(64, "Vir je predolg"),
 });
 
 // ---------- Feedback ----------

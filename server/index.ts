@@ -126,7 +126,7 @@ async function main() {
     const rows = stats.recentUsers
       .map(
         (u) =>
-          `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.connected ? "✅" : "—"}</td><td>${new Date(u.createdAt).toLocaleDateString("sl-SI")}</td><td><button class="del-btn" data-email="${esc(u.email)}" data-name="${esc(u.name)}">Izbriši</button></td></tr>`
+          `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.connected ? "✅" : "—"}</td><td>${esc(u.source || "—")}</td><td>${new Date(u.createdAt).toLocaleDateString("sl-SI")}</td><td><button class="del-btn" data-email="${esc(u.email)}" data-name="${esc(u.name)}">Izbriši</button></td></tr>`
       )
       .join("");
 
@@ -152,6 +152,22 @@ async function main() {
     const clicksBreakdown = Object.entries(stats.tempticoClicksBySource)
       .map(([source, n]) => `${CLICK_SOURCE_LABELS[source] || source}: ${n}`)
       .join(" · ");
+
+    // Tagged QR codes/links (e.g. ?src=paket on the packaging QR): visits
+    // recorded the moment anyone lands with that tag, signups only for
+    // those who go on to register — pairing the two turns "N scans" into a
+    // real conversion number.
+    const acquisitionSources = Array.from(
+      new Set([...Object.keys(stats.visitsBySource), ...Object.keys(stats.signupsBySource)])
+    ).sort();
+    const acquisitionRows = acquisitionSources
+      .map((source) => {
+        const visits = stats.visitsBySource[source] || 0;
+        const signups = stats.signupsBySource[source] || 0;
+        const rate = visits > 0 ? `${Math.round((signups / visits) * 100)}%` : "–";
+        return `<tr><td>${esc(source)}</td><td>${visits}</td><td>${signups}</td><td>${rate}</td></tr>`;
+      })
+      .join("");
 
     // Small CSS-only bar chart for the streak-length distribution — reading
     // "0: 12 · 1-6: 3 · 7-29: 1 ..." as plain text made it hard to see at a
@@ -256,6 +272,18 @@ async function main() {
     </div>
   </div>
 
+  ${
+    acquisitionRows
+      ? `<div class="section">
+    <h2 class="section-title">Viri uporabnikov (QR kode, povezave)</h2>
+    <table>
+      <thead><tr><th>Vir</th><th>Ogledov</th><th>Registracij</th><th>Konverzija</th></tr></thead>
+      <tbody>${acquisitionRows}</tbody>
+    </table>
+  </div>`
+      : ""
+  }
+
   <div class="section">
     <h2 class="section-title">Porazdelitev nizov (dni)</h2>
     <div class="barchart-card">${streakBarRows}</div>
@@ -285,7 +313,7 @@ async function main() {
     <button id="export-csv" style="padding: 0.4rem 0.9rem; border: none; border-radius: 8px; background: #2a2320; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem;">⬇ Izvozi CSV</button>
   </h2>
   <table>
-    <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Registriran/a</th><th>Dejanja</th></tr></thead>
+    <thead><tr><th>Ime</th><th>E-pošta</th><th>Povezan/a</th><th>Vir</th><th>Registriran/a</th><th>Dejanja</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <h2 style="margin-top: 2rem;">Povratne informacije (${allFeedback.length})</h2>

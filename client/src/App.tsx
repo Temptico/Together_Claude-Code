@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Switch, Redirect, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -9,6 +9,7 @@ import { ToastContextProvider } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { BottomNav } from "@/components/BottomNav";
 import { InstallReminderDialog } from "@/components/InstallReminderDialog";
+import { trackLandingVisit } from "@/lib/acquisition";
 
 import Welcome from "@/pages/Welcome";
 
@@ -100,6 +101,13 @@ function Shell() {
 }
 
 export default function App() {
+  // Runs once per real page load (this component only mounts once), which
+  // is exactly what "one landing visit" means here — not once per in-app
+  // route change.
+  useEffect(() => {
+    trackLandingVisit();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

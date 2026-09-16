@@ -8,6 +8,7 @@ import {
   checkRegisterIpLimit,
   checkRequestCodeIpLimit,
   checkRequestCodeEmailLimit,
+  checkTrackVisitIpLimit,
   isEmailLockedOut,
   recordLoginFailure,
   clearLoginFailures,
@@ -27,6 +28,7 @@ import {
   insertUserSchema,
   requestLoginCodeSchema,
   verifyLoginCodeSchema,
+  trackVisitSchema,
   insertMoodSchema,
   insertAnswerSchema,
   insertPlannedDateSchema,
@@ -102,9 +104,32 @@ export function registerRoutes(app: Express) {
         res.status(409).json({ error: "Ta e-poštni naslov je že v uporabi. Prosimo, prijavi se." });
         return;
       }
-      const user = await storage.createUser(parsed.data.name, parsed.data.email, parsed.data.language);
+      const user = await storage.createUser(parsed.data.name, parsed.data.email, parsed.data.language, parsed.data.source);
       sendWelcomeEmail(user.email, user.name, user.language).catch(() => {});
       res.status(201).json(storage.omitPin(user));
+    })
+  );
+
+  // Landing-visit tracking for tagged QR codes/links (e.g. the packaging
+  // card) — fired once per page load from the client, before we know
+  // whether the visitor registers. Pairs with the `source` recorded on the
+  // user row at registration (see /api/auth/register above) so the admin
+  // dashboard can show scans vs. actual signups per channel.
+  app.post(
+    "/api/track/visit",
+    ah(async (req, res) => {
+      const { allowed } = checkTrackVisitIpLimit(req.ip || "unknown");
+      if (!allowed) {
+        res.status(429).end();
+        return;
+      }
+      const parsed = trackVisitSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      await storage.recordLandingVisit(parsed.data.source);
+      res.status(204).end();
     })
   );
 

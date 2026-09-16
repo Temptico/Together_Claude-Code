@@ -20,6 +20,7 @@ import {
   milestoneEvents,
   feedback,
   tempticoClicks,
+  landingVisits,
   type User,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
@@ -62,14 +63,20 @@ export function coupleKeyFor(user: User): string {
 }
 
 // ---------------- Users ----------------
-export async function createUser(name: string, email: string, language?: string): Promise<User> {
+export async function createUser(name: string, email: string, language?: string, source?: string): Promise<User> {
   let connectCode = codeGen();
   // extremely unlikely collision, but guard anyway
   while (await getUserByConnectCode(connectCode)) connectCode = codeGen();
   const values: typeof users.$inferInsert = { id: idGen(), name, email, connectCode };
   if (language) values.language = language;
+  if (source) values.source = source;
   const [user] = await db.insert(users).values(values).returning();
   return user;
+}
+
+// ---------------- Acquisition tracking ----------------
+export async function recordLandingVisit(source: string): Promise<void> {
+  await db.insert(landingVisits).values({ source });
 }
 
 const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
@@ -1067,9 +1074,10 @@ export async function getAdminStats() {
     db.select().from(pushSubscriptions),
   ]);
 
-  const [allMilestones, allTempticoClicks, streaks] = await Promise.all([
+  const [allMilestones, allTempticoClicks, allLandingVisits, streaks] = await Promise.all([
     db.select().from(milestoneEvents),
     db.select().from(tempticoClicks),
+    db.select().from(landingVisits),
     Promise.all(allUsers.map((u: User) => calculateStreak(u.id))),
   ]);
 
@@ -1089,6 +1097,14 @@ export async function getAdminStats() {
   const tempticoClicksBySource: Record<string, number> = {};
   for (const c of allTempticoClicks as { source: string }[])
     tempticoClicksBySource[c.source] = (tempticoClicksBySource[c.source] || 0) + 1;
+
+  // Acquisition: landing visits (anyone who arrived via a tagged QR/link,
+  // whether or not they ever registered) vs. actual signups per source —
+  // pairing the two is what turns "N scans" into a real conversion number.
+  const visitsBySource: Record<string, number> = {};
+  for (const v of allLandingVisits as { source: string }[]) visitsBySource[v.source] = (visitsBySource[v.source] || 0) + 1;
+  const signupsBySource: Record<string, number> = {};
+  for (const u of allUsers as User[]) if (u.source) signupsBySource[u.source] = (signupsBySource[u.source] || 0) + 1;
 
   const activeTodaySet = new Set<string>();
   for (const m of todayMoods) activeTodaySet.add(m.userId);
@@ -1110,7 +1126,7 @@ export async function getAdminStats() {
   const recentUsers = [...allUsers]
     .sort((a: User, b: User) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 500) // effectively "all users" for this app's scale — admin table doubles as the account-management list
-    .map((u: User) => ({ name: u.name, email: u.email, connected: !!u.partnerId, createdAt: u.createdAt }));
+    .map((u: User) => ({ name: u.name, email: u.email, connected: !!u.partnerId, createdAt: u.createdAt, source: u.source }));
 
   return {
     totalUsers,
@@ -1127,6 +1143,8 @@ export async function getAdminStats() {
     milestonesByType,
     tempticoClicksTotal: allTempticoClicks.length,
     tempticoClicksBySource,
+    visitsBySource,
+    signupsBySource,
     totals: {
       moods: allMoods.length,
       answers: allAnswers.length,

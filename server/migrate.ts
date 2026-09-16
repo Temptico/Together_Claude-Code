@@ -17,7 +17,13 @@ const STATEMENTS = [
       reminder_time text NOT NULL DEFAULT 'random',
       language varchar(2) NOT NULL DEFAULT 'sl',
       created_at timestamp NOT NULL DEFAULT now(),
-      pwa_installed_at timestamp
+      pwa_installed_at timestamp,
+      source text
+    )`,
+  `CREATE TABLE IF NOT EXISTS landing_visits (
+      id serial PRIMARY KEY,
+      source text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
     )`,
   `CREATE TABLE IF NOT EXISTS login_codes (
       id serial PRIMARY KEY,
@@ -210,6 +216,7 @@ const STATEMENTS = [
   // reminder_log.type used to be varchar(24); per-planned-date reminder types
   // embed the date's id and can run longer than that.
   `ALTER TABLE reminder_log ALTER COLUMN type TYPE text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS source text`,
 ];
 
 export async function runMigrations() {

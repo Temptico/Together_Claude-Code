@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, ApiError } from "@/lib/queryClient";
+import { getStoredAcquisitionSource } from "@/lib/acquisition";
 import { useState } from "react";
 
 export default function Register() {
@@ -25,7 +26,11 @@ export default function Register() {
   const onSubmit = async (data: InsertUser) => {
     setServerError(null);
     try {
-      const user = await apiRequest<User>("POST", "/api/auth/register", { ...data, language: lang });
+      const user = await apiRequest<User>("POST", "/api/auth/register", {
+        ...data,
+        language: lang,
+        source: getStoredAcquisitionSource(),
+      });
       setUser(user);
       // Always show onboarding, even for someone registering via a partner's
       // invite link — it's the only place install instructions are shown,
