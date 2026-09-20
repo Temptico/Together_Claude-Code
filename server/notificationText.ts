@@ -175,3 +175,14 @@ export function gameCompletedNotification(lang: string, gameName: string): strin
   };
   return bodies[normLang(lang)];
 }
+
+// One-off announcement for the Games feature launch, sent via the admin
+// dashboard's broadcast tool — short by design, the email covers detail.
+export function gamesAnnouncementNotification(lang: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: "Novo v aplikaciji: Igre! 🎮 Preizkusita Never Have I Ever, This or That in več.",
+    en: "New in the app: Games! 🎮 Try Never Have I Ever, This or That, and more.",
+    hr: "Novo u aplikaciji: Igre! 🎮 Isprobajte Never Have I Ever, This or That i više.",
+  };
+  return bodies[normLang(lang)];
+}

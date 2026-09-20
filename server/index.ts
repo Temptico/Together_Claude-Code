@@ -14,8 +14,9 @@ import {
   getAllUsers,
   getPlannedDatesDebug,
 } from "./storage.js";
-import { notifyAllWithNotifications } from "./push.js";
-import { sendWelcomeEmail } from "./email.js";
+import { notifyAllWithNotifications, notifyAllLocalized } from "./push.js";
+import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
+import { gamesAnnouncementNotification } from "./notificationText.js";
 import { startScheduler } from "./scheduler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,33 @@ async function main() {
     // fire-and-forget internally (sendWelcomeEmail never throws), so a
     // simple Promise.all is safe — one bad address can't take down the rest.
     await Promise.all(allUsers.map((u) => sendWelcomeEmail(u.email, u.name, u.language)));
+    res.json({ ok: true, recipients: allUsers.length });
+  });
+
+  app.post("/api/admin/broadcast-games-notification", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    const { key } = req.body || {};
+    if (!secret || key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const result = await notifyAllLocalized((lang) => ({
+      title: "Together",
+      body: gamesAnnouncementNotification(lang),
+      tag: "games-announcement",
+    }));
+    res.json({ ok: true, recipients: result.recipients });
+  });
+
+  app.post("/api/admin/send-games-announcement-emails", async (req, res) => {
+    const secret = process.env.ADMIN_SECRET;
+    const { key } = req.body || {};
+    if (!secret || key !== secret) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const allUsers = await getAllUsers();
+    await Promise.all(allUsers.map((u) => sendGamesAnnouncementEmail(u.email, u.name, u.language)));
     res.json({ ok: true, recipients: allUsers.length });
   });
 
@@ -306,6 +334,18 @@ async function main() {
         <button id="send-welcome-emails" type="button">Pošlji vsem (${stats.totalUsers})</button>
         <p id="welcome-email-result"></p>
       </div>
+      <div class="tool">
+        <h2>Pošlji obvestilo o igrah</h2>
+        <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#7a6f68;">Kratko push obvestilo o novi sekciji iger, vsakemu v njegovem jeziku (SL/EN/HR).</p>
+        <button id="send-games-notification" type="button">Pošlji vsem (${stats.notificationsOptedIn})</button>
+        <p id="games-notification-result"></p>
+      </div>
+      <div class="tool">
+        <h2>Pošlji email o igrah</h2>
+        <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#7a6f68;">Email s predstavitvijo vseh 5 novih iger, vsakemu v njegovem jeziku (SL/EN/HR).</p>
+        <button id="send-games-emails" type="button">Pošlji vsem (${stats.totalUsers})</button>
+        <p id="games-email-result"></p>
+      </div>
     </div>
   </div>
   <h2 style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
@@ -363,6 +403,62 @@ async function main() {
       result.className = '';
       try {
         const res = await fetch('/api/admin/send-welcome-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: ${JSON.stringify(key)} }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result.textContent = 'Poslano ' + data.recipients + ' uporabnikom.';
+          result.className = 'ok';
+        } else {
+          result.textContent = data.error || 'Napaka';
+          result.className = 'err';
+        }
+      } catch {
+        result.textContent = 'Napaka pri povezavi';
+        result.className = 'err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    document.getElementById('send-games-notification').addEventListener('click', async (e) => {
+      if (!confirm('Poslati push obvestilo o igrah VSEM uporabnikom z omogočenimi obvestili (${stats.notificationsOptedIn})? Vsak ga dobi v svojem jeziku.')) return;
+      const btn = e.target;
+      const result = document.getElementById('games-notification-result');
+      btn.disabled = true;
+      result.textContent = '';
+      result.className = '';
+      try {
+        const res = await fetch('/api/admin/broadcast-games-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: ${JSON.stringify(key)} }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result.textContent = 'Poslano ' + data.recipients + ' uporabnikom.';
+          result.className = 'ok';
+        } else {
+          result.textContent = data.error || 'Napaka';
+          result.className = 'err';
+        }
+      } catch {
+        result.textContent = 'Napaka pri povezavi';
+        result.className = 'err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    document.getElementById('send-games-emails').addEventListener('click', async (e) => {
+      if (!confirm('Poslati email o igrah VSEM ${stats.totalUsers} registriranim uporabnikom, vsakemu v njegovem jeziku? Tega ni mogoče preklicati.')) return;
+      const btn = e.target;
+      const result = document.getElementById('games-email-result');
+      btn.disabled = true;
+      result.textContent = '';
+      result.className = '';
+      try {
+        const res = await fetch('/api/admin/send-games-announcement-emails', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: ${JSON.stringify(key)} }),

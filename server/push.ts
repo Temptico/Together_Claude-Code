@@ -51,6 +51,37 @@ export async function notifyUser(
   );
 }
 
+// Localized broadcast tool (used by the admin dashboard for prewritten
+// announcements, e.g. a new-feature launch) — same idea as notifyUser's
+// per-recipient-language callback, but looped over every user with
+// notifications enabled instead of a single userId.
+export async function notifyAllLocalized(
+  buildPayload: (recipientLanguage: string) => { title: string; body: string; tag?: string }
+): Promise<{ recipients: number }> {
+  ensureConfigured();
+  const allUsers = await getAllUsers();
+  const targets = allUsers.filter((u) => u.notificationsEnabled);
+  await Promise.all(
+    targets.map(async (user) => {
+      const payload = buildPayload(user.language);
+      const subs = await getPushSubscriptionsForUser(user.id);
+      await Promise.all(
+        subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>
+          webpush
+            .sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              JSON.stringify(payload)
+            )
+            .catch((err) => {
+              console.warn("[push] localized broadcast failed for one subscription:", err?.message || err);
+            })
+        )
+      );
+    })
+  );
+  return { recipients: targets.length };
+}
+
 // Manual broadcast tool (used by the admin dashboard) — sends the same
 // title/body to every user who has notifications enabled, regardless of
 // their language, since the admin composes the exact text themselves.

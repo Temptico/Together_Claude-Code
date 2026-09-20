@@ -251,3 +251,103 @@ export async function sendLoginCodeEmail(to: string, name: string, code: string,
   const html = codeEmailHtml(name, code, LOGIN_CODE_COPY[lang], "🔐");
   await sendEmail(to, LOGIN_CODE_SUBJECTS[lang], html, "login-code");
 }
+
+const GAMES_ANNOUNCEMENT_SUBJECTS: Record<Lang, string> = {
+  sl: "Nova sekcija: Igre za vaju 🎮",
+  en: "New: Games for you two 🎮",
+  hr: "Nova značajka: Igre za vas 🎮",
+};
+
+const GAMES_ANNOUNCEMENT_COPY: Record<
+  Lang,
+  { greeting: string; intro: string; bullets: string[]; cta: string; tip: string; signoff: string }
+> = {
+  sl: {
+    greeting: "Pozdravljeni",
+    intro:
+      "Dodali smo novo sekcijo iger — kratke, zabavne igre, ki jih igrata vsak na svojem telefonu, nato pa primerjata odgovore. Na voljo je pet iger:",
+    bullets: [
+      "🙊 <strong>Never Have I Ever</strong> — priznajta, česa (ne)sta počela.",
+      "🔥 <strong>Never Have I Ever (Spicy)</strong> — bolj drzna različica, samo za 18+.",
+      "⚖️ <strong>This or That</strong> — izbirata med dvema možnostma in odkrijeta, kako podobna sta si.",
+      "🤔 <strong>Would You Rather</strong> — zabavne dileme o vajinem odnosu.",
+      "💞 <strong>Know Your Partner</strong> — preverita, kako dobro poznata drug drugega.",
+    ],
+    cta: "Odpri Together",
+    tip: "Najdeta jih na domači strani, tik pod dnevnim izzivom.",
+    signoff: "Lep pozdrav,<br>ekipa Temptico",
+  },
+  en: {
+    greeting: "Hi",
+    intro:
+      "We've added a new Games section — short, fun games you each play on your own phone, then compare your answers. Five games are available:",
+    bullets: [
+      "🙊 <strong>Never Have I Ever</strong> — confess what you have (or haven't) done.",
+      "🔥 <strong>Never Have I Ever (Spicy)</strong> — a bolder edition, for 18+ only.",
+      "⚖️ <strong>This or That</strong> — pick between two options and see how alike you are.",
+      "🤔 <strong>Would You Rather</strong> — fun dilemmas about your relationship.",
+      "💞 <strong>Know Your Partner</strong> — test how well you really know each other.",
+    ],
+    cta: "Open Together",
+    tip: "You'll find them on the home screen, right below the Daily Challenge.",
+    signoff: "Best,<br>the Temptico team",
+  },
+  hr: {
+    greeting: "Pozdrav",
+    intro:
+      "Dodali smo novu sekciju igara — kratke, zabavne igre koje igrate svako na svom telefonu, a zatim usporedite odgovore. Dostupno je pet igara:",
+    bullets: [
+      "🙊 <strong>Never Have I Ever</strong> — priznajte što (ni)ste radili.",
+      "🔥 <strong>Never Have I Ever (Spicy)</strong> — smjelija verzija, samo za 18+.",
+      "⚖️ <strong>This or That</strong> — birajte između dvije opcije i otkrijte koliko ste slični.",
+      "🤔 <strong>Would You Rather</strong> — zabavne dileme o vašoj vezi.",
+      "💞 <strong>Know Your Partner</strong> — provjerite koliko dobro poznajete jedno drugo.",
+    ],
+    cta: "Otvori Together",
+    tip: "Pronaći ćete ih na početnom zaslonu, odmah ispod dnevnog izazova.",
+    signoff: "Lijep pozdrav,<br>tim Temptico",
+  },
+};
+
+// Same card layout as welcomeHtml, but with a bullets list describing each
+// game instead of the generic feature list — bullets already carry their
+// own <strong> tags so they're inserted as trusted HTML, not escaped text.
+function gamesAnnouncementHtml(name: string, lang: Lang): string {
+  const c = GAMES_ANNOUNCEMENT_COPY[lang];
+  const safeName = escapeHtml(name);
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f8f5f2;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5f2;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#ff6b6b 0%,#ffa94d 100%);padding:40px 32px;text-align:center;">
+          <div style="font-size:40px;line-height:1;">🎮</div>
+          <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;">Together</div>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 16px;font-size:18px;font-weight:800;color:#2a2320;">${c.greeting}, ${safeName}! 👋</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4a3f3a;">${c.intro}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            ${c.bullets.map((b) => `<tr><td style="padding:5px 0;font-size:14px;line-height:1.5;color:#4a3f3a;">${b}</td></tr>`).join("")}
+          </table>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="border-radius:999px;background:#ff6b6b;">
+              <a href="${APP_URL}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${c.cta}</a>
+            </td></tr>
+          </table>
+          <p style="margin:0;padding:16px;background:#f8f5f2;border-radius:16px;font-size:13px;line-height:1.5;color:#7a6f68;">${c.tip}</p>
+        </td></tr>
+        <tr><td style="padding:24px 32px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#7a6f68;">${c.signoff}</p>
+          <p style="margin:12px 0 0;font-size:11px;color:#b0a59d;">Enigma 101 global j.d.o.o. · info@temptico.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+export async function sendGamesAnnouncementEmail(to: string, name: string, language: string) {
+  const lang = normLang(language);
+  await sendEmail(to, GAMES_ANNOUNCEMENT_SUBJECTS[lang], gamesAnnouncementHtml(name, lang), "games-announcement");
+}
