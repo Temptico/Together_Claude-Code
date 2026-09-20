@@ -57,7 +57,11 @@ export default function GamePlay() {
   });
 
   useEffect(() => {
-    if (slug && user) startMutation.mutate();
+    if (slug && user) {
+      setPrompts(null);
+      setIndex(null);
+      startMutation.mutate();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
@@ -78,8 +82,11 @@ export default function GamePlay() {
     },
   });
 
+  useEffect(() => {
+    if (!game) navigate("/");
+  }, [game, navigate]);
+
   if (!game) {
-    navigate("/");
     return null;
   }
 
