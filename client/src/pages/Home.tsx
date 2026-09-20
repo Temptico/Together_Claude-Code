@@ -13,7 +13,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { bcp47 } from "@/lib/locale";
 import { categoryLabel } from "@/lib/dateIdeaFormat";
-import { MOOD_LEVELS } from "@shared/schema";
+import { cn } from "@/lib/utils";
+import { MOOD_LEVELS, GAMES, GAME_SLUGS, type GameSlug } from "@shared/schema";
 
 type HomeData = {
   user: any;
@@ -73,6 +74,7 @@ export default function Home() {
       {!data.partner && <ConnectBanner />}
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
+      <GamesRow userId={data.user.id} />
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
       <DailyChallengeCard
         challenge={data.challenge}
@@ -251,6 +253,48 @@ function MoodCheckIn({ myMood, userId }: { myMood: any; userId: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function GamesRow({ userId }: { userId: string }) {
+  const { t } = useTranslation();
+  const { data: summary } = useQuery<Record<GameSlug, { total: number; mine: number; partnerDone: number }>>({
+    queryKey: ["/api/games/summary", userId],
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="px-1 text-sm font-extrabold">{t("games.title")}</p>
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+        {GAME_SLUGS.map((slug) => {
+          const game = GAMES[slug];
+          const progress = summary?.[slug];
+          return (
+            <Link key={slug} href={`/games/${slug}`} className="shrink-0">
+              <div
+                className={cn(
+                  "flex h-32 w-36 flex-col justify-between rounded-3xl bg-gradient-to-br p-3 text-white shadow-md",
+                  game.gradient
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-2xl">{game.emoji}</span>
+                  {game.adult && (
+                    <span className="rounded-full bg-black/30 px-1.5 py-0.5 text-[10px] font-extrabold">18+</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-extrabold leading-tight">{game.name}</p>
+                  <p className="text-xs font-semibold text-white/80">
+                    {progress && progress.total > 0 ? `${progress.mine}/${progress.total}` : t("games.play")}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -325,6 +325,89 @@ export const insertPushSubscriptionSchema = z.object({
   }),
 });
 
+// ---------- Games ----------
+// The catalog itself (5 fixed games) is plain code, not a DB table — there's
+// no admin need to add a 6th game without a deploy, and the English names
+// are deliberately fixed regardless of app language ("Never Have I Ever" is
+// how people know the game, in any language).
+export const GAME_SLUGS = [
+  "never-have-i-ever",
+  "never-have-i-ever-spicy",
+  "this-or-that",
+  "would-you-rather",
+  "know-your-partner",
+] as const;
+export type GameSlug = (typeof GAME_SLUGS)[number];
+
+export type GameFormat = "boolean" | "choice" | "text";
+
+export const GAMES: Record<
+  GameSlug,
+  { name: string; emoji: string; format: GameFormat; adult?: boolean; gradient: string }
+> = {
+  "never-have-i-ever": { name: "Never Have I Ever", emoji: "🙊", format: "boolean", gradient: "from-indigo-500 to-purple-600" },
+  "never-have-i-ever-spicy": {
+    name: "Never Have I Ever",
+    emoji: "🔥",
+    format: "boolean",
+    adult: true,
+    gradient: "from-rose-600 to-red-700",
+  },
+  "this-or-that": { name: "This or That", emoji: "⚖️", format: "choice", gradient: "from-sky-500 to-blue-600" },
+  "would-you-rather": { name: "Would You Rather", emoji: "🤔", format: "choice", gradient: "from-amber-500 to-orange-600" },
+  "know-your-partner": { name: "Know Your Partner", emoji: "💞", format: "text", gradient: "from-pink-500 to-rose-600" },
+};
+
+// Prompt library — like questions/challenges, authored in Slovenian with
+// optional EN/HR translations. "choice"-format games (this-or-that,
+// would-you-rather) additionally carry two short option labels per
+// language; boolean/text games leave those columns null.
+export const gamePrompts = pgTable("game_prompts", {
+  id: serial("id").primaryKey(),
+  gameSlug: varchar("game_slug", { length: 32 }).notNull(),
+  text: text("text").notNull(),
+  textEn: text("text_en"),
+  textHr: text("text_hr"),
+  optionA: text("option_a"),
+  optionAEn: text("option_a_en"),
+  optionAHr: text("option_a_hr"),
+  optionB: text("option_b"),
+  optionBEn: text("option_b_en"),
+  optionBHr: text("option_b_hr"),
+});
+
+// One deck of prompts a couple is (or was) playing through for a given
+// game. Created once, by whichever partner starts the game first;
+// `promptIds` is fixed at creation so both partners answer the exact same
+// set. Reused (not recreated) while still open, so opening a game you
+// already started, or one your partner started, resumes the same deck.
+export const gameRounds = pgTable("game_rounds", {
+  id: serial("id").primaryKey(),
+  coupleKey: varchar("couple_key", { length: 49 }).notNull(),
+  gameSlug: varchar("game_slug", { length: 32 }).notNull(),
+  promptIds: text("prompt_ids").notNull(), // JSON-encoded number[]
+  createdBy: varchar("created_by", { length: 24 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// One partner's answer to one prompt within a round. A prompt is "revealed"
+// (both answers visible) once a row exists here for both partners on the
+// same (roundId, promptId).
+export const gameRoundAnswers = pgTable("game_round_answers", {
+  id: serial("id").primaryKey(),
+  roundId: integer("round_id").notNull(),
+  promptId: integer("prompt_id").notNull(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  answer: text("answer").notNull(), // "yes"/"no" (boolean), "A"/"B" (choice), free text (text)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const submitGameAnswerSchema = z.object({
+  userId: z.string(),
+  promptId: z.number(),
+  answer: z.string().min(1, "Manjka odgovor").max(500, "Odgovor je predolg"),
+});
+
 // ---------- Types ----------
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -341,6 +424,9 @@ export type Reaction = typeof reactions.$inferSelect;
 export type CustomQuestion = typeof customQuestions.$inferSelect;
 export type CustomChallenge = typeof customChallenges.$inferSelect;
 export type DailyAssignment = typeof dailyAssignments.$inferSelect;
+export type GamePrompt = typeof gamePrompts.$inferSelect;
+export type GameRound = typeof gameRounds.$inferSelect;
+export type GameRoundAnswer = typeof gameRoundAnswers.$inferSelect;
 
 export const MOOD_LEVELS = [
   { level: 1, emoji: "😢", label: "Zelo slabo" },

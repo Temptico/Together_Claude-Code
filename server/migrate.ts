@@ -217,6 +217,37 @@ const STATEMENTS = [
   // embed the date's id and can run longer than that.
   `ALTER TABLE reminder_log ALTER COLUMN type TYPE text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS source text`,
+  `CREATE TABLE IF NOT EXISTS game_prompts (
+      id serial PRIMARY KEY,
+      game_slug varchar(32) NOT NULL,
+      text text NOT NULL,
+      text_en text,
+      text_hr text,
+      option_a text,
+      option_a_en text,
+      option_a_hr text,
+      option_b text,
+      option_b_en text,
+      option_b_hr text
+    )`,
+  `CREATE TABLE IF NOT EXISTS game_rounds (
+      id serial PRIMARY KEY,
+      couple_key varchar(49) NOT NULL,
+      game_slug varchar(32) NOT NULL,
+      prompt_ids text NOT NULL,
+      created_by varchar(24) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS game_round_answers (
+      id serial PRIMARY KEY,
+      round_id integer NOT NULL,
+      prompt_id integer NOT NULL,
+      user_id varchar(24) NOT NULL,
+      answer text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS game_round_answers_unique_idx ON game_round_answers (round_id, prompt_id, user_id)`,
+  `CREATE INDEX IF NOT EXISTS game_rounds_couple_game_idx ON game_rounds (couple_key, game_slug)`,
 ];
 
 export async function runMigrations() {

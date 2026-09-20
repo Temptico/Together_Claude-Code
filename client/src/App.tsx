@@ -19,6 +19,7 @@ const Home = lazy(() => import("@/pages/Home"));
 const ConnectPartner = lazy(() => import("@/pages/ConnectPartner"));
 const Invite = lazy(() => import("@/pages/Invite"));
 const QuestionAnswer = lazy(() => import("@/pages/QuestionAnswer"));
+const GamePlay = lazy(() => import("@/pages/GamePlay"));
 const Dates = lazy(() => import("@/pages/Dates"));
 const Memories = lazy(() => import("@/pages/Memories"));
 const Profile = lazy(() => import("@/pages/Profile"));
@@ -79,6 +80,7 @@ function Shell() {
             <Route path="/connect" component={ConnectPartner} />
             <Route path="/invite/:code" component={Invite} />
             <Route path="/question" component={QuestionAnswer} />
+            <Route path="/games/:slug" component={GamePlay} />
             <Route path="/dates" component={Dates} />
             <Route path="/memories" component={Memories} />
             <Route path="/profile" component={Profile} />

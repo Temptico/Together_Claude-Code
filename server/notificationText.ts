@@ -154,3 +154,24 @@ export function milestoneNotification(lang: string, days: number): string {
   };
   return bodies[normLang(lang)];
 }
+
+// Game names (e.g. "Never Have I Ever") are always shown in English
+// regardless of app language — that's how people recognize the game — only
+// the surrounding sentence is localized.
+export function gameStartedNotification(lang: string, gameName: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `Partner je začel igro ${gameName} — pridruži se! 🎮`,
+    en: `Your partner started a round of ${gameName} — join in! 🎮`,
+    hr: `Partner je pokrenuo igru ${gameName} — pridruži se! 🎮`,
+  };
+  return bodies[normLang(lang)];
+}
+
+export function gameCompletedNotification(lang: string, gameName: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `Oba sta odgovorila na ${gameName} — poglej primerjavo! 🎮`,
+    en: `You've both finished ${gameName} — check out your results! 🎮`,
+    hr: `Oboje ste odgovorili na ${gameName} — pogledaj usporedbu! 🎮`,
+  };
+  return bodies[normLang(lang)];
+}

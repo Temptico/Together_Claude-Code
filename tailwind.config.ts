@@ -2,7 +2,10 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: "class",
-  content: ["./client/index.html", "./client/src/**/*.{ts,tsx}"],
+  // shared/schema.ts defines Tailwind gradient class names for the Games
+  // catalog (e.g. "from-indigo-500 to-purple-600") — without it in the scan,
+  // those utilities never get generated since they appear nowhere under client/.
+  content: ["./client/index.html", "./client/src/**/*.{ts,tsx}", "./shared/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {

@@ -23,6 +23,8 @@ import {
   planDateNotification,
   photoAddedNotification,
   milestoneNotification,
+  gameStartedNotification,
+  gameCompletedNotification,
 } from "./notificationText.js";
 import {
   insertUserSchema,
@@ -36,8 +38,13 @@ import {
   insertCustomChallengeSchema,
   insertWishlistItemSchema,
   insertFeedbackSchema,
+  submitGameAnswerSchema,
   TEMPTICO_CLICK_SOURCES,
   REACTION_EMOJIS,
+  GAME_SLUGS,
+  GAMES,
+  type GameSlug,
+  type GameRoundAnswer,
 } from "../shared/schema.js";
 
 function ah(fn: (req: Request, res: Response) => Promise<void>) {
@@ -903,6 +910,111 @@ export function registerRoutes(app: Express) {
       }
 
       res.status(201).json({ reaction: result });
+    })
+  );
+
+  // ---------------- Games ----------------
+  app.get(
+    "/api/games/summary/:userId",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      const summary = await storage.getGamesSummary(user);
+      res.json(summary);
+    })
+  );
+
+  // Starts (or resumes) the couple's current deck for a game. Only notifies
+  // the partner the first time a fresh deck is created, not on every resume.
+  app.post(
+    "/api/games/start",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string(), gameSlug: z.enum(GAME_SLUGS) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+
+      const gameSlug = parsed.data.gameSlug as GameSlug;
+      const result = await storage.getOrCreateGameRound(user, gameSlug);
+      if (!result) {
+        res.status(404).json({ error: "Igra trenutno nima vprašanj" });
+        return;
+      }
+      const { round, isNew } = result;
+
+      if (isNew && user.partnerId) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: gameStartedNotification(lang, GAMES[gameSlug].name),
+          tag: `game-${round.id}`,
+        })).catch(() => {});
+      }
+
+      const promptIds: number[] = JSON.parse(round.promptIds);
+      const allPrompts = await storage.getGamePrompts(gameSlug);
+      const promptById = new Map(allPrompts.map((p) => [p.id, p]));
+      const answers = await storage.getGameRoundAnswers(round.id);
+
+      const prompts = promptIds
+        .map((pid) => promptById.get(pid))
+        .filter((p): p is NonNullable<typeof p> => !!p)
+        .map((p) => {
+          const mine = answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.id);
+          const partnerAnswer = user.partnerId
+            ? answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.partnerId)
+            : undefined;
+          return {
+            ...storage.localizeGamePrompt(p, user.language),
+            myAnswer: mine?.answer ?? null,
+            partnerAnswer: partnerAnswer?.answer ?? null,
+          };
+        });
+
+      res.json({ roundId: round.id, gameSlug, prompts });
+    })
+  );
+
+  app.post(
+    "/api/games/answer",
+    ah(async (req, res) => {
+      const schema = submitGameAnswerSchema.extend({ roundId: z.number() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+
+      await storage.submitGameRoundAnswer(parsed.data.roundId, user.id, parsed.data.promptId, parsed.data.answer);
+
+      // If this was the last missing answer in the deck, let the partner
+      // know the full comparison is ready — but only once per round.
+      if (user.partnerId) {
+        const round = await storage.getGameRoundById(parsed.data.roundId);
+        if (round) {
+          const promptIds: number[] = JSON.parse(round.promptIds);
+          const answers = await storage.getGameRoundAnswers(round.id);
+          const complete = promptIds.every(
+            (pid) =>
+              answers.some((a: GameRoundAnswer) => a.promptId === pid && a.userId === user.id) &&
+              answers.some((a: GameRoundAnswer) => a.promptId === pid && a.userId === user.partnerId)
+          );
+          if (complete) {
+            notifyUser(user.partnerId, (lang) => ({
+              title: "Together",
+              body: gameCompletedNotification(lang, GAMES[round.gameSlug as GameSlug].name),
+              tag: `game-complete-${round.id}`,
+            })).catch(() => {});
+          }
+        }
+      }
+
+      res.status(201).json({ ok: true });
     })
   );
 

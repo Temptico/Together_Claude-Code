@@ -21,7 +21,13 @@ import {
   feedback,
   tempticoClicks,
   landingVisits,
+  gamePrompts,
+  gameRounds,
+  gameRoundAnswers,
+  GAME_SLUGS,
   type User,
+  type GameSlug,
+  type GamePrompt,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
 import bcrypt from "bcryptjs";
@@ -944,6 +950,147 @@ export async function getReactionsForTargets(targetType: "mood" | "answer" | "ch
     map.set(r.targetId, list);
   }
   return map;
+}
+
+// ---------------- Games ----------------
+// A "round" is one shared deck of prompts a couple plays through for a given
+// game. Kept small (10 prompts) to match the reference UX (a short session
+// with a progress bar, not an open-ended daily drip like questions/
+// challenges) and reused while still open so both partners answer the exact
+// same deck.
+const GAME_ROUND_SIZE = 10;
+
+function pickLocalizedOption(
+  row: { optionA: string | null; optionAEn: string | null; optionAHr: string | null; optionB: string | null; optionBEn: string | null; optionBHr: string | null },
+  language: string
+): { optionA: string; optionB: string } | null {
+  if (!row.optionA || !row.optionB) return null;
+  if (language === "en") return { optionA: row.optionAEn || row.optionA, optionB: row.optionBEn || row.optionB };
+  if (language === "hr") return { optionA: row.optionAHr || row.optionA, optionB: row.optionBHr || row.optionB };
+  return { optionA: row.optionA, optionB: row.optionB };
+}
+
+// Shapes a prompt row for the client: localized text (+ options for
+// "choice"-format games), with no raw translation columns leaking through.
+export function localizeGamePrompt(prompt: GamePrompt, language?: string) {
+  const lang = language || "sl";
+  const options = pickLocalizedOption(prompt, lang);
+  return {
+    id: prompt.id,
+    gameSlug: prompt.gameSlug,
+    text: pickLocalizedText(prompt, lang),
+    optionA: options?.optionA,
+    optionB: options?.optionB,
+  };
+}
+
+export async function getGamePrompts(gameSlug: GameSlug): Promise<GamePrompt[]> {
+  return db.select().from(gamePrompts).where(eq(gamePrompts.gameSlug, gameSlug));
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+async function roundIsComplete(round: typeof gameRounds.$inferSelect, coupleIds: string[]): Promise<boolean> {
+  if (coupleIds.length < 2) return false; // no partner yet — a round can never "complete" solo
+  const promptIds: number[] = JSON.parse(round.promptIds);
+  const answers = await db.select().from(gameRoundAnswers).where(eq(gameRoundAnswers.roundId, round.id));
+  return promptIds.every((pid) =>
+    coupleIds.every((uid) => answers.some((a: typeof gameRoundAnswers.$inferSelect) => a.promptId === pid && a.userId === uid))
+  );
+}
+
+// Returns the couple's current deck for this game — resuming an
+// already-open one, or starting a fresh one (excluding prompts used in
+// past rounds for this couple+game, falling back to allowing repeats once
+// the library is exhausted) if none is open.
+export async function getOrCreateGameRound(user: User, gameSlug: GameSlug) {
+  const coupleKey = coupleKeyFor(user);
+  const coupleIds = user.partnerId ? [user.id, user.partnerId] : [user.id];
+
+  const existingRounds = await db
+    .select()
+    .from(gameRounds)
+    .where(and(eq(gameRounds.coupleKey, coupleKey), eq(gameRounds.gameSlug, gameSlug)))
+    .orderBy(desc(gameRounds.createdAt));
+
+  if (existingRounds.length > 0) {
+    const latest = existingRounds[0];
+    if (!(await roundIsComplete(latest, coupleIds))) return { round: latest, isNew: false };
+  }
+
+  const allPrompts = await getGamePrompts(gameSlug);
+  if (allPrompts.length === 0) return undefined;
+  const usedIds = new Set(existingRounds.flatMap((r: typeof gameRounds.$inferSelect) => JSON.parse(r.promptIds) as number[]));
+  const unused = allPrompts.filter((p) => !usedIds.has(p.id));
+  const pool = unused.length >= GAME_ROUND_SIZE ? unused : allPrompts;
+  const promptIds = shuffle(pool)
+    .slice(0, Math.min(GAME_ROUND_SIZE, pool.length))
+    .map((p) => p.id);
+
+  const [round] = await db
+    .insert(gameRounds)
+    .values({ coupleKey, gameSlug, promptIds: JSON.stringify(promptIds), createdBy: user.id })
+    .returning();
+  return { round, isNew: true };
+}
+
+export async function getGameRoundById(id: number) {
+  const [round] = await db.select().from(gameRounds).where(eq(gameRounds.id, id));
+  return round;
+}
+
+export async function getGameRoundAnswers(roundId: number) {
+  return db.select().from(gameRoundAnswers).where(eq(gameRoundAnswers.roundId, roundId));
+}
+
+export async function submitGameRoundAnswer(roundId: number, userId: string, promptId: number, answer: string) {
+  const [row] = await db
+    .insert(gameRoundAnswers)
+    .values({ roundId, promptId, userId, answer })
+    .onConflictDoUpdate({
+      target: [gameRoundAnswers.roundId, gameRoundAnswers.promptId, gameRoundAnswers.userId],
+      set: { answer },
+    })
+    .returning();
+  return row;
+}
+
+// Small per-game progress summary for the Home screen's game cards —
+// how many of the current deck's prompts this user (and their partner)
+// have answered so far, without shipping the full deck/answers.
+export async function getGamesSummary(user: User) {
+  const coupleKey = coupleKeyFor(user);
+  const summary: Record<string, { total: number; mine: number; partnerDone: number }> = {};
+  for (const slug of GAME_SLUGS) {
+    const rounds = await db
+      .select()
+      .from(gameRounds)
+      .where(and(eq(gameRounds.coupleKey, coupleKey), eq(gameRounds.gameSlug, slug)))
+      .orderBy(desc(gameRounds.createdAt))
+      .limit(1);
+    if (rounds.length === 0) {
+      summary[slug] = { total: 0, mine: 0, partnerDone: 0 };
+      continue;
+    }
+    const round = rounds[0];
+    const promptIds: number[] = JSON.parse(round.promptIds);
+    const answers = await getGameRoundAnswers(round.id);
+    summary[slug] = {
+      total: promptIds.length,
+      mine: answers.filter((a: typeof gameRoundAnswers.$inferSelect) => a.userId === user.id).length,
+      partnerDone: user.partnerId
+        ? answers.filter((a: typeof gameRoundAnswers.$inferSelect) => a.userId === user.partnerId).length
+        : 0,
+    };
+  }
+  return summary;
 }
 
 // ---------------- Random idea ----------------
