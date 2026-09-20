@@ -1,6 +1,6 @@
 import * as storage from "./storage.js";
 import { notifyUser } from "./push.js";
-import { sendConnectReminderEmail } from "./email.js";
+import { sendConnectReminderEmail, sendGamesAnnouncementEmail } from "./email.js";
 import {
   dailyReminderNotification,
   anniversaryNotification,
@@ -82,6 +82,24 @@ async function tick() {
             }));
           }
           await storage.markReminderSent(user.id, date, type);
+        }
+      }
+
+      // Games-feature intro email, 14 days after registering — regardless
+      // of partner/connection status (games work solo too). Sent
+      // unconditionally like the connect reminder above, not gated by
+      // notificationsEnabled (that flag controls push, not email).
+      if (isTopOfHour(now, 10)) {
+        const ageDays = daysSince(new Date(user.createdAt), now);
+        if (ageDays === 14) {
+          const type = "games_intro_14d";
+          const alreadySent = await storage.wasReminderSent(user.id, date, type);
+          if (!alreadySent) {
+            await sendGamesAnnouncementEmail(user.email, user.name, user.language).catch((err) =>
+              console.warn("[scheduler] games intro email failed for user", user.id, err)
+            );
+            await storage.markReminderSent(user.id, date, type);
+          }
         }
       }
 

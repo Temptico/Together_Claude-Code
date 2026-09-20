@@ -18,6 +18,7 @@ import { notifyAllWithNotifications, notifyAllLocalized } from "./push.js";
 import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
 import { gamesAnnouncementNotification } from "./notificationText.js";
 import { startScheduler } from "./scheduler.js";
+import { sendInBatches } from "./batchSend.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,9 +67,9 @@ async function main() {
     }
     const allUsers = await getAllUsers();
     // Each send is already localized to that user's own language and
-    // fire-and-forget internally (sendWelcomeEmail never throws), so a
-    // simple Promise.all is safe — one bad address can't take down the rest.
-    await Promise.all(allUsers.map((u) => sendWelcomeEmail(u.email, u.name, u.language)));
+    // fire-and-forget internally (sendWelcomeEmail never throws). Batched
+    // (not a plain Promise.all) to stay under Resend's 10 req/s cap.
+    await sendInBatches(allUsers, 8, 1100, (u) => sendWelcomeEmail(u.email, u.name, u.language));
     res.json({ ok: true, recipients: allUsers.length });
   });
 
@@ -95,7 +96,8 @@ async function main() {
       return;
     }
     const allUsers = await getAllUsers();
-    await Promise.all(allUsers.map((u) => sendGamesAnnouncementEmail(u.email, u.name, u.language)));
+    // Batched (not a plain Promise.all) to stay under Resend's 10 req/s cap.
+    await sendInBatches(allUsers, 8, 1100, (u) => sendGamesAnnouncementEmail(u.email, u.name, u.language));
     res.json({ ok: true, recipients: allUsers.length });
   });
 
