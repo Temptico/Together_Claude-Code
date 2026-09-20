@@ -74,7 +74,6 @@ export default function Home() {
       {!data.partner && <ConnectBanner />}
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
-      <GamesRow userId={data.user.id} />
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
       <DailyChallengeCard
         challenge={data.challenge}
@@ -82,6 +81,7 @@ export default function Home() {
         completed={data.challengeCompleted}
         userId={data.user.id}
       />
+      <GamesRow userId={data.user.id} />
       <UpcomingDatesCard dates={data.upcomingDates} />
       <NotificationOptInDialog />
     </div>

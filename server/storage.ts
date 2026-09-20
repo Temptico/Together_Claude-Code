@@ -954,11 +954,9 @@ export async function getReactionsForTargets(targetType: "mood" | "answer" | "ch
 
 // ---------------- Games ----------------
 // A "round" is one shared deck of prompts a couple plays through for a given
-// game. Kept small (10 prompts) to match the reference UX (a short session
-// with a progress bar, not an open-ended daily drip like questions/
-// challenges) and reused while still open so both partners answer the exact
-// same deck.
-const GAME_ROUND_SIZE = 10;
+// game — the whole authored library at once (currently 15 per game), not an
+// open-ended daily drip like questions/challenges — reused while still open
+// so both partners answer the exact same deck.
 
 function pickLocalizedOption(
   row: { optionA: string | null; optionAEn: string | null; optionAHr: string | null; optionB: string | null; optionBEn: string | null; optionBHr: string | null },
@@ -1029,10 +1027,8 @@ export async function getOrCreateGameRound(user: User, gameSlug: GameSlug) {
   if (allPrompts.length === 0) return undefined;
   const usedIds = new Set(existingRounds.flatMap((r: typeof gameRounds.$inferSelect) => JSON.parse(r.promptIds) as number[]));
   const unused = allPrompts.filter((p) => !usedIds.has(p.id));
-  const pool = unused.length >= GAME_ROUND_SIZE ? unused : allPrompts;
-  const promptIds = shuffle(pool)
-    .slice(0, Math.min(GAME_ROUND_SIZE, pool.length))
-    .map((p) => p.id);
+  const pool = unused.length > 0 ? unused : allPrompts;
+  const promptIds = shuffle(pool).map((p) => p.id);
 
   const [round] = await db
     .insert(gameRounds)
