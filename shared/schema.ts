@@ -198,7 +198,7 @@ export const reactions = pgTable("reactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const REACTION_EMOJIS = ["❤️", "🥰", "😂", "👏", "🔥", "🥺", "😢", "😲"] as const;
+export const REACTION_EMOJIS = ["❤️", "🥰", "😂", "🥺", "😢", "😲"] as const;
 
 // ---------- Custom questions & challenges ----------
 export const customQuestions = pgTable("custom_questions", {

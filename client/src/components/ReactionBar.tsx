@@ -63,15 +63,7 @@ export function ReactionBar({
           +
         </button>
         {pickerOpen && (
-          // Wraps instead of a single row — REACTION_EMOJIS has grown past
-          // what fits in one row on a narrow phone screen, so this wraps
-          // into a fixed-width block (4 per row at the current count)
-          // instead of overflowing sideways off-screen. An explicit width is
-          // required here: CSS grid's `1fr` tracks collapse to 0 inside an
-          // intrinsically-sized (shrink-to-fit) absolutely-positioned
-          // container, so grid-cols-N silently breaks in this exact spot —
-          // flex-wrap with a fixed width sidesteps that.
-          <div className="absolute bottom-8 left-0 z-10 flex w-36 flex-wrap gap-1 rounded-2xl border border-border bg-card p-1.5 shadow-lg">
+          <div className="absolute bottom-8 left-0 z-10 flex gap-1 rounded-full border border-border bg-card p-1.5 shadow-lg">
             {REACTION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
