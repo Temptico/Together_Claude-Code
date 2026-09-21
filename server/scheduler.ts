@@ -9,6 +9,7 @@ import {
   dateReminder3dNotification,
   dateReminderTodayNotification,
   connectReminderNotification,
+  challengeUnfinishedNotification,
 } from "./notificationText.js";
 
 const TICK_INTERVAL_MS = 15 * 60_000;
@@ -185,6 +186,28 @@ async function tick() {
             tag: type,
           }));
           await storage.markReminderSent(user.id, date, type);
+        }
+      }
+
+      // Evening nudge for a challenge this user accepted today but hasn't
+      // finished — keyed to today's date (not the challenge's own
+      // assignment date) so it re-fires once per evening for as long as the
+      // challenge stays open (it no longer auto-rotates to a new one).
+      if (isTopOfHour(now, 19)) {
+        const alreadySent = await storage.wasReminderSent(user.id, date, "challenge_reminder");
+        if (!alreadySent) {
+          const openChallenge = await storage.resolveDailyChallenge(user, date);
+          if (openChallenge) {
+            const completion = await storage.getCompletionForDate(user.id, openChallenge.id, openChallenge.date);
+            if (completion && !completion.completedAt) {
+              await notifyUser(user.id, (lang) => ({
+                title: "Together",
+                body: challengeUnfinishedNotification(lang),
+                tag: "challenge-reminder",
+              }));
+            }
+          }
+          await storage.markReminderSent(user.id, date, "challenge_reminder");
         }
       }
 

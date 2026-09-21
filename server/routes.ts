@@ -285,7 +285,10 @@ export function registerRoutes(app: Express) {
       ]);
 
       const myAnswer = question ? await storage.getAnswerForDate(user.id, question.id, date) : undefined;
-      const completion = challenge ? await storage.getCompletionForDate(user.id, challenge.id, date) : undefined;
+      // challenge.date is the assignment's own date, not necessarily today —
+      // a challenge rolled over from an earlier day (see resolveDailyChallenge)
+      // has its completion stored under that original date.
+      const completion = challenge ? await storage.getCompletionForDate(user.id, challenge.id, challenge.date) : undefined;
 
       const upcomingWithIdeas = await Promise.all(
         upcomingDates.map(async (d: any) => ({ ...d, idea: await storage.getDateIdeaById(d.ideaId, user.language) }))
@@ -390,9 +393,10 @@ export function registerRoutes(app: Express) {
       }
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
-      const date = storage.todayStr();
 
-      const todaysChallenge = await storage.resolveDailyChallenge(user, date);
+      // todaysChallenge.date is the assignment's own date — may be an
+      // earlier day if the couple hasn't finished it yet (rollover).
+      const todaysChallenge = await storage.resolveDailyChallenge(user, storage.todayStr());
       if (!todaysChallenge || todaysChallenge.id !== parsed.data.challengeId) {
         res.status(400).json({ error: "Izziv ni več veljaven, osveži stran" });
         return;
@@ -401,7 +405,7 @@ export function registerRoutes(app: Express) {
       const acceptance = await storage.acceptChallenge(
         user.id,
         parsed.data.challengeId,
-        date,
+        todaysChallenge.date,
         todaysChallenge.isCustom ? "custom" : "builtin"
       );
       res.status(201).json(acceptance);
@@ -419,9 +423,16 @@ export function registerRoutes(app: Express) {
       }
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
-      const date = storage.todayStr();
 
-      const completion = await storage.markChallengeCompleted(user.id, parsed.data.challengeId, date);
+      // Same reasoning as accept above — complete against the challenge's
+      // own assignment date, not always today.
+      const todaysChallenge = await storage.resolveDailyChallenge(user, storage.todayStr());
+      if (!todaysChallenge || todaysChallenge.id !== parsed.data.challengeId) {
+        res.status(400).json({ error: "Izziv ni več veljaven, osveži stran" });
+        return;
+      }
+
+      const completion = await storage.markChallengeCompleted(user.id, parsed.data.challengeId, todaysChallenge.date);
       if (!completion) {
         res.status(400).json({ error: "Izziv še ni sprejet" });
         return;

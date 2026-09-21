@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, asc, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, or, desc, gte, lte, lt, asc, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "./db.js";
 import {
   users,
@@ -332,10 +332,77 @@ async function getBuiltinChallengeOfTheDay(date: string, coupleKey: string) {
   return all[dayIndex(date + coupleKey) % all.length];
 }
 
-export type ResolvedChallenge = { id: number; text: string; category: string; difficulty: string; isCustom: boolean };
+export type ResolvedChallenge = {
+  id: number;
+  text: string;
+  category: string;
+  difficulty: string;
+  isCustom: boolean;
+  // The daily_assignments row's own date — NOT always "today". Callers must
+  // use this (not todayStr()) when accepting/completing, so the completion
+  // is matched back to the right assignment by resolveDailyChallenge/
+  // isChallengeAssignmentOpen.
+  date: string;
+};
+
+async function resolveAssignedChallenge(
+  assignment: { date: string; source: string; itemId: number },
+  language: string
+): Promise<ResolvedChallenge | undefined> {
+  if (assignment.source === "custom") {
+    const [custom] = await db.select().from(customChallenges).where(eq(customChallenges.id, assignment.itemId));
+    if (!custom) return undefined;
+    return { id: custom.id, text: custom.text, category: "lastno", difficulty: "easy", isCustom: true, date: assignment.date };
+  }
+  const [builtin] = await db.select().from(challenges).where(eq(challenges.id, assignment.itemId));
+  if (!builtin) return undefined;
+  return {
+    id: builtin.id,
+    text: pickLocalizedText(builtin, language),
+    category: builtin.category,
+    difficulty: builtin.difficulty,
+    isCustom: false,
+    date: assignment.date,
+  };
+}
+
+// True once anyone in the couple has actually finished the challenge this
+// assignment points to — checked by (challengeId, assignment date), which is
+// what challengeCompletions.date means now that completions can happen on a
+// later calendar day than the assignment itself.
+async function isChallengeAssignmentOpen(assignment: { date: string; itemId: number }, coupleIds: string[]): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(challengeCompletions)
+    .where(
+      and(
+        eq(challengeCompletions.challengeId, assignment.itemId),
+        eq(challengeCompletions.date, assignment.date),
+        isNotNull(challengeCompletions.completedAt)
+      )
+    );
+  return !rows.some((r: typeof challengeCompletions.$inferSelect) => coupleIds.includes(r.userId));
+}
 
 export async function resolveDailyChallenge(user: User, date: string): Promise<ResolvedChallenge | undefined> {
   const coupleKey = coupleKeyFor(user);
+  const coupleIds = user.partnerId ? [user.id, user.partnerId] : [user.id];
+
+  // An unfinished challenge from an earlier day stays "the" daily challenge
+  // — a fresh one only rotates in once someone in the couple actually
+  // completes it, so an abandoned challenge doesn't silently get swapped out
+  // overnight.
+  const [mostRecentPast] = await db
+    .select()
+    .from(dailyAssignments)
+    .where(and(eq(dailyAssignments.coupleKey, coupleKey), eq(dailyAssignments.type, "challenge"), lt(dailyAssignments.date, date)))
+    .orderBy(desc(dailyAssignments.date))
+    .limit(1);
+
+  if (mostRecentPast && (await isChallengeAssignmentOpen(mostRecentPast, coupleIds))) {
+    const resolved = await resolveAssignedChallenge(mostRecentPast, user.language);
+    if (resolved) return resolved;
+  }
 
   const [existingAssignment] = await db
     .select()
@@ -345,20 +412,8 @@ export async function resolveDailyChallenge(user: User, date: string): Promise<R
     );
 
   if (existingAssignment) {
-    if (existingAssignment.source === "custom") {
-      const [custom] = await db.select().from(customChallenges).where(eq(customChallenges.id, existingAssignment.itemId));
-      if (custom) return { id: custom.id, text: custom.text, category: "lastno", difficulty: "easy", isCustom: true };
-    } else {
-      const [builtin] = await db.select().from(challenges).where(eq(challenges.id, existingAssignment.itemId));
-      if (builtin)
-        return {
-          id: builtin.id,
-          text: pickLocalizedText(builtin, user.language),
-          category: builtin.category,
-          difficulty: builtin.difficulty,
-          isCustom: false,
-        };
-    }
+    const resolved = await resolveAssignedChallenge(existingAssignment, user.language);
+    if (resolved) return resolved;
   }
 
   const [pendingCustom] = await db
@@ -377,7 +432,7 @@ export async function resolveDailyChallenge(user: User, date: string): Promise<R
       .insert(dailyAssignments)
       .values({ coupleKey, date, type: "challenge", itemId: pendingCustom.id, source: "custom" })
       .onConflictDoNothing();
-    return { id: pendingCustom.id, text: pendingCustom.text, category: "lastno", difficulty: "easy", isCustom: true };
+    return { id: pendingCustom.id, text: pendingCustom.text, category: "lastno", difficulty: "easy", isCustom: true, date };
   }
 
   const builtin = await getBuiltinChallengeOfTheDay(date, coupleKey);
@@ -392,6 +447,7 @@ export async function resolveDailyChallenge(user: User, date: string): Promise<R
     category: builtin.category,
     difficulty: builtin.difficulty,
     isCustom: false,
+    date,
   };
 }
 
@@ -439,13 +495,15 @@ export async function markChallengeCompleted(userId: string, challengeId: number
 }
 
 // Only counts challenges that were actually finished, not just accepted —
-// used for streaks, memories, and activity tracking.
+// used for streaks, memories, and activity tracking. Ordered by completedAt
+// (when it was actually done), not the assignment date — a rolled-over
+// challenge finished today can have a much older assignment date.
 export async function getRecentCompletions(userId: string, limit = 30) {
   return db
     .select()
     .from(challengeCompletions)
     .where(and(eq(challengeCompletions.userId, userId), isNotNull(challengeCompletions.completedAt)))
-    .orderBy(desc(challengeCompletions.date))
+    .orderBy(desc(challengeCompletions.completedAt))
     .limit(limit);
 }
 
@@ -660,6 +718,17 @@ function dateKeyFromTimestamp(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// A challenge can now be accepted/completed days after it was assigned (see
+// resolveDailyChallenge's rollover), so challengeCompletions.date means
+// "which daily pick this belongs to," not "when it was actually done" —
+// anything that needs the real day (streaks, "active today", on-this-day
+// memories) must filter on completedAt instead.
+function completedOnDate(date: string) {
+  const start = new Date(`${date}T00:00:00.000Z`);
+  const end = new Date(`${date}T23:59:59.999Z`);
+  return and(gte(challengeCompletions.completedAt, start), lte(challengeCompletions.completedAt, end));
+}
+
 async function getRecentCompletedDates(userId: string, limit: number) {
   const rows = await db
     .select()
@@ -686,7 +755,13 @@ export async function getActivityTimeline(userIds: string[], limit = 20): Promis
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
-    for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+    for (const comp of c)
+      entries.push({
+        type: "challenge",
+        date: comp.completedAt ? dateKeyFromTimestamp(new Date(comp.completedAt)) : comp.date,
+        userId,
+        detail: comp,
+      });
   }
   entries.sort((a, b) => (a.date < b.date ? 1 : -1));
   return entries.slice(0, limit);
@@ -718,18 +793,12 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
       db
         .select()
         .from(challengeCompletions)
-        .where(
-          and(
-            eq(challengeCompletions.userId, userId),
-            eq(challengeCompletions.date, targetDate),
-            isNotNull(challengeCompletions.completedAt)
-          )
-        ),
+        .where(and(eq(challengeCompletions.userId, userId), completedOnDate(targetDate))),
       db.select().from(plannedDates).where(and(eq(plannedDates.userId, userId), eq(plannedDates.completed, true))),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
-    for (const comp of c) entries.push({ type: "challenge", date: comp.date, userId, detail: comp });
+    for (const comp of c) entries.push({ type: "challenge", date: targetDate, userId, detail: comp });
     for (const planned of plannedRows as (typeof plannedDates.$inferSelect)[]) {
       if (dateKeyFromTimestamp(new Date(planned.scheduledAt)) !== targetDate) continue;
       entries.push({ type: "date", date: targetDate, userId, detail: { ...planned, idea: await getDateIdeaById(planned.ideaId) } });
@@ -747,7 +816,10 @@ export async function calculateStreak(userId: string): Promise<number> {
   const activeDays = new Set<string>([
     ...m.map((x: { date: string }) => x.date),
     ...a.map((x: { date: string }) => x.date),
-    ...c.map((x: { date: string }) => x.date),
+    // completedAt (when it actually happened), not the assignment date — a
+    // rolled-over challenge finished today must count toward today's streak
+    // even if it was originally assigned days ago.
+    ...c.map((x: { date: string; completedAt: Date | null }) => (x.completedAt ? dateKeyFromTimestamp(new Date(x.completedAt)) : x.date)),
   ]);
   let streak = 0;
   const cursor = new Date();
@@ -1121,8 +1193,7 @@ export async function hasActivityToday(userId: string, date: string): Promise<bo
     .where(
       and(
         eq(challengeCompletions.userId, userId),
-        eq(challengeCompletions.date, date),
-        isNotNull(challengeCompletions.completedAt)
+        completedOnDate(date)
       )
     );
   return !!completion;
@@ -1199,16 +1270,10 @@ export async function getAdminStats() {
   ] = await Promise.all([
     db.select().from(moods).where(eq(moods.date, today)),
     db.select().from(questionAnswers).where(eq(questionAnswers.date, today)),
-    db
-      .select()
-      .from(challengeCompletions)
-      .where(and(eq(challengeCompletions.date, today), isNotNull(challengeCompletions.completedAt))),
+    db.select().from(challengeCompletions).where(completedOnDate(today)),
     db.select().from(moods).where(gte(moods.date, weekAgoStr)),
     db.select().from(questionAnswers).where(gte(questionAnswers.date, weekAgoStr)),
-    db
-      .select()
-      .from(challengeCompletions)
-      .where(and(gte(challengeCompletions.date, weekAgoStr), isNotNull(challengeCompletions.completedAt))),
+    db.select().from(challengeCompletions).where(gte(challengeCompletions.completedAt, weekAgoDate)),
     db.select().from(moods),
     db.select().from(questionAnswers),
     db.select().from(challengeCompletions).where(isNotNull(challengeCompletions.completedAt)),

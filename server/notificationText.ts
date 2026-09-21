@@ -119,6 +119,15 @@ export function streakFreezeNotification(lang: string, streak: number): string {
   return bodies[normLang(lang)];
 }
 
+export function challengeUnfinishedNotification(lang: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: "Danes sprejeti izziv še čaka — dokončajta ga, preden se dan izteče! 🏆",
+    en: "Today's accepted challenge is still open — finish it before the day's out! 🏆",
+    hr: "Danas prihvaćeni izazov još čeka — dovršite ga prije kraja dana! 🏆",
+  };
+  return bodies[normLang(lang)];
+}
+
 export function connectReminderNotification(lang: string): string {
   const bodies: Record<Lang, string> = {
     sl: "Ne pozabi povabiti partnerja/ko! Tvoja koda za povezavo te čaka. 💕",
