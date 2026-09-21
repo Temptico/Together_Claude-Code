@@ -361,6 +361,9 @@ export const translations = {
       partnerAnswer: "Partner",
       notYet: "Še ni odgovoril/a",
       playAgain: "Igraj znova",
+      invitePartnerTitle: "Igrajta skupaj 💞",
+      invitePartnerBody: "Za najboljšo izkušnjo naj tudi partner zdaj odpre to igro na svojem telefonu — tako bosta lahko primerjala odgovore takoj, ko bosta oba končala.",
+      invitePartnerCta: "Razumem",
     },
   },
   en: {
@@ -725,6 +728,9 @@ export const translations = {
       partnerAnswer: "Partner",
       notYet: "Hasn't answered yet",
       playAgain: "Play again",
+      invitePartnerTitle: "Play together 💞",
+      invitePartnerBody: "For the best experience, have your partner open this game on their phone too — that way you can compare answers as soon as you're both done.",
+      invitePartnerCta: "Got it",
     },
   },
   hr: {
@@ -1089,6 +1095,9 @@ export const translations = {
       partnerAnswer: "Partner",
       notYet: "Još nije odgovorio/la",
       playAgain: "Igraj ponovno",
+      invitePartnerTitle: "Igrajte zajedno 💞",
+      invitePartnerBody: "Za najbolje iskustvo neka i partner sada otvori ovu igru na svom telefonu — tako ćete moći usporediti odgovore čim oboje završite.",
+      invitePartnerCta: "Razumijem",
     },
   },
 } as const;

@@ -977,7 +977,7 @@ export async function deleteWishlistItem(id: number, user: User) {
 // ---------------- Reactions ----------------
 export async function toggleReaction(
   userId: string,
-  targetType: "mood" | "answer" | "challenge",
+  targetType: "mood" | "answer" | "challenge" | "game_answer",
   targetId: number,
   emoji: string
 ) {
@@ -998,7 +998,10 @@ export async function toggleReaction(
   return row;
 }
 
-export async function getTargetOwner(targetType: "mood" | "answer" | "challenge", targetId: number): Promise<string | undefined> {
+export async function getTargetOwner(
+  targetType: "mood" | "answer" | "challenge" | "game_answer",
+  targetId: number
+): Promise<string | undefined> {
   if (targetType === "mood") {
     const [row] = await db.select().from(moods).where(eq(moods.id, targetId));
     return row?.userId;
@@ -1007,11 +1010,15 @@ export async function getTargetOwner(targetType: "mood" | "answer" | "challenge"
     const [row] = await db.select().from(questionAnswers).where(eq(questionAnswers.id, targetId));
     return row?.userId;
   }
+  if (targetType === "game_answer") {
+    const [row] = await db.select().from(gameRoundAnswers).where(eq(gameRoundAnswers.id, targetId));
+    return row?.userId;
+  }
   const [row] = await db.select().from(challengeCompletions).where(eq(challengeCompletions.id, targetId));
   return row?.userId;
 }
 
-export async function getReactionsForTargets(targetType: "mood" | "answer" | "challenge", targetIds: number[]) {
+export async function getReactionsForTargets(targetType: "mood" | "answer" | "challenge" | "game_answer", targetIds: number[]) {
   if (targetIds.length === 0) return new Map<number, { userId: string; emoji: string }[]>();
   const all = await db.select().from(reactions).where(eq(reactions.targetType, targetType));
   const map = new Map<number, { userId: string; emoji: string }[]>();

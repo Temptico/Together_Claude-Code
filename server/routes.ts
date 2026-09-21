@@ -890,7 +890,7 @@ export function registerRoutes(app: Express) {
     ah(async (req, res) => {
       const schema = z.object({
         userId: z.string(),
-        targetType: z.enum(["mood", "answer", "challenge"]),
+        targetType: z.enum(["mood", "answer", "challenge", "game_answer"]),
         targetId: z.number(),
         emoji: z.enum(REACTION_EMOJIS),
       });
@@ -969,6 +969,10 @@ export function registerRoutes(app: Express) {
       const allPrompts = await storage.getGamePrompts(gameSlug);
       const promptById = new Map(allPrompts.map((p) => [p.id, p]));
       const answers = await storage.getGameRoundAnswers(round.id);
+      const answerReactions = await storage.getReactionsForTargets(
+        "game_answer",
+        answers.map((a: GameRoundAnswer) => a.id)
+      );
 
       const prompts = promptIds
         .map((pid) => promptById.get(pid))
@@ -981,11 +985,15 @@ export function registerRoutes(app: Express) {
           return {
             ...storage.localizeGamePrompt(p, user.language),
             myAnswer: mine?.answer ?? null,
+            myAnswerId: mine?.id ?? null,
+            myAnswerReactions: mine ? answerReactions.get(mine.id) || [] : [],
             partnerAnswer: partnerAnswer?.answer ?? null,
+            partnerAnswerId: partnerAnswer?.id ?? null,
+            partnerAnswerReactions: partnerAnswer ? answerReactions.get(partnerAnswer.id) || [] : [],
           };
         });
 
-      res.json({ roundId: round.id, gameSlug, prompts });
+      res.json({ roundId: round.id, gameSlug, isNew, prompts });
     })
   );
 

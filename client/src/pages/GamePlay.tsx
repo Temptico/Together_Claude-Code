@@ -5,11 +5,15 @@ import { ChevronLeft, PartyPopper } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ReactionBar } from "@/components/ReactionBar";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { GAMES, type GameSlug } from "@shared/schema";
+
+type ReactionItem = { userId: string; emoji: string };
 
 type Prompt = {
   id: number;
@@ -18,7 +22,11 @@ type Prompt = {
   optionA?: string | null;
   optionB?: string | null;
   myAnswer: string | null;
+  myAnswerId: number | null;
+  myAnswerReactions: ReactionItem[];
   partnerAnswer: string | null;
+  partnerAnswerId: number | null;
+  partnerAnswerReactions: ReactionItem[];
 };
 
 function formatAnswer(format: string, prompt: Prompt, answer: string, iHave: string, never: string) {
@@ -41,10 +49,11 @@ export default function GamePlay() {
   const [prompts, setPrompts] = useState<Prompt[] | null>(null);
   const [index, setIndex] = useState<number | null>(null);
   const [textDraft, setTextDraft] = useState("");
+  const [showInvite, setShowInvite] = useState(false);
 
   const startMutation = useMutation({
     mutationFn: () =>
-      apiRequest<{ roundId: number; gameSlug: string; prompts: Prompt[] }>("POST", "/api/games/start", {
+      apiRequest<{ roundId: number; gameSlug: string; isNew: boolean; prompts: Prompt[] }>("POST", "/api/games/start", {
         userId: user!.id,
         gameSlug: slug,
       }),
@@ -53,8 +62,23 @@ export default function GamePlay() {
       setPrompts(data.prompts);
       const firstUnanswered = data.prompts.findIndex((p) => !p.myAnswer);
       setIndex(firstUnanswered === -1 ? data.prompts.length : firstUnanswered);
+      // Only for a genuinely fresh deck, not when resuming one already in
+      // progress — otherwise this would nag on every single visit.
+      if (data.isNew && user?.partnerId) setShowInvite(true);
     },
   });
+
+  // Reactions live in local `prompts` state, not a TanStack Query cache, so
+  // after reacting we just re-fetch the current deck to pick up the new
+  // reaction — same request as resuming, no side effects, index untouched.
+  const refetchPrompts = async () => {
+    const data = await apiRequest<{ roundId: number; gameSlug: string; isNew: boolean; prompts: Prompt[] }>(
+      "POST",
+      "/api/games/start",
+      { userId: user!.id, gameSlug: slug }
+    );
+    setPrompts(data.prompts);
+  };
 
   useEffect(() => {
     if (slug && user) {
@@ -99,6 +123,18 @@ export default function GamePlay() {
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
+      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("games.invitePartnerTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t("games.invitePartnerBody")}</p>
+          <Button className="mt-5 w-full" onClick={() => setShowInvite(false)}>
+            {t("games.invitePartnerCta")}
+          </Button>
+        </DialogContent>
+      </Dialog>
+
       <button onClick={() => navigate("/")} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
         <ChevronLeft className="h-4 w-4" /> {t("common.back")}
       </button>
@@ -211,17 +247,43 @@ export default function GamePlay() {
               .map((p) => (
                 <div key={p.id} className="rounded-2xl bg-muted p-3">
                   <p className="text-sm font-semibold">{p.text}</p>
-                  <div className="mt-2 flex flex-col gap-1 text-xs">
-                    <p>
-                      <span className="font-bold">{t("games.myAnswer")}:</span>{" "}
-                      {formatAnswer(game.format, p, p.myAnswer!, t("games.iHave"), t("games.never"))}
-                    </p>
-                    <p className="text-muted-foreground">
-                      <span className="font-bold">{t("games.partnerAnswer")}:</span>{" "}
-                      {p.partnerAnswer
-                        ? formatAnswer(game.format, p, p.partnerAnswer, t("games.iHave"), t("games.never"))
-                        : t("games.notYet")}
-                    </p>
+                  <div className="mt-2 flex flex-col gap-2 text-xs">
+                    <div>
+                      <p>
+                        <span className="font-bold">{t("games.myAnswer")}:</span>{" "}
+                        {formatAnswer(game.format, p, p.myAnswer!, t("games.iHave"), t("games.never"))}
+                      </p>
+                      {p.myAnswerId != null && (
+                        <div className="mt-1">
+                          <ReactionBar
+                            targetType="game_answer"
+                            targetId={p.myAnswerId}
+                            reactions={p.myAnswerReactions}
+                            invalidateKeys={[]}
+                            onReacted={refetchPrompts}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">
+                        <span className="font-bold">{t("games.partnerAnswer")}:</span>{" "}
+                        {p.partnerAnswer
+                          ? formatAnswer(game.format, p, p.partnerAnswer, t("games.iHave"), t("games.never"))
+                          : t("games.notYet")}
+                      </p>
+                      {p.partnerAnswerId != null && (
+                        <div className="mt-1">
+                          <ReactionBar
+                            targetType="game_answer"
+                            targetId={p.partnerAnswerId}
+                            reactions={p.partnerAnswerReactions}
+                            invalidateKeys={[]}
+                            onReacted={refetchPrompts}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

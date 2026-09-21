@@ -12,11 +12,16 @@ export function ReactionBar({
   targetId,
   reactions,
   invalidateKeys,
+  onReacted,
 }: {
-  targetType: "mood" | "answer" | "challenge";
+  targetType: "mood" | "answer" | "challenge" | "game_answer";
   targetId: number;
   reactions: ReactionItem[];
   invalidateKeys: unknown[][];
+  // For callers whose reaction list isn't backed by a TanStack Query cache
+  // (e.g. GamePlay's locally-held prompts) — called after a successful
+  // toggle so they can refresh their own state instead.
+  onReacted?: () => void;
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -34,6 +39,7 @@ export function ReactionBar({
       apiRequest("POST", "/api/reactions", { userId: user!.id, targetType, targetId, emoji }),
     onSuccess: () => {
       for (const key of invalidateKeys) qc.invalidateQueries({ queryKey: key });
+      onReacted?.();
       setPickerOpen(false);
     },
   });
