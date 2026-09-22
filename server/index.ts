@@ -19,6 +19,7 @@ import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
 import { gamesAnnouncementNotification } from "./notificationText.js";
 import { startScheduler } from "./scheduler.js";
 import { sendInBatches } from "./batchSend.js";
+import { GAMES, type GameSlug } from "../shared/schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -182,6 +183,9 @@ async function main() {
     const clicksBreakdown = Object.entries(stats.tempticoClicksBySource)
       .map(([source, n]) => `${CLICK_SOURCE_LABELS[source] || source}: ${n}`)
       .join(" · ");
+    const gamesBreakdown = Object.entries(stats.gameRoundsBySlug)
+      .map(([slug, n]) => `${GAMES[slug as GameSlug]?.name || slug}: ${n}`)
+      .join(" · ");
 
     // Tagged QR codes/links (e.g. ?src=paket on the packaging QR): visits
     // recorded the moment anyone lands with that tag, signups only for
@@ -274,7 +278,7 @@ async function main() {
       <div class="card"><div class="value">${stats.totals.moods}</div><div class="label">Razpoloženj skupaj</div></div>
       <div class="card"><div class="value">${stats.totals.answers}</div><div class="label">Odgovorov skupaj</div></div>
       <div class="card"><div class="value">${stats.totals.completions}</div><div class="label">Izzivov opravljenih</div></div>
-      <div class="card"><div class="value">${stats.totals.completedDates}/${stats.totals.plannedDates}</div><div class="label">Zmenkov opravljenih/načrtovanih</div></div>
+      <div class="card"><div class="value">${stats.totals.completedDates}/${stats.totals.plannedDates}</div><div class="label">Zmenkov</div></div>
       <div class="card"><div class="value">${stats.totals.wishlistItems}</div><div class="label">Želja na seznamih</div></div>
     </div>
   </div>
@@ -299,20 +303,24 @@ async function main() {
         <div class="value">${stats.tempticoClicksTotal}</div>
         <div class="label">Kliki na Temptico ponudbo${clicksBreakdown ? ` <span style="font-weight:400">(${clicksBreakdown})</span>` : ""}</div>
       </div>
+      <div class="card">
+        <div class="value">${stats.gamesPlayedTotal}</div>
+        <div class="label">Iger igranih${gamesBreakdown ? ` <span style="font-weight:400">(${gamesBreakdown})</span>` : ""}</div>
+      </div>
     </div>
   </div>
 
-  ${
-    acquisitionRows
-      ? `<div class="section">
+  <div class="section">
     <h2 class="section-title">Viri uporabnikov (QR kode, povezave)</h2>
-    <table>
+    ${
+      acquisitionRows
+        ? `<table>
       <thead><tr><th>Vir</th><th>Ogledov</th><th>Registracij</th><th>Konverzija</th></tr></thead>
       <tbody>${acquisitionRows}</tbody>
-    </table>
-  </div>`
-      : ""
-  }
+    </table>`
+        : `<p style="color:#7a6f68;font-size:0.9rem;">Še ni zabeleženih obiskov z označenim virom (npr. <code>?src=paket</code> na QR kodi). Ta razdelek se napolni takoj, ko nekdo prvič odpre povezavo s tem parametrom.</p>`
+    }
+  </div>
 
   <div class="section">
     <h2 class="section-title">Porazdelitev nizov (dni)</h2>

@@ -1289,12 +1289,16 @@ export async function getAdminStats() {
     db.select().from(pushSubscriptions),
   ]);
 
-  const [allMilestones, allTempticoClicks, allLandingVisits, streaks] = await Promise.all([
+  const [allMilestones, allTempticoClicks, allLandingVisits, allGameRounds, streaks] = await Promise.all([
     db.select().from(milestoneEvents),
     db.select().from(tempticoClicks),
     db.select().from(landingVisits),
+    db.select().from(gameRounds),
     Promise.all(allUsers.map((u: User) => calculateStreak(u.id))),
   ]);
+
+  const gameRoundsBySlug: Record<string, number> = {};
+  for (const r of allGameRounds as { gameSlug: string }[]) gameRoundsBySlug[r.gameSlug] = (gameRoundsBySlug[r.gameSlug] || 0) + 1;
 
   const streakDistribution = { zero: 0, d1to6: 0, d7to29: 0, d30to59: 0, d60to99: 0, d100plus: 0 };
   for (const s of streaks) {
@@ -1358,6 +1362,8 @@ export async function getAdminStats() {
     milestonesByType,
     tempticoClicksTotal: allTempticoClicks.length,
     tempticoClicksBySource,
+    gamesPlayedTotal: allGameRounds.length,
+    gameRoundsBySlug,
     visitsBySource,
     signupsBySource,
     totals: {
