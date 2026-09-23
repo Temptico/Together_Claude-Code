@@ -197,6 +197,11 @@ export const translations = {
       deleteAccount: "Izbriši račun",
       deleteAccountWarning: "To bo trajno izbrisalo tvoj račun in vse tvoje podatke (razpoloženja, odgovore, izzive, načrtovane zmenke in fotografije) — tudi tiste, ki jih vidi tvoj partner. Dejanja ni mogoče razveljaviti.",
       deleteAccountConfirm: "Trajno izbriši",
+      disconnectPartner: "Prekini povezavo s partnerjem",
+      disconnectPartnerWarning:
+        "Oba računa ostaneta, vendar vajina skupna vsebina (seznam želja, lastna vprašanja in izzivi, igre) ne bo več vidna. Oba dobita novo kodo za povezavo — če se kdaj ponovno povežeta, se skupna vsebina vrne.",
+      disconnectPartnerConfirm: "Prekini povezavo",
+      partnerDisconnected: "Povezava s partnerjem je prekinjena",
     },
     custom: {
       title: "Lastna vprašanja in izzivi",
@@ -564,6 +569,11 @@ export const translations = {
       deleteAccount: "Delete account",
       deleteAccountWarning: "This will permanently delete your account and all your data (moods, answers, challenges, planned dates and photos) — including what your partner can see. This can't be undone.",
       deleteAccountConfirm: "Delete permanently",
+      disconnectPartner: "Disconnect from partner",
+      disconnectPartnerWarning:
+        "Both accounts stay, but your shared content (wishlist, custom questions and challenges, games) will no longer be visible. You'll both get a new connect code — if you ever reconnect, your shared content comes back.",
+      disconnectPartnerConfirm: "Disconnect",
+      partnerDisconnected: "You're no longer connected",
     },
     custom: {
       title: "Custom questions & challenges",
@@ -931,6 +941,11 @@ export const translations = {
       deleteAccount: "Izbriši račun",
       deleteAccountWarning: "Ovo će trajno izbrisati tvoj račun i sve tvoje podatke (raspoloženja, odgovore, izazove, planirane spojeve i fotografije) — uključujući ono što vidi tvoj partner. Ova radnja se ne može poništiti.",
       deleteAccountConfirm: "Trajno izbriši",
+      disconnectPartner: "Prekini vezu s partnerom",
+      disconnectPartnerWarning:
+        "Oba računa ostaju, ali vaš zajednički sadržaj (popis želja, vlastita pitanja i izazovi, igre) više neće biti vidljiv. Oboje dobivate novi kod za povezivanje — ako se ikad ponovno povežete, zajednički sadržaj se vraća.",
+      disconnectPartnerConfirm: "Prekini vezu",
+      partnerDisconnected: "Veza s partnerom je prekinuta",
     },
     custom: {
       title: "Vlastita pitanja i izazovi",

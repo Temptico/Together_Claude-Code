@@ -252,6 +252,26 @@ export function registerRoutes(app: Express) {
     })
   );
 
+  app.post(
+    "/api/partner/disconnect",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      if (!user.partnerId) {
+        res.status(400).json({ error: "Nimaš povezanega partnerja" });
+        return;
+      }
+      const updated = await storage.disconnectPartner(user);
+      res.json(storage.omitPin(updated));
+    })
+  );
+
   app.get(
     "/api/partner/invite-info/:code",
     ah(async (req, res) => {

@@ -18,6 +18,7 @@ import {
   Share,
   PlayCircle,
   MessageSquareHeart,
+  HeartOff,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { DeleteAccountDialog } from "@/components/DeleteAccountDialog";
+import { DisconnectPartnerDialog } from "@/components/DisconnectPartnerDialog";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -61,6 +63,7 @@ export default function Profile() {
   const { canInstall, install, showInstallCard, instructionsKey } = usePwaInstall();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [anniversary, setAnniversary] = useState(user!.anniversaryDate || "");
   const [anniversaryError, setAnniversaryError] = useState<string | null>(null);
@@ -293,6 +296,15 @@ export default function Profile() {
         <LogOut className="h-4 w-4" /> {t("profile.logout")}
       </Button>
 
+      {user!.partnerId && (
+        <button
+          onClick={() => setDisconnectOpen(true)}
+          className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-muted-foreground"
+        >
+          <HeartOff className="h-3.5 w-3.5" /> {t("profile.disconnectPartner")}
+        </button>
+      )}
+
       <button
         onClick={() => setDeleteOpen(true)}
         className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-muted-foreground"
@@ -302,6 +314,7 @@ export default function Profile() {
 
       <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
       <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <DisconnectPartnerDialog open={disconnectOpen} onOpenChange={setDisconnectOpen} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );

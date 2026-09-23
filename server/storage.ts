@@ -157,9 +157,28 @@ export async function deleteUserAccount(user: User): Promise<void> {
   await db.delete(reactions).where(eq(reactions.userId, user.id));
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
   await db.delete(reminderLog).where(eq(reminderLog.userId, user.id));
+  await db.delete(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id));
   await db.delete(dailyAssignments).where(eq(dailyAssignments.coupleKey, coupleKeyFor(user)));
 
   await db.delete(users).where(eq(users.id, user.id));
+}
+
+// Unlinks a couple without deleting either account. Couple-keyed content
+// (daily picks, custom questions/challenges, wishlist, game rounds) is left
+// in place — it's unreachable under each user's new solo coupleKey and
+// reappears only if these same two people reconnect. Both connect codes are
+// regenerated: connecting needs nothing but the other person's code, so an
+// ex who still knows the old one could otherwise silently re-link.
+export async function disconnectPartner(user: User): Promise<User> {
+  if (user.partnerId) {
+    await db.update(users).set({ partnerId: null, connectCode: codeGen() }).where(eq(users.id, user.partnerId));
+  }
+  const [updated] = await db
+    .update(users)
+    .set({ partnerId: null, connectCode: codeGen() })
+    .where(eq(users.id, user.id))
+    .returning();
+  return updated;
 }
 
 export async function connectPartner(
