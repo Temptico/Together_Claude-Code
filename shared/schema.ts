@@ -200,6 +200,11 @@ export const reactions = pgTable("reactions", {
 
 export const REACTION_EMOJIS = ["❤️", "🥰", "😂", "🥺", "😢", "😲"] as const;
 
+// The scheduler skips every tick outside 08:00–22:00 without touching the
+// database (see FIRST/LAST_REMINDER_HOUR in scheduler.ts), so a time outside
+// that range would silently never fire — widen both together.
+export const REMINDER_TIMES = ["random", "08:00", "09:00", "10:00", "11:00", "12:00", "18:00", "19:00", "20:00", "21:00", "22:00"] as const;
+
 // ---------- Custom questions & challenges ----------
 export const customQuestions = pgTable("custom_questions", {
   id: serial("id").primaryKey(),

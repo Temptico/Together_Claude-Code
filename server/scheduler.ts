@@ -27,6 +27,21 @@ function isTopOfHour(now: Date, targetHour: number): boolean {
   return now.getHours() === targetHour && now.getMinutes() < TICK_INTERVAL_MS / 60_000;
 }
 
+// Earliest and latest hour anything below can fire at: the reminder-time
+// picker spans 08:00–22:00, and every fixed reminder (9, 10, 19, 20) sits
+// inside that. Keep these in sync if either range ever widens.
+const FIRST_REMINDER_HOUR = 8;
+const LAST_REMINDER_HOUR = 22;
+
+// Every reminder is gated by isTopOfHour, so a tick outside the top of an
+// active hour can't send anything — skipping it before touching the
+// database lets Neon stay suspended for 3 of every 4 ticks by day and all
+// night, instead of waking 96 times a day to do nothing.
+export function tickCanSendAnything(now: Date): boolean {
+  const hour = now.getHours();
+  return hour >= FIRST_REMINDER_HOUR && hour <= LAST_REMINDER_HOUR && now.getMinutes() < TICK_INTERVAL_MS / 60_000;
+}
+
 function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
   const anniv = new Date(anniversaryDate);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -52,6 +67,7 @@ function daysSince(past: Date, now: Date): number {
 
 async function tick() {
   const now = new Date();
+  if (!tickCanSendAnything(now)) return;
   const date = storage.todayStr();
 
   const users = await storage.getAllUsers();

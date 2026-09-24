@@ -45,8 +45,9 @@ export default function Home() {
     queryKey: ["/api/home", user!.id],
     // Polls so a partner's mood/answer/challenge shows up without a manual
     // refresh — push notifications cover the closed-app case, this covers
-    // the tab-already-open case.
-    refetchInterval: 15_000,
+    // the tab-already-open case. Once a minute: each poll wakes the Neon
+    // database, and a partner's update landing within a minute is plenty.
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
 

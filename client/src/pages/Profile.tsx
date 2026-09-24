@@ -37,9 +37,7 @@ import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { subscribeToPush } from "@/hooks/use-push";
-import type { User } from "@shared/schema";
-
-const REMINDER_TIMES = ["random", "08:00", "09:00", "10:00", "11:00", "12:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
+import { REMINDER_TIMES, type User } from "@shared/schema";
 
 function computeAnniversaryCountdown(anniversaryDate: string) {
   const anniv = new Date(anniversaryDate);

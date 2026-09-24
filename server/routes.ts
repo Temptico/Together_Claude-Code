@@ -41,6 +41,7 @@ import {
   submitGameAnswerSchema,
   TEMPTICO_CLICK_SOURCES,
   REACTION_EMOJIS,
+  REMINDER_TIMES,
   GAME_SLUGS,
   GAMES,
   type GameSlug,
@@ -824,7 +825,7 @@ export function registerRoutes(app: Express) {
           .nullable()
           .optional(),
         notificationsEnabled: z.boolean().optional(),
-        reminderTime: z.string().optional(),
+        reminderTime: z.enum(REMINDER_TIMES).optional(),
         language: z.enum(["sl", "en", "hr"]).optional(),
         pwaInstalled: z.literal(true).optional(),
       });

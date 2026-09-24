@@ -33,10 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     enabled: !!userId,
     staleTime: 15_000,
-    // Keeps the couple-connection status, name, and settings in sync across
-    // devices/tabs without requiring a manual refresh — e.g. when your partner
-    // connects from their own session, your open tab picks it up shortly after.
-    refetchInterval: 20_000,
+    // Polls only while not yet connected, so a partner connecting from their
+    // own phone shows up here on its own. Once connected, profile changes are
+    // rare and refetchOnWindowFocus covers them — every poll wakes the Neon
+    // database, so there's no point polling a status that won't change.
+    refetchInterval: (query) => (query.state.data?.partnerId ? false : 20_000),
     refetchOnWindowFocus: true,
     retry: false,
   });
