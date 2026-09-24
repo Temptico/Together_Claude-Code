@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, lte, lt, asc, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, or, desc, gte, lte, lt, asc, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import {
   users,
@@ -674,29 +674,61 @@ export async function getPlannedDates(user: User) {
     .orderBy(plannedDates.scheduledAt);
 }
 
+// Every planned_dates column except the base64 photo (~100 KB each). Most
+// callers only need dates and status — the home screen polls upcoming dates
+// every minute and the scheduler reads every couple's dates each morning —
+// and pulling every photo along for that grows with each photo uploaded.
+const plannedDateWithoutPhoto = {
+  id: plannedDates.id,
+  userId: plannedDates.userId,
+  ideaId: plannedDates.ideaId,
+  scheduledAt: plannedDates.scheduledAt,
+  notes: plannedDates.notes,
+  completed: plannedDates.completed,
+  createdAt: plannedDates.createdAt,
+  photoLength: sql<number>`coalesce(length(${plannedDates.photo}), 0)`.mapWith(Number),
+};
+
+export type PlannedDateWithoutPhoto = Omit<typeof plannedDates.$inferSelect, "photo"> & { photoLength: number };
+
+export async function getPlannedDatesWithoutPhotos(user: User): Promise<PlannedDateWithoutPhoto[]> {
+  return db
+    .select(plannedDateWithoutPhoto)
+    .from(plannedDates)
+    .where(inArray(plannedDates.userId, coupleIds(user)))
+    .orderBy(plannedDates.scheduledAt);
+}
+
 // Admin-only diagnostic: summarizes a user's planned dates without returning
 // the (potentially large) base64 photo payloads themselves — just whether
 // each row has one. Used to investigate "my photos disappeared" reports.
 export async function getPlannedDatesDebug(user: User) {
-  const rows = await getPlannedDates(user);
-  return rows.map((d: typeof plannedDates.$inferSelect) => ({
+  const rows = await getPlannedDatesWithoutPhotos(user);
+  return rows.map((d) => ({
     id: d.id,
     userId: d.userId,
     ideaId: d.ideaId,
     scheduledAt: d.scheduledAt,
     completed: d.completed,
-    hasPhoto: !!d.photo,
-    photoLength: d.photo ? d.photo.length : 0,
+    hasPhoto: d.photoLength > 0,
+    photoLength: d.photoLength,
     createdAt: d.createdAt,
   }));
 }
 
-export async function getUpcomingPlannedDates(user: User, limit = 3) {
-  const all = await getPlannedDates(user);
-  const now = new Date();
-  return all
-    .filter((d: typeof plannedDates.$inferSelect) => !d.completed && new Date(d.scheduledAt) >= now)
-    .slice(0, limit);
+export async function getUpcomingPlannedDates(user: User, limit = 3): Promise<PlannedDateWithoutPhoto[]> {
+  return db
+    .select(plannedDateWithoutPhoto)
+    .from(plannedDates)
+    .where(
+      and(
+        inArray(plannedDates.userId, coupleIds(user)),
+        eq(plannedDates.completed, false),
+        gte(plannedDates.scheduledAt, new Date())
+      )
+    )
+    .orderBy(plannedDates.scheduledAt)
+    .limit(limit);
 }
 
 export async function updatePlannedDate(
@@ -749,10 +781,13 @@ function dateKeyFromTimestamp(d: Date): string {
 // "which daily pick this belongs to," not "when it was actually done" —
 // anything that needs the real day (streaks, "active today", on-this-day
 // memories) must filter on completedAt instead.
-function completedOnDate(date: string) {
+function localDayRange(date: string): { start: Date; nextDayStart: Date } {
   const [y, m, d] = date.split("-").map(Number);
-  const start = new Date(y, m - 1, d);
-  const nextDayStart = new Date(y, m - 1, d + 1);
+  return { start: new Date(y, m - 1, d), nextDayStart: new Date(y, m - 1, d + 1) };
+}
+
+function completedOnDate(date: string) {
+  const { start, nextDayStart } = localDayRange(date);
   return and(gte(challengeCompletions.completedAt, start), lt(challengeCompletions.completedAt, nextDayStart));
 }
 
@@ -811,6 +846,7 @@ export async function getPastDatesTimeline(userIds: string[], limit = 20): Promi
 export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineEntry[]> {
   const now = new Date();
   const targetDate = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const targetDay = localDayRange(targetDate);
 
   const entries: TimelineEntry[] = [];
   for (const userId of userIds) {
@@ -821,13 +857,24 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
         .select()
         .from(challengeCompletions)
         .where(and(eq(challengeCompletions.userId, userId), completedOnDate(targetDate))),
-      db.select().from(plannedDates).where(and(eq(plannedDates.userId, userId), eq(plannedDates.completed, true))),
+      // Filtered to that one day in SQL — it used to load every completed
+      // date (photos and all) and pick the matching day out in JS.
+      db
+        .select()
+        .from(plannedDates)
+        .where(
+          and(
+            eq(plannedDates.userId, userId),
+            eq(plannedDates.completed, true),
+            gte(plannedDates.scheduledAt, targetDay.start),
+            lt(plannedDates.scheduledAt, targetDay.nextDayStart)
+          )
+        ),
     ]);
     for (const mood of m) entries.push({ type: "mood", date: mood.date, userId, detail: mood });
     for (const answer of a) entries.push({ type: "answer", date: answer.date, userId, detail: answer });
     for (const comp of c) entries.push({ type: "challenge", date: targetDate, userId, detail: comp });
     for (const planned of plannedRows as (typeof plannedDates.$inferSelect)[]) {
-      if (dateKeyFromTimestamp(new Date(planned.scheduledAt)) !== targetDate) continue;
       entries.push({ type: "date", date: targetDate, userId, detail: { ...planned, idea: await getDateIdeaById(planned.ideaId) } });
     }
   }
@@ -1311,7 +1358,7 @@ export async function getAdminStats() {
     db.select().from(moods),
     db.select().from(questionAnswers),
     db.select().from(challengeCompletions).where(isNotNull(challengeCompletions.completedAt)),
-    db.select().from(plannedDates),
+    db.select({ completed: plannedDates.completed, photoLength: plannedDateWithoutPhoto.photoLength }).from(plannedDates),
     db.select().from(wishlistItems),
     db.select().from(pushSubscriptions),
   ]);
@@ -1399,7 +1446,7 @@ export async function getAdminStats() {
       completions: allCompletions.length,
       plannedDates: allPlanned.length,
       completedDates: allPlanned.filter((d: { completed: boolean }) => d.completed).length,
-      datesWithPhotos: allPlanned.filter((d: { photo: string | null }) => !!d.photo).length,
+      datesWithPhotos: allPlanned.filter((d: { photoLength: number }) => d.photoLength > 0).length,
       wishlistItems: allWishlist.length,
     },
     recentUsers,

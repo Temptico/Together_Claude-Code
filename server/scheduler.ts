@@ -184,7 +184,7 @@ async function tick() {
       // partners' rows), so each partner naturally gets their own reminder in
       // their own language when this loop reaches their user record.
       if (isTopOfHour(now, 9)) {
-        const planned = await storage.getPlannedDates(user);
+        const planned = await storage.getPlannedDatesWithoutPhotos(user);
         for (const pd of planned) {
           if (pd.completed) continue;
           const daysUntil = daysUntilDate(new Date(pd.scheduledAt), now);
