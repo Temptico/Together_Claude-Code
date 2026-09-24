@@ -10,6 +10,8 @@ import {
   dateReminderTodayNotification,
   connectReminderNotification,
   challengeUnfinishedNotification,
+  partnerBirthdayNotification,
+  ownBirthdayNotification,
 } from "./notificationText.js";
 
 const TICK_INTERVAL_MS = 15 * 60_000;
@@ -42,8 +44,9 @@ export function tickCanSendAnything(now: Date): boolean {
   return hour >= FIRST_REMINDER_HOUR && hour <= LAST_REMINDER_HOUR && now.getMinutes() < TICK_INTERVAL_MS / 60_000;
 }
 
-function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
-  const anniv = new Date(anniversaryDate);
+// Days until the next occurrence of a yearly date (anniversary, birthday).
+function daysUntilNextYearly(yearlyDate: string, now: Date): number {
+  const anniv = new Date(yearlyDate);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let next = new Date(now.getFullYear(), anniv.getMonth(), anniv.getDate());
   if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, anniv.getMonth(), anniv.getDate());
@@ -51,7 +54,7 @@ function daysUntilAnniversary(anniversaryDate: string, now: Date): number {
 }
 
 // Plain calendar-day difference (ignores time of day), unlike
-// daysUntilAnniversary which wraps to next year — a planned date is a single
+// daysUntilNextYearly which wraps to next year — a planned date is a single
 // fixed point in time, not a yearly-recurring one.
 function daysUntilDate(target: Date, now: Date): number {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -71,6 +74,7 @@ async function tick() {
   const date = storage.todayStr();
 
   const users = await storage.getAllUsers();
+  const usersById = new Map(users.map((u) => [u.id, u]));
 
   for (const user of users) {
     try {
@@ -163,7 +167,7 @@ async function tick() {
       // Advance anniversary heads-up, 30 and 14 days out — also checked once
       // a day at 09:00.
       if (isTopOfHour(now, 9) && user.anniversaryDate) {
-        const daysUntil = daysUntilAnniversary(user.anniversaryDate, now);
+        const daysUntil = daysUntilNextYearly(user.anniversaryDate, now);
         for (const milestone of [30, 14] as const) {
           if (daysUntil !== milestone) continue;
           const type = `anniversary_${milestone}d`;
@@ -175,6 +179,33 @@ async function tick() {
               tag: type,
             }));
             await storage.markReminderSent(user.id, date, type);
+          }
+        }
+      }
+
+      // Birthdays, checked once a day at 09:00: the partner gets a heads-up
+      // 14 days out and on the day itself; the birthday person gets a
+      // greeting on the day.
+      if (isTopOfHour(now, 9)) {
+        const partner = user.partnerId ? usersById.get(user.partnerId) : undefined;
+        if (partner?.birthday) {
+          const daysUntil = daysUntilNextYearly(partner.birthday, now);
+          if (daysUntil === 14 || daysUntil === 0) {
+            const type = `partner_birthday_${daysUntil}d`;
+            if (!(await storage.wasReminderSent(user.id, date, type))) {
+              await notifyUser(user.id, (lang) => ({
+                title: "Together",
+                body: partnerBirthdayNotification(lang, partner.name, daysUntil),
+                tag: type,
+              }));
+              await storage.markReminderSent(user.id, date, type);
+            }
+          }
+        }
+        if (user.birthday && daysUntilNextYearly(user.birthday, now) === 0) {
+          if (!(await storage.wasReminderSent(user.id, date, "own_birthday"))) {
+            await notifyUser(user.id, (lang) => ({ title: "Together", body: ownBirthdayNotification(lang), tag: "own-birthday" }));
+            await storage.markReminderSent(user.id, date, "own_birthday");
           }
         }
       }

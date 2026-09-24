@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -7,6 +7,7 @@ import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { subscribeToPush } from "@/hooks/use-push";
+import { isNewConnection, CELEBRATION_DONE_EVENT } from "@/lib/celebration";
 import type { User } from "@shared/schema";
 
 const DISMISSED_KEY = "together:notifPromptShown";
@@ -20,9 +21,18 @@ export function NotificationOptInDialog() {
   const { user, setUser } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [celebrationsDone, bumpCelebrationsDone] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    window.addEventListener(CELEBRATION_DONE_EVENT, bumpCelebrationsDone);
+    return () => window.removeEventListener(CELEBRATION_DONE_EVENT, bumpCelebrationsDone);
+  }, []);
 
   useEffect(() => {
     if (!user?.partnerId) return;
+    // The connection celebration is on screen right now — two modals at
+    // once leave the lower one unclickable, so ask once it's dismissed.
+    if (isNewConnection(user.partnerId)) return;
     if (localStorage.getItem(DISMISSED_KEY)) return;
     if (!("Notification" in window) || Notification.permission !== "default") {
       localStorage.setItem(DISMISSED_KEY, "1");
@@ -30,7 +40,7 @@ export function NotificationOptInDialog() {
     }
     setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.partnerId]);
+  }, [user?.partnerId, celebrationsDone]);
 
   const mutation = useMutation({
     mutationFn: async () => {

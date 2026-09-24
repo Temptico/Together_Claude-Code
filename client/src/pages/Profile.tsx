@@ -65,6 +65,7 @@ export default function Profile() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [anniversary, setAnniversary] = useState(user!.anniversaryDate || "");
   const [anniversaryError, setAnniversaryError] = useState<string | null>(null);
+  const [birthday, setBirthday] = useState(user!.birthday || "");
 
   const updateMutation = useMutation({
     mutationFn: (patch: Partial<User>) => apiRequest<User>("PATCH", `/api/users/${user!.id}`, patch),
@@ -161,6 +162,23 @@ export default function Profile() {
                 {anniversaryCountdown.years} {t("home.anniversaryYears")}
               </p>
             ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-2 py-4">
+          <p className="font-extrabold">{t("profile.birthday")}</p>
+          <div className="flex gap-2">
+            <Input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} className="flex-1" />
+            <Button
+              size="sm"
+              onClick={() => updateMutation.mutate({ birthday: (birthday || null) as any })}
+              disabled={updateMutation.isPending}
+            >
+              {t("profile.save")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("profile.birthdayHint")}</p>
         </CardContent>
       </Card>
 

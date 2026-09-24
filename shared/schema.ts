@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   connectCode: varchar("connect_code", { length: 8 }).notNull().unique(),
   partnerId: varchar("partner_id", { length: 24 }),
   anniversaryDate: text("anniversary_date"), // stored as YYYY-MM-DD
+  birthday: text("birthday"), // YYYY-MM-DD; drives the partner's birthday reminders
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   reminderTime: text("reminder_time").notNull().default("random"),
   language: varchar("language", { length: 2 }).notNull().default("sl"),

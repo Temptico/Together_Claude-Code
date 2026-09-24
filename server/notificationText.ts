@@ -101,6 +101,34 @@ export function anniversaryUpcomingNotification(lang: string, daysUntil: 30 | 14
   return bodies[normLang(lang)][daysUntil];
 }
 
+// Sent to the partner of the person whose birthday it is.
+export function partnerBirthdayNotification(lang: string, name: string, daysUntil: 14 | 0): string {
+  const bodies: Record<Lang, Record<14 | 0, string>> = {
+    sl: {
+      14: `Čez 14 dni ima ${name} rojstni dan — še je dovolj časa za darilo 🎁`,
+      0: `Danes ima ${name} rojstni dan! 🎂 Poskrbi, da bo dan poseben.`,
+    },
+    en: {
+      14: `${name}'s birthday is in 14 days — still plenty of time for a gift 🎁`,
+      0: `It's ${name}'s birthday today! 🎂 Make it a special one.`,
+    },
+    hr: {
+      14: `Za 14 dana ${name} ima rođendan — još ima vremena za poklon 🎁`,
+      0: `Danas ${name} ima rođendan! 🎂 Pobrini se da dan bude poseban.`,
+    },
+  };
+  return bodies[normLang(lang)][daysUntil];
+}
+
+export function ownBirthdayNotification(lang: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: "Vse najboljše za rojstni dan! 🎂💕",
+    en: "Happy birthday! 🎂💕",
+    hr: "Sretan rođendan! 🎂💕",
+  };
+  return bodies[normLang(lang)];
+}
+
 export function photoAddedNotification(lang: string, title: string): string {
   const bodies: Record<Lang, string> = {
     sl: `Partner je dodal/a fotografijo k zmenku: ${title} 📸`,

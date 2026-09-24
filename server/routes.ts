@@ -816,17 +816,18 @@ export function registerRoutes(app: Express) {
       const user = await requireUser(req, res, req.params.id);
       if (!user) return;
 
+      const calendarDate = z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Neveljaven datum")
+        .refine((v) => {
+          const year = Number(v.slice(0, 4));
+          return year >= 1900 && year <= 9999;
+        }, "Neveljavno leto");
       const schema = z.object({
         name: z.string().min(1, "Ime ne sme biti prazno").optional(),
         email: z.string().email("Neveljaven e-poštni naslov").optional(),
-        anniversaryDate: z
-          .string()
-          .refine((v) => {
-            const year = Number(v.slice(0, 4));
-            return year >= 1900 && year <= 9999;
-          }, "Neveljavno leto")
-          .nullable()
-          .optional(),
+        anniversaryDate: calendarDate.nullable().optional(),
+        birthday: calendarDate.nullable().optional(),
         notificationsEnabled: z.boolean().optional(),
         reminderTime: z.enum(REMINDER_TIMES).optional(),
         language: z.enum(["sl", "en", "hr"]).optional(),

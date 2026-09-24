@@ -205,6 +205,8 @@ export const translations = {
         "Oba računa ostaneta, vendar vajina skupna vsebina (seznam želja, lastna vprašanja in izzivi, igre) ne bo več vidna. Oba dobita novo kodo za povezavo — če se kdaj ponovno povežeta, se skupna vsebina vrne.",
       disconnectPartnerConfirm: "Prekini povezavo",
       partnerDisconnected: "Povezava s partnerjem je prekinjena",
+      birthday: "Rojstni dan",
+      birthdayHint: "Partner bo 14 dni prej dobil namig, da se pripravi na tvoj dan 🎂",
     },
     custom: {
       title: "Lastna vprašanja in izzivi",
@@ -225,6 +227,12 @@ export const translations = {
       skip: "Preskoči",
       next: "Naprej",
       connectCta: "Poveži se s partnerjem",
+      birthdayTitle: "Kdaj imaš rojstni dan?",
+      birthdayBody: "Partnerju bomo pravočasno namignili, da se pripravi na tvoj dan. Lahko tudi preskočiš.",
+      notificationsTitle: "Ne zamudi ničesar",
+      notificationsBody:
+        "Obvestimo te, ko partner deli razpoloženje, odgovori ali te povabi k igri — in te nežno opomnimo na dnevni check-in.",
+      notificationsCta: "Vklopi obvestila",
       moodTitle: "Deli svoje razpoloženje",
       moodBody: "Vsak dan v nekaj sekundah označita, kako se počutata — partner takoj vidi.",
       questionTitle: "Vprašanje dneva",
@@ -355,6 +363,11 @@ export const translations = {
       s10ContactNote: "Za vsa vprašanja v zvezi s temi pogoji ali obdelavo tvojih podatkov nas kontaktiraj na",
     },
     common: { loading: "Nalaganje...", error: "Prišlo je do napake", close: "Zapri", back: "Nazaj" },
+    celebration: {
+      title: "Povezana sta! 🎉",
+      body: "Ti in {name} sta zdaj povezana. Delita razpoloženja, odgovarjajta na vprašanja in igrajta igre — skupaj.",
+      cta: "Začniva 💞",
+    },
     games: {
       title: "Igre",
       play: "Igraj",
@@ -580,6 +593,8 @@ export const translations = {
         "Both accounts stay, but your shared content (wishlist, custom questions and challenges, games) will no longer be visible. You'll both get a new connect code — if you ever reconnect, your shared content comes back.",
       disconnectPartnerConfirm: "Disconnect",
       partnerDisconnected: "You're no longer connected",
+      birthday: "Birthday",
+      birthdayHint: "Your partner gets a heads-up 14 days before, so they can get ready for your day 🎂",
     },
     custom: {
       title: "Custom questions & challenges",
@@ -600,6 +615,12 @@ export const translations = {
       skip: "Skip",
       next: "Next",
       connectCta: "Connect with your partner",
+      birthdayTitle: "When's your birthday?",
+      birthdayBody: "We'll give your partner a heads-up in time to get ready for your day. You can also skip this.",
+      notificationsTitle: "Don't miss a thing",
+      notificationsBody:
+        "We'll let you know when your partner shares a mood, answers, or invites you to a game — and gently remind you to check in each day.",
+      notificationsCta: "Turn on notifications",
       moodTitle: "Share your mood",
       moodBody: "Every day, tell each other how you're feeling in a few seconds — your partner sees it right away.",
       questionTitle: "Question of the day",
@@ -730,6 +751,11 @@ export const translations = {
       s10ContactNote: "For any questions about these terms or the processing of your data, contact us at",
     },
     common: { loading: "Loading...", error: "Something went wrong", close: "Close", back: "Back" },
+    celebration: {
+      title: "You're connected! 🎉",
+      body: "You and {name} are now connected. Share moods, answer questions and play games — together.",
+      cta: "Let's start 💞",
+    },
     games: {
       title: "Games",
       play: "Play",
@@ -955,6 +981,8 @@ export const translations = {
         "Oba računa ostaju, ali vaš zajednički sadržaj (popis želja, vlastita pitanja i izazovi, igre) više neće biti vidljiv. Oboje dobivate novi kod za povezivanje — ako se ikad ponovno povežete, zajednički sadržaj se vraća.",
       disconnectPartnerConfirm: "Prekini vezu",
       partnerDisconnected: "Veza s partnerom je prekinuta",
+      birthday: "Rođendan",
+      birthdayHint: "Partner će 14 dana ranije dobiti podsjetnik da se pripremi za tvoj dan 🎂",
     },
     custom: {
       title: "Vlastita pitanja i izazovi",
@@ -975,6 +1003,12 @@ export const translations = {
       skip: "Preskoči",
       next: "Dalje",
       connectCta: "Poveži se s partnerom",
+      birthdayTitle: "Kada ti je rođendan?",
+      birthdayBody: "Partneru ćemo na vrijeme dati znak da se pripremi za tvoj dan. Možeš i preskočiti.",
+      notificationsTitle: "Ne propusti ništa",
+      notificationsBody:
+        "Javit ćemo ti kad partner podijeli raspoloženje, odgovori ili te pozove na igru — i nježno te podsjetiti na dnevni check-in.",
+      notificationsCta: "Uključi obavijesti",
       moodTitle: "Podijeli svoje raspoloženje",
       moodBody: "Svaki dan u par sekundi označite kako se osjećate — partner odmah vidi.",
       questionTitle: "Pitanje dana",
@@ -1105,6 +1139,11 @@ export const translations = {
       s10ContactNote: "Za sva pitanja vezana uz ove uvjete ili obradu tvojih podataka kontaktiraj nas na",
     },
     common: { loading: "Učitavanje...", error: "Došlo je do pogreške", close: "Zatvori", back: "Natrag" },
+    celebration: {
+      title: "Povezani ste! 🎉",
+      body: "Ti i {name} ste sada povezani. Dijelite raspoloženja, odgovarajte na pitanja i igrajte igre — zajedno.",
+      cta: "Krenimo 💞",
+    },
     games: {
       title: "Igre",
       play: "Igraj",

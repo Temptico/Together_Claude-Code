@@ -217,6 +217,7 @@ const STATEMENTS = [
   // embed the date's id and can run longer than that.
   `ALTER TABLE reminder_log ALTER COLUMN type TYPE text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS source text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday text`,
   `CREATE TABLE IF NOT EXISTS game_prompts (
       id serial PRIMARY KEY,
       game_slug varchar(32) NOT NULL,

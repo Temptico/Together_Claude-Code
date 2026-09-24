@@ -9,6 +9,7 @@ import { ToastContextProvider } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { BottomNav } from "@/components/BottomNav";
 import { InstallReminderDialog } from "@/components/InstallReminderDialog";
+import { ConnectionCelebration } from "@/components/ConnectionCelebration";
 import { trackLandingVisit } from "@/lib/acquisition";
 
 import Welcome from "@/pages/Welcome";
@@ -98,6 +99,7 @@ function Shell() {
       </div>
       <BottomNav />
       <InstallReminderDialog />
+      <ConnectionCelebration />
     </div>
   );
 }
