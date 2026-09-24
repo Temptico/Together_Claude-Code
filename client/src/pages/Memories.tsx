@@ -9,13 +9,18 @@ import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { bcp47 } from "@/lib/locale";
-import { MOOD_LEVELS } from "@shared/schema";
+import { Link } from "wouter";
+import { ChevronRight } from "lucide-react";
+import { MOOD_LEVELS, GAMES, type GameSlug } from "@shared/schema";
+
+type CompletedGame = { roundId: number; gameSlug: GameSlug; completedAt: string; total: number; matches: number | null };
 
 type MemoriesData = {
   stats: { moodCount: number; answeredCount: number; completedCount: number; avgMood: number };
   activity: any[];
   pastDates: any[];
   onThisDay: any[];
+  games: CompletedGame[];
   partnerName: string | null;
 };
 
@@ -83,6 +88,17 @@ export default function Memories() {
             </div>
           )}
 
+          {data.games.length > 0 && (
+            <>
+              <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.gamesSection")}</h2>
+              <div className="flex flex-col gap-3">
+                {data.games.map((g) => (
+                  <GameMemoryCard key={g.roundId} game={g} />
+                ))}
+              </div>
+            </>
+          )}
+
           <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.recentMemories")}</h2>
 
           {data.activity.length === 0 ? (
@@ -114,6 +130,44 @@ export default function Memories() {
         </>
       )}
     </div>
+  );
+}
+
+function GameMemoryCard({ game }: { game: CompletedGame }) {
+  const { t, lang } = useTranslation();
+  const meta = GAMES[game.gameSlug];
+  if (!meta) return null;
+  const summary =
+    game.matches === null
+      ? t("memories.gameAnswers").replace("{total}", String(game.total))
+      : t("memories.gameMatches").replace("{n}", String(game.matches)).replace("{total}", String(game.total));
+
+  return (
+    <Link href={`/games/${game.gameSlug}?round=${game.roundId}`}>
+      <Card>
+        <CardContent className="flex items-center gap-3 py-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-xl",
+              meta.gradient
+            )}
+          >
+            {meta.emoji}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold">
+              {meta.name}
+              {meta.adult && <span className="ml-1.5 text-[10px] font-extrabold text-muted-foreground">18+</span>}
+            </p>
+            <p className="text-sm">{summary}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(game.completedAt).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" })}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

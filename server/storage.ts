@@ -25,6 +25,7 @@ import {
   gameRounds,
   gameRoundAnswers,
   GAME_SLUGS,
+  GAMES,
   type User,
   type GameSlug,
   type GamePrompt,
@@ -1157,11 +1158,13 @@ async function roundIsComplete(round: typeof gameRounds.$inferSelect, coupleIds:
   );
 }
 
-// Returns the couple's current deck for this game — resuming an
-// already-open one, or starting a fresh one (excluding prompts used in
-// past rounds for this couple+game, falling back to allowing repeats once
-// the library is exhausted) if none is open.
-export async function getOrCreateGameRound(user: User, gameSlug: GameSlug) {
+// Returns the couple's current deck for this game. An unfinished deck is
+// always resumed. A finished one is returned as-is too (so the "you've both
+// finished — see your results" notification opens the results, not a fresh
+// deck) unless startNew is set — the recap's "Play again" button. A new
+// deck excludes prompts used in this couple's past rounds of the game,
+// falling back to allowing repeats once the library is exhausted.
+export async function getOrCreateGameRound(user: User, gameSlug: GameSlug, startNew = false) {
   const coupleKey = coupleKeyFor(user);
   const coupleIds = user.partnerId ? [user.id, user.partnerId] : [user.id];
 
@@ -1173,7 +1176,7 @@ export async function getOrCreateGameRound(user: User, gameSlug: GameSlug) {
 
   if (existingRounds.length > 0) {
     const latest = existingRounds[0];
-    if (!(await roundIsComplete(latest, coupleIds))) return { round: latest, isNew: false };
+    if (!startNew || !(await roundIsComplete(latest, coupleIds))) return { round: latest, isNew: false };
   }
 
   const allPrompts = await getGamePrompts(gameSlug);
@@ -1193,6 +1196,64 @@ export async function getOrCreateGameRound(user: User, gameSlug: GameSlug) {
 export async function getGameRoundById(id: number) {
   const [round] = await db.select().from(gameRounds).where(eq(gameRounds.id, id));
   return round;
+}
+
+// A specific round, only if it belongs to this user's current couple — used
+// to reopen a past round's results from Memories.
+export async function getGameRoundForUser(user: User, roundId: number) {
+  const round = await getGameRoundById(roundId);
+  return round && round.coupleKey === coupleKeyFor(user) ? round : undefined;
+}
+
+export type CompletedGameRound = {
+  roundId: number;
+  gameSlug: string;
+  completedAt: Date;
+  total: number;
+  // How many prompts both partners answered the same way — only meaningful
+  // for boolean/choice games; null for free-text ones.
+  matches: number | null;
+};
+
+// Finished rounds (both partners answered every prompt), newest first — the
+// "Games played" section of Memories.
+export async function getCompletedGameRounds(user: User, limit = 10): Promise<CompletedGameRound[]> {
+  if (!user.partnerId) return [];
+  const coupleIds = [user.id, user.partnerId];
+  const rounds = await db
+    .select()
+    .from(gameRounds)
+    .where(eq(gameRounds.coupleKey, coupleKeyFor(user)))
+    .orderBy(desc(gameRounds.createdAt))
+    .limit(limit * 2);
+  if (rounds.length === 0) return [];
+
+  const answers = await db
+    .select()
+    .from(gameRoundAnswers)
+    .where(inArray(gameRoundAnswers.roundId, rounds.map((r: typeof gameRounds.$inferSelect) => r.id)));
+
+  const result: CompletedGameRound[] = [];
+  for (const round of rounds as (typeof gameRounds.$inferSelect)[]) {
+    const promptIds: number[] = JSON.parse(round.promptIds);
+    const roundAnswers = answers.filter((a: typeof gameRoundAnswers.$inferSelect) => a.roundId === round.id);
+    const answerOf = (promptId: number, userId: string) =>
+      roundAnswers.find((a: typeof gameRoundAnswers.$inferSelect) => a.promptId === promptId && a.userId === userId);
+    const complete = promptIds.every((pid) => coupleIds.every((uid) => answerOf(pid, uid)));
+    if (!complete) continue;
+
+    const format = GAMES[round.gameSlug as GameSlug]?.format;
+    const matches =
+      format === "text"
+        ? null
+        : promptIds.filter((pid) => answerOf(pid, coupleIds[0])!.answer === answerOf(pid, coupleIds[1])!.answer).length;
+    const completedAt = new Date(
+      Math.max(...roundAnswers.map((a: typeof gameRoundAnswers.$inferSelect) => new Date(a.createdAt).getTime()))
+    );
+    result.push({ roundId: round.id, gameSlug: round.gameSlug, completedAt, total: promptIds.length, matches });
+    if (result.length >= limit) break;
+  }
+  return result;
 }
 
 export async function getGameRoundAnswers(roundId: number) {

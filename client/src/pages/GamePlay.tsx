@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, PartyPopper } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +29,8 @@ type Prompt = {
   partnerAnswerReactions: ReactionItem[];
 };
 
+type DeckResponse = { roundId: number; gameSlug: string; isNew: boolean; prompts: Prompt[] };
+
 function formatAnswer(format: string, prompt: Prompt, answer: string, iHave: string, never: string) {
   if (format === "boolean") return answer === "yes" ? iHave : never;
   if (format === "choice") return answer === "A" ? prompt.optionA : prompt.optionB;
@@ -45,18 +47,22 @@ export default function GamePlay() {
   const qc = useQueryClient();
   const [, navigate] = useLocation();
 
+  // ?round=<id> reopens one specific past round (linked from Memories)
+  // instead of the game's current deck. Read once per game, on load.
+  const search = useSearch();
+  const requestedRoundId = Number(new URLSearchParams(search).get("round")) || null;
+
   const [roundId, setRoundId] = useState<number | null>(null);
   const [prompts, setPrompts] = useState<Prompt[] | null>(null);
   const [index, setIndex] = useState<number | null>(null);
   const [textDraft, setTextDraft] = useState("");
   const [showInvite, setShowInvite] = useState(false);
 
-  const startMutation = useMutation({
-    mutationFn: () =>
-      apiRequest<{ roundId: number; gameSlug: string; isNew: boolean; prompts: Prompt[] }>("POST", "/api/games/start", {
-        userId: user!.id,
-        gameSlug: slug,
-      }),
+  const loadMutation = useMutation({
+    mutationFn: ({ newRound = false, specificRoundId }: { newRound?: boolean; specificRoundId?: number | null }) =>
+      specificRoundId
+        ? apiRequest<DeckResponse>("POST", "/api/games/round", { userId: user!.id, roundId: specificRoundId })
+        : apiRequest<DeckResponse>("POST", "/api/games/start", { userId: user!.id, gameSlug: slug, newRound }),
     onSuccess: (data) => {
       setRoundId(data.roundId);
       setPrompts(data.prompts);
@@ -69,22 +75,26 @@ export default function GamePlay() {
   });
 
   // Reactions live in local `prompts` state, not a TanStack Query cache, so
-  // after reacting we just re-fetch the current deck to pick up the new
-  // reaction — same request as resuming, no side effects, index untouched.
+  // after reacting we re-fetch the round on screen by its id — never
+  // "the current deck", which could be a different round.
   const refetchPrompts = async () => {
-    const data = await apiRequest<{ roundId: number; gameSlug: string; isNew: boolean; prompts: Prompt[] }>(
-      "POST",
-      "/api/games/start",
-      { userId: user!.id, gameSlug: slug }
-    );
+    if (!roundId) return;
+    const data = await apiRequest<DeckResponse>("POST", "/api/games/round", { userId: user!.id, roundId });
     setPrompts(data.prompts);
+  };
+
+  const playAgain = () => {
+    setPrompts(null);
+    setIndex(null);
+    loadMutation.mutate({ newRound: true });
+    if (requestedRoundId) navigate(`/games/${slug}`, { replace: true });
   };
 
   useEffect(() => {
     if (slug && user) {
       setPrompts(null);
       setIndex(null);
-      startMutation.mutate();
+      loadMutation.mutate({ specificRoundId: requestedRoundId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
@@ -290,14 +300,7 @@ export default function GamePlay() {
           </div>
 
           {roundComplete && (
-            <Button
-              disabled={startMutation.isPending}
-              onClick={() => {
-                setPrompts(null);
-                setIndex(null);
-                startMutation.mutate();
-              }}
-            >
+            <Button disabled={loadMutation.isPending} onClick={playAgain}>
               {t("games.playAgain")}
             </Button>
           )}

@@ -46,6 +46,7 @@ import {
   GAMES,
   type GameSlug,
   type GameRoundAnswer,
+  type User,
 } from "../shared/schema.js";
 
 function ah(fn: (req: Request, res: Response) => Promise<void>) {
@@ -745,10 +746,11 @@ export function registerRoutes(app: Express) {
       const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
       const stats = await storage.getStats(user.id);
       const ids = user.partnerId ? [user.id, user.partnerId] : [user.id];
-      const [activity, pastDates, onThisDay] = await Promise.all([
+      const [activity, pastDates, onThisDay, games] = await Promise.all([
         storage.getActivityTimeline(ids, 20),
         storage.getPastDatesTimeline(ids, 20),
         storage.getOnThisDayMemories(ids),
+        storage.getCompletedGameRounds(user, 10),
       ]);
       const all = [...activity, ...pastDates, ...onThisDay];
 
@@ -801,6 +803,7 @@ export function registerRoutes(app: Express) {
         activity: activity.map(enrich),
         pastDates: pastDates.map(enrich),
         onThisDay: onThisDay.map(enrich),
+        games,
         partnerName: partner?.name || null,
       });
     })
@@ -956,12 +959,47 @@ export function registerRoutes(app: Express) {
     })
   );
 
+  // The full deck for one round as the client renders it: localized prompts
+  // in deck order, each with both partners' answers and reactions.
+  async function gameDeckResponse(user: User, round: { id: number; gameSlug: string; promptIds: string }, isNew: boolean) {
+    const gameSlug = round.gameSlug as GameSlug;
+    const promptIds: number[] = JSON.parse(round.promptIds);
+    const allPrompts = await storage.getGamePrompts(gameSlug);
+    const promptById = new Map(allPrompts.map((p) => [p.id, p]));
+    const answers = await storage.getGameRoundAnswers(round.id);
+    const answerReactions = await storage.getReactionsForTargets(
+      "game_answer",
+      answers.map((a: GameRoundAnswer) => a.id)
+    );
+
+    const prompts = promptIds
+      .map((pid) => promptById.get(pid))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map((p) => {
+        const mine = answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.id);
+        const partnerAnswer = user.partnerId
+          ? answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.partnerId)
+          : undefined;
+        return {
+          ...storage.localizeGamePrompt(p, user.language),
+          myAnswer: mine?.answer ?? null,
+          myAnswerId: mine?.id ?? null,
+          myAnswerReactions: mine ? answerReactions.get(mine.id) || [] : [],
+          partnerAnswer: partnerAnswer?.answer ?? null,
+          partnerAnswerId: partnerAnswer?.id ?? null,
+          partnerAnswerReactions: partnerAnswer ? answerReactions.get(partnerAnswer.id) || [] : [],
+        };
+      });
+
+    return { roundId: round.id, gameSlug, isNew, prompts };
+  }
+
   // Starts (or resumes) the couple's current deck for a game. Only notifies
   // the partner the first time a fresh deck is created, not on every resume.
   app.post(
     "/api/games/start",
     ah(async (req, res) => {
-      const schema = z.object({ userId: z.string(), gameSlug: z.enum(GAME_SLUGS) });
+      const schema = z.object({ userId: z.string(), gameSlug: z.enum(GAME_SLUGS), newRound: z.boolean().optional() });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: "Neveljavni podatki" });
@@ -971,7 +1009,7 @@ export function registerRoutes(app: Express) {
       if (!user) return;
 
       const gameSlug = parsed.data.gameSlug as GameSlug;
-      const result = await storage.getOrCreateGameRound(user, gameSlug);
+      const result = await storage.getOrCreateGameRound(user, gameSlug, parsed.data.newRound ?? false);
       if (!result) {
         res.status(404).json({ error: "Igra trenutno nima vprašanj" });
         return;
@@ -986,35 +1024,29 @@ export function registerRoutes(app: Express) {
         })).catch(() => {});
       }
 
-      const promptIds: number[] = JSON.parse(round.promptIds);
-      const allPrompts = await storage.getGamePrompts(gameSlug);
-      const promptById = new Map(allPrompts.map((p) => [p.id, p]));
-      const answers = await storage.getGameRoundAnswers(round.id);
-      const answerReactions = await storage.getReactionsForTargets(
-        "game_answer",
-        answers.map((a: GameRoundAnswer) => a.id)
-      );
+      res.json(await gameDeckResponse(user, round, isNew));
+    })
+  );
 
-      const prompts = promptIds
-        .map((pid) => promptById.get(pid))
-        .filter((p): p is NonNullable<typeof p> => !!p)
-        .map((p) => {
-          const mine = answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.id);
-          const partnerAnswer = user.partnerId
-            ? answers.find((a: GameRoundAnswer) => a.promptId === p.id && a.userId === user.partnerId)
-            : undefined;
-          return {
-            ...storage.localizeGamePrompt(p, user.language),
-            myAnswer: mine?.answer ?? null,
-            myAnswerId: mine?.id ?? null,
-            myAnswerReactions: mine ? answerReactions.get(mine.id) || [] : [],
-            partnerAnswer: partnerAnswer?.answer ?? null,
-            partnerAnswerId: partnerAnswer?.id ?? null,
-            partnerAnswerReactions: partnerAnswer ? answerReactions.get(partnerAnswer.id) || [] : [],
-          };
-        });
-
-      res.json({ roundId: round.id, gameSlug, isNew, prompts });
+  // Reopens one specific round (e.g. a finished one from Memories) without
+  // starting or resuming anything.
+  app.post(
+    "/api/games/round",
+    ah(async (req, res) => {
+      const schema = z.object({ userId: z.string(), roundId: z.number() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const round = await storage.getGameRoundForUser(user, parsed.data.roundId);
+      if (!round) {
+        res.status(404).json({ error: "Igra ne obstaja" });
+        return;
+      }
+      res.json(await gameDeckResponse(user, round, false));
     })
   );
 
