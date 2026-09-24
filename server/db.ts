@@ -20,9 +20,13 @@ if (process.env.DATABASE_URL) {
   // Resolved from the working directory (not __dirname) so the store lives at
   // the project root whether running from source (tsx) or from dist/ (build) —
   // otherwise a build would nest it inside dist/ and wipe it on every rebuild.
-  const client = new PGlite(path.resolve(process.cwd(), ".pgdata"));
+  // PGLITE_DATA_DIR=memory:// gives tests a throwaway in-memory database.
+  const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(process.cwd(), ".pgdata");
+  const client = new PGlite(dataDir);
   db = drizzle(client, { schema });
-  console.log("[db] Using local embedded PGlite database (.pgdata). Set DATABASE_URL to use Neon/Postgres.");
+  if (!process.env.PGLITE_DATA_DIR) {
+    console.log("[db] Using local embedded PGlite database (.pgdata). Set DATABASE_URL to use Neon/Postgres.");
+  }
 }
 
 export { db };

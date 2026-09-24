@@ -14,5 +14,8 @@
     },
     "noEmit": false
   },
-  "include": ["server", "shared"]
+  "include": ["server", "shared"],
+  // Tests import vitest, a devDependency the production install doesn't
+  // have — keep them out of the server build (tsconfig.json still checks them).
+  "exclude": ["server/**/*.test.ts", "server/testUtils.ts"]
 }

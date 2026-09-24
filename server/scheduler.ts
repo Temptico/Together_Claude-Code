@@ -68,7 +68,7 @@ function daysSince(past: Date, now: Date): number {
   return Math.round((today.getTime() - pastDay.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-async function tick() {
+export async function tick() {
   const now = new Date();
   if (!tickCanSendAnything(now)) return;
   const date = storage.todayStr();

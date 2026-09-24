@@ -13,7 +13,8 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "db:push": "drizzle-kit push",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
@@ -63,6 +64,7 @@
     "@types/react-dom": "^18.3.1",
     "concurrently": "^10.0.4",
     "drizzle-kit": "^0.27.0",
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "vitest": "^2.1.9"
   }
 }
