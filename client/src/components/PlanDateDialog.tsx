@@ -9,6 +9,7 @@ import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { localToday } from "@/lib/locale";
 
 export function PlanDateDialog({
   idea,
@@ -24,7 +25,7 @@ export function PlanDateDialog({
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const [date, setDate] = useState(today);
   const [time, setTime] = useState("19:00");
   const [notes, setNotes] = useState("");

@@ -50,8 +50,15 @@ export function omitPin<T extends { pin?: string | null }>(user: T): Omit<T, "pi
   return rest;
 }
 
+// YYYY-MM-DD in the server's local time zone (see tz.ts). Not
+// toISOString(), which is always UTC — that made "today" roll over at
+// 02:00 in Slovenia in summer.
+export function localDateKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 function dayIndex(dateStr: string): number {
@@ -734,7 +741,7 @@ export type TimelineEntry = {
 };
 
 function dateKeyFromTimestamp(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 }
 
 // A challenge can now be accepted/completed days after it was assigned (see
@@ -743,9 +750,10 @@ function dateKeyFromTimestamp(d: Date): string {
 // anything that needs the real day (streaks, "active today", on-this-day
 // memories) must filter on completedAt instead.
 function completedOnDate(date: string) {
-  const start = new Date(`${date}T00:00:00.000Z`);
-  const end = new Date(`${date}T23:59:59.999Z`);
-  return and(gte(challengeCompletions.completedAt, start), lte(challengeCompletions.completedAt, end));
+  const [y, m, d] = date.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const nextDayStart = new Date(y, m - 1, d + 1);
+  return and(gte(challengeCompletions.completedAt, start), lt(challengeCompletions.completedAt, nextDayStart));
 }
 
 async function getRecentCompletedDates(userId: string, limit: number) {
@@ -843,10 +851,10 @@ export async function calculateStreak(userId: string): Promise<number> {
   let streak = 0;
   const cursor = new Date();
   // if today has no activity yet, streak counts from yesterday backwards
-  if (!activeDays.has(cursor.toISOString().slice(0, 10))) {
+  if (!activeDays.has(localDateKey(cursor))) {
     cursor.setDate(cursor.getDate() - 1);
   }
-  while (activeDays.has(cursor.toISOString().slice(0, 10))) {
+  while (activeDays.has(localDateKey(cursor))) {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -1273,7 +1281,7 @@ export async function getAdminStats() {
   const allUsers = await db.select().from(users);
   const today = todayStr();
   const weekAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const weekAgoStr = weekAgoDate.toISOString().slice(0, 10);
+  const weekAgoStr = localDateKey(weekAgoDate);
 
   const totalUsers = allUsers.length;
   const connectedUsers = allUsers.filter((u: User) => u.partnerId).length;
