@@ -16,6 +16,7 @@ import {
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import { geocode } from "./geocode.js";
 import { parseRadiusKm } from "./geo.js";
+import { mergeNearby } from "./nearbyMerge.js";
 import {
   moodNotification,
   answerNotification,
@@ -549,9 +550,7 @@ export function registerRoutes(app: Express) {
       const osmResults = await fetchNearbyOsmPlaces(lat, lng, types, radiusKm);
       const osmIdeas = await withDistance(osmResults);
 
-      const byId = new Map<number, any>();
-      for (const idea of [...localIdeas, ...osmIdeas]) byId.set(idea.id, idea);
-      const merged = [...byId.values()].sort((a, b) => a.distanceKm - b.distanceKm);
+      const merged = mergeNearby<any>(localIdeas, osmIdeas);
 
       // null (not just empty) means the lookup itself failed (timeout, rate
       // limit, network) — worth telling the user apart from "there's

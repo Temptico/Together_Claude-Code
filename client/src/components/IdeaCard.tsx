@@ -1,4 +1,4 @@
-import { MapPin, Clock, CalendarPlus, Map, ExternalLink } from "lucide-react";
+import { MapPin, Clock, CalendarPlus, Navigation, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { costLabel, durationLabel, categoryLabel } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { directionsUrl } from "@/lib/navigation";
 
 export function IdeaCard({
   idea,
@@ -52,12 +53,12 @@ export function IdeaCard({
           </Button>
           {idea.lat != null && idea.lng != null && (
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${idea.lat},${idea.lng}`}
+              href={directionsUrl(idea.lat, idea.lng, idea.title)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs font-bold text-primary"
             >
-              <Map className="h-3.5 w-3.5" /> {t("dates.viewMap")}
+              <Navigation className="h-3.5 w-3.5" /> {t("dates.directions")}
             </a>
           )}
           {idea.website && (
