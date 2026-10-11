@@ -3,22 +3,39 @@
 
 import { haversineKm } from "./geo.js";
 
-type OsmMapping = { query: string; category: string; costHint?: string };
+// Which OSM element kinds to ask for. Many venues are mapped as a building
+// outline (a way) rather than a point — in Ljubljana that's well over a
+// hundred cafés/restaurants/bars, and parks are almost always areas — so
+// asking only for nodes silently missed them. Relations matter only for big
+// areas (parks, attractions); shops stay node-only since there are so many.
+type OsmMapping = {
+  elements: "node" | "nw" | "nwr";
+  key: string;
+  value?: string;
+  category: string;
+  costHint?: string;
+};
 
 const OSM_TYPE_MAP: Record<string, OsmMapping> = {
-  restavracije: { query: `node["amenity"="restaurant"]`, category: "sprosceno" },
-  kavarne: { query: `node["amenity"="cafe"]`, category: "sprosceno" },
-  parki: { query: `node["leisure"="park"]`, category: "na-prostem", costHint: "brezplacno" },
-  "naravni-kraji": { query: `node["tourism"="attraction"]`, category: "na-prostem" },
-  muzeji: { query: `node["tourism"="museum"]`, category: "kulturno" },
-  galerije: { query: `node["tourism"="gallery"]`, category: "kulturno" },
-  vinarije: { query: `node["craft"="winery"]`, category: "sprosceno" },
-  bari: { query: `node["amenity"="bar"]`, category: "sprosceno" },
-  trznice: { query: `node["amenity"="marketplace"]`, category: "sprosceno" },
-  trgovine: { query: `node["shop"]`, category: "sprosceno" },
-  "plesni-studii": { query: `node["leisure"="dance"]`, category: "aktivno" },
-  "rekreacijski-centri": { query: `node["leisure"="fitness_centre"]`, category: "aktivno" },
+  restavracije: { elements: "nw", key: "amenity", value: "restaurant", category: "sprosceno" },
+  kavarne: { elements: "nw", key: "amenity", value: "cafe", category: "sprosceno" },
+  parki: { elements: "nwr", key: "leisure", value: "park", category: "na-prostem", costHint: "brezplacno" },
+  "naravni-kraji": { elements: "nwr", key: "tourism", value: "attraction", category: "na-prostem" },
+  muzeji: { elements: "nwr", key: "tourism", value: "museum", category: "kulturno" },
+  galerije: { elements: "nw", key: "tourism", value: "gallery", category: "kulturno" },
+  vinarije: { elements: "nw", key: "craft", value: "winery", category: "sprosceno" },
+  bari: { elements: "nw", key: "amenity", value: "bar", category: "sprosceno" },
+  trznice: { elements: "nw", key: "amenity", value: "marketplace", category: "sprosceno" },
+  trgovine: { elements: "node", key: "shop", category: "sprosceno" },
+  "plesni-studii": { elements: "nw", key: "leisure", value: "dance", category: "aktivno" },
+  "rekreacijski-centri": { elements: "nw", key: "leisure", value: "fitness_centre", category: "aktivno" },
+  gledalisca: { elements: "nw", key: "amenity", value: "theatre", category: "kulturno" },
+  knjiznice: { elements: "nw", key: "amenity", value: "library", category: "kulturno", costHint: "brezplacno" },
 };
+
+function osmFilter(m: OsmMapping): string {
+  return m.value ? `${m.elements}["${m.key}"="${m.value}"]` : `${m.elements}["${m.key}"]`;
+}
 
 const DEFAULT_TYPES = ["kavarne", "restavracije", "parki", "muzeji"];
 // Independently-hosted Overpass instances with worldwide data. Every mirror
@@ -142,7 +159,7 @@ async function fetchOnce(
 ): Promise<OsmNearbyResult[] | null> {
   const radiusMeters = Math.round(radiusKm * 1000);
   const around = `(around:${radiusMeters},${lat},${lng})`;
-  const clauses = requestedTypes.map((t) => `${OSM_TYPE_MAP[t].query}${around};`).join("\n  ");
+  const clauses = requestedTypes.map((t) => `${osmFilter(OSM_TYPE_MAP[t])}${around};`).join("\n  ");
   // Now that a failed attempt falls through to a second endpoint rather than
   // being the only shot, each individual attempt gets a shorter budget so a
   // stuck first endpoint doesn't eat the whole request.
@@ -196,11 +213,8 @@ async function fetchOnce(
       if (elLat == null || elLng == null) continue;
 
       const matchedType = requestedTypes.find((t) => {
-        const mapping = OSM_TYPE_MAP[t];
-        const [key, value] = mapping.query.replace(/^node\[/, "").replace(/\]$/, "").split("=");
-        const tagKey = key.replace(/"/g, "");
-        const tagValue = value?.replace(/"/g, "");
-        return tagValue ? tags[tagKey] === tagValue : !!tags[tagKey];
+        const { key, value } = OSM_TYPE_MAP[t];
+        return value ? tags[key] === value : !!tags[key];
       });
       if (!matchedType) continue;
 
