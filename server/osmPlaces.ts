@@ -65,6 +65,9 @@ export type OsmNearbyResult = {
   address?: string;
   phone?: string;
   website?: string;
+  // Raw OSM opening_hours tag; turned into "open now" when the response is
+  // built (it changes by the minute, so it isn't stored).
+  openingHours?: string;
   lat: number;
   lng: number;
 };
@@ -217,6 +220,7 @@ async function fetchOnce(
         address: address || undefined,
         website: website || undefined,
         phone: phone || undefined,
+        openingHours: tags.opening_hours || undefined,
         lat: elLat,
         lng: elLng,
       });

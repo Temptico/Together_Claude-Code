@@ -17,6 +17,7 @@ import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import { geocode } from "./geocode.js";
 import { parseRadiusKm } from "./geo.js";
 import { mergeNearby } from "./nearbyMerge.js";
+import { isOpenAt } from "./openingHours.js";
 import {
   moodNotification,
   answerNotification,
@@ -534,21 +535,19 @@ export function registerRoutes(app: Express) {
 
       const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm, lang);
 
-      const withDistance = async (items: { lat: number; lng: number; externalId: string }[] | null) => {
-        if (!items) return [] as any[];
-        const upserted = await Promise.all(
-          items.filter((r) => r.lat != null && r.lng != null).map((r) => storage.upsertExternalIdea(r as any))
-        );
-        return upserted
-          .filter((idea): idea is NonNullable<typeof idea> => !!idea)
-          .map((idea) => ({
+      const osmResults = await fetchNearbyOsmPlaces(lat, lng, types, radiusKm);
+      const now = new Date();
+      const osmIdeas = await Promise.all(
+        (osmResults ?? []).map(async ({ openingHours, ...place }) => {
+          const idea = await storage.upsertExternalIdea(place);
+          if (!idea) return null;
+          return {
             ...idea,
             distanceKm: Math.round(storage.haversineKm(lat, lng, idea.lat!, idea.lng!) * 10) / 10,
-          }));
-      };
-
-      const osmResults = await fetchNearbyOsmPlaces(lat, lng, types, radiusKm);
-      const osmIdeas = await withDistance(osmResults);
+            openNow: isOpenAt(openingHours, now),
+          };
+        })
+      ).then((ideas) => ideas.filter((idea) => idea !== null));
 
       const merged = mergeNearby<any>(localIdeas, osmIdeas);
 

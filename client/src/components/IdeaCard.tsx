@@ -40,6 +40,11 @@ export function IdeaCard({
               <MapPin className="h-3.5 w-3.5" /> {idea.distanceKm.toFixed(1)} km
             </span>
           )}
+          {idea.openNow != null && (
+            <span className={idea.openNow ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>
+              {idea.openNow ? t("dates.openNow") : t("dates.closedNow")}
+            </span>
+          )}
           {idea.city && !idea.distanceKm && (
             <span className="flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5" /> {idea.city}

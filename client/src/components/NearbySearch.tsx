@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, LocateFixed, MapPin, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
 import { locationTypeLabel, LOCATION_TYPE_IDS } from "@/lib/dateIdeaFormat";
@@ -72,6 +73,7 @@ function getPosition(): Promise<Coords> {
 export function NearbySearch() {
   const { t, lang } = useTranslation();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const [initial] = useState(loadSaved);
   const [center, setCenterState] = useState<Center | null>(initial.center);
   const [radiusKm, setRadiusState] = useState<number>(initial.radiusKm);
@@ -97,7 +99,10 @@ export function NearbySearch() {
     },
     enabled: !!center,
   });
-  const results = data?.results ?? [];
+  const allResults = data?.results ?? [];
+  // Places without opening hours in OSM are unknown, not closed — but "open
+  // now only" means ones we know are open.
+  const results = onlyOpen ? allResults.filter((idea: any) => idea.openNow === true) : allResults;
   const searchFailed = data?.searchFailed ?? false;
 
   const toggleType = (id: string) => {
@@ -256,6 +261,10 @@ export function NearbySearch() {
               </button>
             ))}
           </div>
+          <label className="flex items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
+            {t("dates.onlyOpenNow")}
+            <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
+          </label>
         </div>
       )}
 
@@ -268,7 +277,9 @@ export function NearbySearch() {
       {locError && <p className="text-sm font-semibold text-destructive">{locError}</p>}
 
       {center && !isFetching && results.length === 0 && (
-        <p className="text-sm text-muted-foreground">{searchFailed ? t("dates.searchFailed") : t("dates.noResults")}</p>
+        <p className="text-sm text-muted-foreground">
+          {allResults.length > 0 ? t("dates.noOpenResults") : searchFailed ? t("dates.searchFailed") : t("dates.noResults")}
+        </p>
       )}
 
       {!isFetching && results.some((idea: any) => idea.externalId) && (
