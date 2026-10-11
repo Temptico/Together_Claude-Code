@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { lazy, Suspense, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, LocateFixed, MapPin, RefreshCw, Search } from "lucide-react";
+import { List, Loader2, LocateFixed, Map as MapIcon, MapPin, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +11,8 @@ import { useTranslation } from "@/i18n/i18n";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
+const NearbyMap = lazy(() => import("@/components/NearbyMap"));
+
 type Coords = { lat: number; lng: number };
 // Where the search is centered: the device position (label null) or a place
 // the user searched for by name.
@@ -20,6 +22,17 @@ type GeocodeResult = { name: string; label: string; lat: number; lng: number };
 const RADII_KM = [1, 5, 20] as const;
 const DEFAULT_RADIUS_KM = 5;
 const STORAGE_KEY = "together:nearby";
+const VIEW_KEY = "together:nearbyView";
+
+type View = "list" | "map";
+
+function loadView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "map" ? "map" : "list";
+  } catch {
+    return "list";
+  }
+}
 
 // The last center and radius are remembered so reopening the tab searches
 // right away instead of asking for location again. Storage can be missing
@@ -74,6 +87,15 @@ export function NearbySearch() {
   const { t, lang } = useTranslation();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [view, setViewState] = useState<View>(loadView);
+  const setView = (next: View) => {
+    setViewState(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Not remembering is fine.
+    }
+  };
   const [initial] = useState(loadSaved);
   const [center, setCenterState] = useState<Center | null>(initial.center);
   const [radiusKm, setRadiusState] = useState<number>(initial.radiusKm);
@@ -286,7 +308,40 @@ export function NearbySearch() {
         <p className="text-xs text-muted-foreground">{t("dates.livePlacesNote")}</p>
       )}
 
-      {!isFetching && (
+      {center && !isFetching && (
+        <div className="flex rounded-full bg-muted p-1" role="group">
+          {([
+            ["list", List, t("dates.listView")],
+            ["map", MapIcon, t("dates.mapView")],
+          ] as const).map(([id, Icon, label]) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              aria-pressed={view === id}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-bold",
+                view === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {center && !isFetching && view === "map" && (
+        <Suspense
+          fallback={
+            <div className="flex h-[60vh] min-h-[320px] items-center justify-center rounded-2xl bg-muted">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          }
+        >
+          <NearbyMap center={center} radiusKm={radiusKm} results={results} onPlan={setPlanIdea} />
+        </Suspense>
+      )}
+
+      {!isFetching && view === "list" && (
         <div className="flex flex-col gap-3">
           {results.map((idea: any) => (
             <IdeaCard key={idea.id} idea={idea} onPlan={setPlanIdea} />
