@@ -54,6 +54,9 @@ export async function fetchNearbyPlaces(
   const radiusMeters = Math.round(radiusKm * 1000);
   const results: GoogleNearbyResult[] = [];
   const seen = new Set<string>();
+  // null (not []) when every request failed, so the route can tell a failed
+  // search apart from a genuinely empty area.
+  let anySucceeded = false;
 
   for (const type of requestedTypes) {
     const mapping = GOOGLE_TYPE_MAP[type];
@@ -85,6 +88,7 @@ export async function fetchNearbyPlaces(
         console.warn("[places] Google Places API error:", data.status, data.error_message);
         continue;
       }
+      anySucceeded = true;
       for (const place of data.results || []) {
         if (seen.has(place.place_id)) continue;
         const lat = place.geometry?.location?.lat;
@@ -109,5 +113,5 @@ export async function fetchNearbyPlaces(
     }
   }
 
-  return results;
+  return anySucceeded ? results : null;
 }
