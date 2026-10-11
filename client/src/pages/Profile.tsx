@@ -19,6 +19,7 @@ import {
   PlayCircle,
   MessageSquareHeart,
   HeartOff,
+  Navigation,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { getMapsPreference, setMapsPreference, type MapsApp } from "@/lib/navigation";
 import { bcp47 } from "@/lib/locale";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +57,12 @@ export default function Profile() {
   const { t, lang, setLang } = useTranslation();
   const { user, setUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [mapsApp, setMapsApp] = useState<MapsApp | "ask">(() => getMapsPreference() ?? "ask");
+  const changeMapsApp = (value: string) => {
+    const app = value === "google" || value === "apple" ? value : null;
+    setMapsPreference(app);
+    setMapsApp(app ?? "ask");
+  };
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
@@ -238,6 +246,24 @@ export default function Profile() {
             {t("profile.darkMode")}
           </div>
           <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex items-center justify-between gap-3 py-4">
+          <div className="flex items-center gap-2 font-extrabold">
+            <Navigation className="h-5 w-5 text-primary" /> {t("profile.mapsApp")}
+          </div>
+          <Select value={mapsApp} onValueChange={changeMapsApp}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ask">{t("profile.mapsAsk")}</SelectItem>
+              <SelectItem value="google">Google Maps</SelectItem>
+              <SelectItem value="apple">Apple Maps</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 

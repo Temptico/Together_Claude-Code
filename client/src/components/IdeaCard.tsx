@@ -1,4 +1,4 @@
-import { MapPin, Clock, CalendarPlus, Navigation, ExternalLink } from "lucide-react";
+import { MapPin, Clock, CalendarPlus, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { costLabel, durationLabel, categoryLabel } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { directionsUrl } from "@/lib/navigation";
+import { DirectionsLink } from "@/components/DirectionsLink";
 
 export function IdeaCard({
   idea,
@@ -57,14 +57,7 @@ export function IdeaCard({
             {t("dates.planDate")}
           </Button>
           {idea.lat != null && idea.lng != null && (
-            <a
-              href={directionsUrl(idea.lat, idea.lng, idea.title)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs font-bold text-primary"
-            >
-              <Navigation className="h-3.5 w-3.5" /> {t("dates.directions")}
-            </a>
+            <DirectionsLink lat={idea.lat} lng={idea.lng} name={idea.title} />
           )}
           {idea.website && (
             <a

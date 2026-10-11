@@ -2,10 +2,10 @@ import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { CalendarPlus, Navigation } from "lucide-react";
+import { CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/i18n";
-import { directionsUrl } from "@/lib/navigation";
+import { DirectionsLink } from "@/components/DirectionsLink";
 
 // Loaded lazily from NearbySearch, so Leaflet (and its CSS) only downloads
 // for people who open the map.
@@ -92,14 +92,7 @@ export default function NearbyMap({ center, radiusKm, results, onPlan }: Props) 
                     <CalendarPlus className="h-4 w-4" />
                     {t("dates.planDate")}
                   </Button>
-                  <a
-                    href={directionsUrl(idea.lat, idea.lng, idea.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs font-bold text-primary"
-                  >
-                    <Navigation className="h-3.5 w-3.5" /> {t("dates.directions")}
-                  </a>
+                  <DirectionsLink lat={idea.lat} lng={idea.lng} name={idea.title} />
                 </div>
               </div>
             </Popup>
