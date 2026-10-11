@@ -549,7 +549,7 @@ export function registerRoutes(app: Express) {
       // is an optional extra layer when GOOGLE_PLACES_API_KEY is configured.
       const [osmResults, googleResults] = await Promise.all([
         fetchNearbyOsmPlaces(lat, lng, types, radiusKm),
-        fetchNearbyPlaces(lat, lng, types, radiusKm),
+        fetchNearbyPlaces(lat, lng, types, radiusKm, lang),
       ]);
       const [osmIdeas, googleIdeas] = await Promise.all([withDistance(osmResults), withDistance(googleResults)]);
 
