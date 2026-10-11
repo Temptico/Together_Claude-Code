@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Check, MapPin, ChevronLeft, ChevronRight, Sparkles, Dices, Plus, Heart } from "lucide-react";
+import { Trash2, Check, ChevronLeft, ChevronRight, Sparkles, Dices, Plus, Heart } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,14 @@ import { IdeaCard } from "@/components/IdeaCard";
 import { PlanDateDialog } from "@/components/PlanDateDialog";
 import { AddCustomDateDialog } from "@/components/AddCustomDateDialog";
 import { DatePhotoField } from "@/components/DatePhotoField";
+import { NearbySearch } from "@/components/NearbySearch";
 import {
   categoryLabel,
   durationLabel,
   costLabel,
-  locationTypeLabel,
   DATE_CATEGORY_IDS,
   DURATION_IDS,
   COST_IDS,
-  LOCATION_TYPE_IDS,
 } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
 import { translations } from "@/i18n/translations";
@@ -54,7 +53,7 @@ export default function Dates() {
           <CatalogTab />
         </TabsContent>
         <TabsContent value="nearby" className="mt-4">
-          <NearbyTab />
+          <NearbySearch />
         </TabsContent>
         <TabsContent value="planned" className="mt-4">
           <PlannedTab />
@@ -218,92 +217,6 @@ function SurpriseDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function NearbyTab() {
-  const { t, lang } = useTranslation();
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [locError, setLocError] = useState<string | null>(null);
-  const [planIdea, setPlanIdea] = useState<any>(null);
-
-  const { data, isFetching, refetch } = useQuery<{ results: any[]; searchFailed: boolean }>({
-    queryKey: ["/api/dates/nearby", coords?.lat, coords?.lng, selectedTypes.join(","), lang],
-    queryFn: async () => {
-      const params = new URLSearchParams({ lat: String(coords!.lat), lng: String(coords!.lng), lang });
-      if (selectedTypes.length) params.set("types", selectedTypes.join(","));
-      return apiRequest("GET", `/api/dates/nearby?${params.toString()}`);
-    },
-    enabled: !!coords,
-  });
-  const results = data?.results ?? [];
-  const searchFailed = data?.searchFailed ?? false;
-
-  const toggleType = (id: string) => {
-    setSelectedTypes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-
-  const requestLocation = () => {
-    setLocError(null);
-    if (!navigator.geolocation) {
-      setLocError(t("dates.locationDenied"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocError(t("dates.locationDenied")),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {LOCATION_TYPE_IDS.map((id) => (
-          <button
-            key={id}
-            onClick={() => toggleType(id)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-bold",
-              selectedTypes.includes(id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            )}
-          >
-            {locationTypeLabel(t, id)}
-          </button>
-        ))}
-      </div>
-
-      {!coords ? (
-        <Button onClick={requestLocation}>
-          <MapPin className="h-4 w-4" /> {t("dates.enableLocation")}
-        </Button>
-      ) : (
-        <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
-          <MapPin className="h-4 w-4" /> {t("dates.findNearby")}
-        </Button>
-      )}
-
-      {locError && <p className="text-sm font-semibold text-destructive">{locError}</p>}
-
-      {coords && !isFetching && results.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          {searchFailed ? t("dates.searchFailed") : t("dates.noResults")}
-        </p>
-      )}
-
-      {results.some((idea: any) => idea.externalId) && (
-        <p className="text-xs text-muted-foreground">{t("dates.livePlacesNote")}</p>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {results.map((idea: any) => (
-          <IdeaCard key={idea.id} idea={idea} onPlan={setPlanIdea} />
-        ))}
-      </div>
-
-      <PlanDateDialog idea={planIdea} open={!!planIdea} onOpenChange={(o) => !o && setPlanIdea(null)} />
-    </div>
   );
 }
 
