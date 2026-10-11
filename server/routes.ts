@@ -13,7 +13,6 @@ import {
   recordLoginFailure,
   clearLoginFailures,
 } from "./rateLimit.js";
-import { fetchNearbyPlaces } from "./places.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
 import {
   moodNotification,
@@ -545,22 +544,17 @@ export function registerRoutes(app: Express) {
           }));
       };
 
-      // OpenStreetMap needs no API key, so it's always attempted; Google Places
-      // is an optional extra layer when GOOGLE_PLACES_API_KEY is configured.
-      const [osmResults, googleResults] = await Promise.all([
-        fetchNearbyOsmPlaces(lat, lng, types, radiusKm),
-        fetchNearbyPlaces(lat, lng, types, radiusKm, lang),
-      ]);
-      const [osmIdeas, googleIdeas] = await Promise.all([withDistance(osmResults), withDistance(googleResults)]);
+      const osmResults = await fetchNearbyOsmPlaces(lat, lng, types, radiusKm);
+      const osmIdeas = await withDistance(osmResults);
 
       const byId = new Map<number, any>();
-      for (const idea of [...localIdeas, ...osmIdeas, ...googleIdeas]) byId.set(idea.id, idea);
+      for (const idea of [...localIdeas, ...osmIdeas]) byId.set(idea.id, idea);
       const merged = [...byId.values()].sort((a, b) => a.distanceKm - b.distanceKm);
 
-      // Both external lookups returning null (not just empty) means the search
-      // itself failed (timeout, rate limit, network) — worth telling the user
-      // apart from "there's genuinely nothing nearby".
-      const searchFailed = osmResults === null && googleResults === null;
+      // null (not just empty) means the lookup itself failed (timeout, rate
+      // limit, network) — worth telling the user apart from "there's
+      // genuinely nothing nearby".
+      const searchFailed = osmResults === null;
 
       res.json({ results: merged, searchFailed });
     })

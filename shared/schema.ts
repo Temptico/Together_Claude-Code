@@ -152,7 +152,7 @@ export const dateIdeas = pgTable("date_ideas", {
   tags: text("tags").array(),
   lat: doublePrecision("lat"),
   lng: doublePrecision("lng"),
-  externalId: text("external_id").unique(), // Google Places place_id, when sourced live
+  externalId: text("external_id").unique(), // source id when sourced live, e.g. "osm:node:123"
   custom: boolean("custom").notNull().default(false), // user-typed-in-app entry — never shown in the shared browsable catalog, only referenced by its own planned date
 });
 

@@ -1,6 +1,5 @@
-// Free, keyless "real nearby venues" lookup via OpenStreetMap's Overpass API.
-// This is the default enhancement for nearby search — unlike Google Places
-// (see places.ts), it needs no account or billing, so it's always active.
+// Free, keyless "real nearby venues" lookup via OpenStreetMap's Overpass API
+// — the live source for nearby search; it needs no account or billing.
 
 type OsmMapping = { query: string; category: string; costHint?: string };
 
