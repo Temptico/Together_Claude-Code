@@ -31,6 +31,7 @@ import {
   type GamePrompt,
 } from "../shared/schema.js";
 import { customAlphabet } from "nanoid";
+import { haversineKm, boundingBox } from "./geo.js";
 import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 
@@ -569,15 +570,7 @@ export async function getDateIdeaById(id: number, language?: string) {
   return idea ? pickDateIdea(idea, language) : idea;
 }
 
-export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+export { haversineKm };
 
 export async function upsertExternalIdea(idea: {
   externalId: string;
@@ -603,9 +596,21 @@ export async function upsertExternalIdea(idea: {
 }
 
 export async function getNearbyIdeas(lat: number, lng: number, types: string[], radiusKm = 5, language?: string) {
-  const all = await db.select().from(dateIdeas);
-  return all
-    .filter((idea: typeof dateIdeas.$inferSelect) => idea.lat != null && idea.lng != null)
+  // Prefiltered to the surrounding box in SQL: every nearby search stores the
+  // OSM places it finds here, so loading the whole table grows without bound.
+  const box = boundingBox(lat, lng, radiusKm);
+  const candidates = await db
+    .select()
+    .from(dateIdeas)
+    .where(
+      and(
+        gte(dateIdeas.lat, box.minLat),
+        lte(dateIdeas.lat, box.maxLat),
+        gte(dateIdeas.lng, box.minLng),
+        lte(dateIdeas.lng, box.maxLng)
+      )
+    );
+  return candidates
     .filter((idea: typeof dateIdeas.$inferSelect) =>
       types.length === 0 ? true : types.includes(idea.locationType || "")
     )

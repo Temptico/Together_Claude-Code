@@ -1,6 +1,8 @@
 // Free, keyless "real nearby venues" lookup via OpenStreetMap's Overpass API
 // — the live source for nearby search; it needs no account or billing.
 
+import { haversineKm } from "./geo.js";
+
 type OsmMapping = { query: string; category: string; costHint?: string };
 
 const OSM_TYPE_MAP: Record<string, OsmMapping> = {
@@ -31,6 +33,10 @@ const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overp
 // the first successful answer wins — fast when the primary is healthy,
 // without hitting every mirror on every search.
 export const HEDGE_DELAY_MS = 2500;
+const OVERPASS_CANDIDATES = 500;
+// Every result is stored as a date idea (so it can be planned), so the list
+// sent back is capped rather than the full candidate set.
+const MAX_RESULTS = 40;
 const PER_MIRROR_TIMEOUT_MS = 15_000;
 
 // A short cache so many people asking about the same area within a few
@@ -137,7 +143,10 @@ async function fetchOnce(
   // Now that a failed attempt falls through to a second endpoint rather than
   // being the only shot, each individual attempt gets a shorter budget so a
   // stuck first endpoint doesn't eat the whole request.
-  const query = `[out:json][timeout:12];\n(\n  ${clauses}\n);\nout center 30;`;
+  // Overpass returns matches in no particular order, so a small cap would
+  // keep an arbitrary subset — on a 20 km radius often none of the closest.
+  // Ask for plenty, then keep only the nearest MAX_RESULTS below.
+  const query = `[out:json][timeout:12];\n(\n  ${clauses}\n);\nout center ${OVERPASS_CANDIDATES};`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PER_MIRROR_TIMEOUT_MS);
@@ -212,7 +221,11 @@ async function fetchOnce(
         lng: elLng,
       });
     }
-    return results;
+    return results
+      .map((r) => ({ r, d: haversineKm(lat, lng, r.lat, r.lng) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, MAX_RESULTS)
+      .map(({ r }) => r);
   } catch (err) {
     // Aborted because another mirror answered first — not a failure.
     if (!raceSignal.aborted) {

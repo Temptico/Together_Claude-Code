@@ -14,6 +14,8 @@ import {
   clearLoginFailures,
 } from "./rateLimit.js";
 import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
+import { geocode } from "./geocode.js";
+import { parseRadiusKm } from "./geo.js";
 import {
   moodNotification,
   answerNotification,
@@ -526,7 +528,7 @@ export function registerRoutes(app: Express) {
         return;
       }
       const types = ((req.query.types as string) || "").split(",").filter(Boolean);
-      const radiusKm = 5;
+      const radiusKm = parseRadiusKm(req.query.radius);
       const lang = req.query.lang as string | undefined;
 
       const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm, lang);
@@ -557,6 +559,26 @@ export function registerRoutes(app: Express) {
       const searchFailed = osmResults === null;
 
       res.json({ results: merged, searchFailed });
+    })
+  );
+
+  // Place-name search for nearby ("Banja Luka" instead of GPS). Called only
+  // when the user submits the search field — see geocode.ts for why.
+  app.get(
+    "/api/geocode",
+    ah(async (req, res) => {
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (q.length < 2 || q.length > 200) {
+        res.status(400).json({ error: "Neveljavno iskanje" });
+        return;
+      }
+      const lang = typeof req.query.lang === "string" ? req.query.lang.slice(0, 5) : undefined;
+      const results = await geocode(q, lang);
+      if (results === null) {
+        res.status(503).json({ error: "Iskanje kraja trenutno ni na voljo" });
+        return;
+      }
+      res.json({ results });
     })
   );
 
