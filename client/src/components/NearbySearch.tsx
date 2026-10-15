@@ -107,7 +107,7 @@ export function NearbySearch() {
   const [locError, setLocError] = useState<string | null>(null);
   const [planIdea, setPlanIdea] = useState<any>(null);
 
-  const { data, isFetching, refetch } = useQuery<{ results: any[]; searchFailed: boolean }>({
+  const { data, isFetching, refetch } = useQuery<{ results: any[]; searchFailed: boolean; poweredBy?: "geoapify" | null }>({
     queryKey: ["/api/dates/nearby", center?.lat, center?.lng, radiusKm, selectedTypes.join(","), lang],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -305,7 +305,24 @@ export function NearbySearch() {
       )}
 
       {!isFetching && results.some((idea: any) => idea.externalId) && (
-        <p className="text-xs text-muted-foreground">{t("dates.livePlacesNote")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("dates.livePlacesNote")}{" "}
+          {/* Attribution required by the OSM licence and Geoapify's free plan. */}
+          <span className="whitespace-nowrap">
+            ©{" "}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">
+              OpenStreetMap
+            </a>
+            {data?.poweredBy === "geoapify" && (
+              <>
+                {" · Powered by "}
+                <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer" className="underline">
+                  Geoapify
+                </a>
+              </>
+            )}
+          </span>
+        </p>
       )}
 
       {center && !isFetching && (

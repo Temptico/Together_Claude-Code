@@ -13,7 +13,7 @@ import {
   recordLoginFailure,
   clearLoginFailures,
 } from "./rateLimit.js";
-import { fetchNearbyOsmPlaces } from "./osmPlaces.js";
+import { fetchNearbyPlaces } from "./nearbyPlaces.js";
 import { geocode } from "./geocode.js";
 import { parseRadiusKm } from "./geo.js";
 import { mergeNearby } from "./nearbyMerge.js";
@@ -535,7 +535,7 @@ export function registerRoutes(app: Express) {
 
       const localIdeas = await storage.getNearbyIdeas(lat, lng, types, radiusKm, lang);
 
-      const osmResults = await fetchNearbyOsmPlaces(lat, lng, types, radiusKm);
+      const { results: osmResults, source } = await fetchNearbyPlaces(lat, lng, types, radiusKm);
       const now = new Date();
       const osmIdeas = await Promise.all(
         (osmResults ?? []).map(async ({ openingHours, ...place }) => {
@@ -556,7 +556,7 @@ export function registerRoutes(app: Express) {
       // genuinely nothing nearby".
       const searchFailed = osmResults === null;
 
-      res.json({ results: merged, searchFailed });
+      res.json({ results: merged, searchFailed, poweredBy: source === "geoapify" ? "geoapify" : null });
     })
   );
 

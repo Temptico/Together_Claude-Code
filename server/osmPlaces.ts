@@ -37,7 +37,14 @@ function osmFilter(m: OsmMapping): string {
   return m.value ? `${m.elements}["${m.key}"="${m.value}"]` : `${m.elements}["${m.key}"]`;
 }
 
-const DEFAULT_TYPES = ["kavarne", "restavracije", "parki", "muzeji"];
+export const DEFAULT_TYPES = ["kavarne", "restavracije", "parki", "muzeji"];
+
+// Category and cost hint for a nearby type, shared with the Geoapify source
+// so a café looks the same whichever source found it.
+export function placeTypeInfo(type: string): { category: string; costHint?: string } | undefined {
+  const m = OSM_TYPE_MAP[type];
+  return m && { category: m.category, costHint: m.costHint };
+}
 // Independently-hosted Overpass instances with worldwide data. Every mirror
 // here MUST cover the whole planet: a regional one (overpass.osm.ch, which
 // used to be the fallback, only has Switzerland) answers anywhere else with
