@@ -255,6 +255,29 @@ const STATEMENTS = [
     )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS game_round_answers_unique_idx ON game_round_answers (round_id, prompt_id, user_id)`,
   `CREATE INDEX IF NOT EXISTS game_rounds_couple_game_idx ON game_rounds (couple_key, game_slug)`,
+  // One mood / answer / challenge acceptance per user per day was only
+  // enforced by a check-then-insert in code, which a double tap could slip
+  // past. Collapse any duplicates that got in (keeping the earliest row),
+  // then enforce it in the database.
+  `DELETE FROM moods a USING moods b
+     WHERE a.user_id = b.user_id AND a.date = b.date AND a.id > b.id`,
+  `DELETE FROM question_answers a USING question_answers b
+     WHERE a.user_id = b.user_id AND a.question_id = b.question_id AND a.date = b.date AND a.id > b.id`,
+  `DELETE FROM challenge_completions a USING challenge_completions b
+     WHERE a.user_id = b.user_id AND a.challenge_id = b.challenge_id AND a.date = b.date AND a.id > b.id`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS moods_user_date_idx ON moods (user_id, date)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS question_answers_user_question_date_idx ON question_answers (user_id, question_id, date)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS challenge_completions_user_challenge_date_idx ON challenge_completions (user_id, challenge_id, date)`,
+  // Lookups the home screen, scheduler and nearby search run per user.
+  `CREATE INDEX IF NOT EXISTS planned_dates_user_scheduled_idx ON planned_dates (user_id, scheduled_at)`,
+  `CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions (user_id)`,
+  `CREATE INDEX IF NOT EXISTS login_codes_user_idx ON login_codes (user_id)`,
+  `CREATE INDEX IF NOT EXISTS wishlist_items_couple_idx ON wishlist_items (couple_key)`,
+  `CREATE INDEX IF NOT EXISTS custom_questions_couple_idx ON custom_questions (couple_key)`,
+  `CREATE INDEX IF NOT EXISTS custom_challenges_couple_idx ON custom_challenges (couple_key)`,
+  `CREATE INDEX IF NOT EXISTS reactions_target_idx ON reactions (target_type, target_id)`,
+  `CREATE INDEX IF NOT EXISTS date_ideas_lat_lng_idx ON date_ideas (lat, lng)`,
+  `CREATE INDEX IF NOT EXISTS users_partner_idx ON users (partner_id)`,
 ];
 
 export async function runMigrations() {

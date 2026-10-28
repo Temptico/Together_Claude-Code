@@ -4,6 +4,8 @@
 // in push.ts), so local dev and any deploy that hasn't configured it yet
 // behave exactly as before.
 
+import { Sentry } from "./sentry.js";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 // The domain actually verified in Resend is the "together" subdomain, not
 // bare temptico.com (DKIM/SPF records are published under
@@ -118,9 +120,13 @@ async function sendEmail(to: string, subject: string, html: string, logLabel: st
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.warn(`[email] Resend API error (${logLabel}):`, res.status, body);
+      // Login codes go out this way, so a silent Resend failure looks like
+      // "nobody can log in" with nothing to go on — make it visible.
+      Sentry.captureMessage(`Resend API error (${logLabel}): ${res.status}`, { level: "error", extra: { body } });
     }
   } catch (err) {
     console.warn(`[email] Failed to send ${logLabel} email:`, err);
+    Sentry.captureException(err, { tags: { area: "email", logLabel } });
   }
 }
 

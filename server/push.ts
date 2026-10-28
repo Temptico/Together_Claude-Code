@@ -1,7 +1,30 @@
 import webpush from "web-push";
-import { getPushSubscriptionsForUser, getUserById, getAllUsers } from "./storage.js";
+import { getPushSubscriptionsForUser, getUserById, getAllUsers, deletePushSubscriptionByEndpoint } from "./storage.js";
+import { Sentry } from "./sentry.js";
 
 let configured = false;
+
+// A push service that never answers must not stall the scheduler's loop
+// over users, so every send has a deadline.
+const SEND_OPTIONS = { timeout: 10_000, TTL: 24 * 60 * 60 };
+
+type Sub = { endpoint: string; p256dh: string; auth: string };
+
+// Sends to one subscription; never throws. Endpoints the push service says
+// are gone (unsubscribed, app uninstalled) are deleted so they aren't
+// retried on every reminder; other failures go to Sentry.
+async function sendToSubscription(sub: Sub, payload: string, logLabel: string) {
+  try {
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, SEND_OPTIONS);
+  } catch (err: any) {
+    if (err?.statusCode === 404 || err?.statusCode === 410) {
+      await deletePushSubscriptionByEndpoint(sub.endpoint).catch(() => {});
+      return;
+    }
+    console.warn(`[push] ${logLabel} failed:`, err?.message || err);
+    Sentry.captureException(err, { tags: { area: "push" } });
+  }
+}
 
 function ensureConfigured() {
   if (configured) return;
@@ -32,23 +55,9 @@ export async function notifyUser(
   ensureConfigured();
   const user = await getUserById(userId);
   if (!user?.notificationsEnabled) return;
-  const payload = buildPayload(user.language);
+  const payload = JSON.stringify(buildPayload(user.language));
   const subs = await getPushSubscriptionsForUser(userId);
-  await Promise.all(
-    subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>
-      webpush
-        .sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
-          JSON.stringify(payload)
-        )
-        .catch((err) => {
-          console.warn("[push] failed to send notification:", err?.message || err);
-        })
-    )
-  );
+  await Promise.all(subs.map((sub: Sub) => sendToSubscription(sub, payload, "notification")));
 }
 
 // Localized broadcast tool (used by the admin dashboard for prewritten
@@ -65,18 +74,7 @@ export async function notifyAllLocalized(
     targets.map(async (user) => {
       const payload = buildPayload(user.language);
       const subs = await getPushSubscriptionsForUser(user.id);
-      await Promise.all(
-        subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>
-          webpush
-            .sendNotification(
-              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              JSON.stringify(payload)
-            )
-            .catch((err) => {
-              console.warn("[push] localized broadcast failed for one subscription:", err?.message || err);
-            })
-        )
-      );
+      await Promise.all(subs.map((sub: Sub) => sendToSubscription(sub, JSON.stringify(payload), "broadcast")));
     })
   );
   return { recipients: targets.length };
@@ -94,21 +92,7 @@ export async function notifyAllWithNotifications(payload: { title: string; body:
   await Promise.all(
     targets.map(async (user) => {
       const subs = await getPushSubscriptionsForUser(user.id);
-      await Promise.all(
-        subs.map((sub: { endpoint: string; p256dh: string; auth: string }) =>
-          webpush
-            .sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: { p256dh: sub.p256dh, auth: sub.auth },
-              },
-              JSON.stringify(payload)
-            )
-            .catch((err) => {
-              console.warn("[push] broadcast failed for one subscription:", err?.message || err);
-            })
-        )
-      );
+      await Promise.all(subs.map((sub: Sub) => sendToSubscription(sub, JSON.stringify(payload), "broadcast")));
     })
   );
   return { recipients: targets.length };

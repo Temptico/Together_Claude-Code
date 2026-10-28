@@ -149,32 +149,67 @@ export async function updateUser(id: string, patch: Partial<User>): Promise<User
   return user;
 }
 
-// Clears a user's PIN so they can claim a new one on their next login —
-// the only recovery path since there's no email-based reset flow.
+// Right-to-erasure account deletion: removes every row that references this
+// user, unlinks them from their partner, and finally the account itself.
+// Content the user created but shared with their partner (planned dates,
+// custom questions/challenges) is deleted too rather than reassigned, which
+// is the simplest and safest reading of "erase my data." The partner's
+// reactions on this user's content go as well, since they point at rows
+// that no longer exist.
 export async function deleteUserAccount(user: User): Promise<void> {
-  // Right-to-erasure account deletion: removes every row that references
-  // this user, unlinks them from their partner, and finally the account
-  // itself. Content the user created but shared with their partner (planned
-  // dates, custom questions/challenges) is deleted too rather than
-  // reassigned, which is the simplest and safest reading of "erase my data."
-  if (user.partnerId) {
-    await db.update(users).set({ partnerId: null }).where(eq(users.id, user.partnerId));
+  const myMoods = db.select({ id: moods.id }).from(moods).where(eq(moods.userId, user.id));
+  const myAnswers = db.select({ id: questionAnswers.id }).from(questionAnswers).where(eq(questionAnswers.userId, user.id));
+  const myCompletions = db
+    .select({ id: challengeCompletions.id })
+    .from(challengeCompletions)
+    .where(eq(challengeCompletions.userId, user.id));
+  const myGameAnswers = db.select({ id: gameRoundAnswers.id }).from(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id));
+  const myCustomIdeas = db
+    .select({ ideaId: plannedDates.ideaId })
+    .from(plannedDates)
+    .where(eq(plannedDates.userId, user.id));
+
+  const statements = [
+    ...(user.partnerId ? [db.update(users).set({ partnerId: null }).where(eq(users.id, user.partnerId))] : []),
+    db.delete(reactions).where(and(eq(reactions.targetType, "mood"), inArray(reactions.targetId, myMoods))),
+    db.delete(reactions).where(and(eq(reactions.targetType, "answer"), inArray(reactions.targetId, myAnswers))),
+    db.delete(reactions).where(and(eq(reactions.targetType, "challenge"), inArray(reactions.targetId, myCompletions))),
+    db.delete(reactions).where(and(eq(reactions.targetType, "game_answer"), inArray(reactions.targetId, myGameAnswers))),
+    db.delete(reactions).where(eq(reactions.userId, user.id)),
+    // The user's own typed-in date ideas (never in the shared catalog).
+    db.delete(dateIdeas).where(and(eq(dateIdeas.custom, true), inArray(dateIdeas.id, myCustomIdeas))),
+    db.delete(moods).where(eq(moods.userId, user.id)),
+    db.delete(questionAnswers).where(eq(questionAnswers.userId, user.id)),
+    db.delete(challengeCompletions).where(eq(challengeCompletions.userId, user.id)),
+    db.delete(plannedDates).where(eq(plannedDates.userId, user.id)),
+    db.delete(customQuestions).where(eq(customQuestions.createdBy, user.id)),
+    db.delete(customChallenges).where(eq(customChallenges.createdBy, user.id)),
+    db.delete(wishlistItems).where(eq(wishlistItems.createdBy, user.id)),
+    db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
+    db.delete(reminderLog).where(eq(reminderLog.userId, user.id)),
+    db.delete(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id)),
+    db.delete(dailyAssignments).where(eq(dailyAssignments.coupleKey, coupleKeyFor(user))),
+    db.delete(loginCodes).where(eq(loginCodes.userId, user.id)),
+    db.delete(milestoneEvents).where(eq(milestoneEvents.userId, user.id)),
+    db.delete(feedback).where(eq(feedback.userId, user.id)),
+    db.delete(tempticoClicks).where(eq(tempticoClicks.userId, user.id)),
+    db.delete(users).where(eq(users.id, user.id)),
+  ];
+  await runAtomically(statements);
+}
+
+// Runs the statements as one unit where the driver supports it (neon-http
+// has `batch`, which is a single transaction) and sequentially otherwise
+// (PGlite in dev/tests). A half-finished deletion on a Neon hiccup would
+// otherwise leave an account with some of its data gone and the login
+// still working.
+async function runAtomically(statements: any[]): Promise<void> {
+  if (statements.length === 0) return;
+  if (typeof db.batch === "function") {
+    await db.batch(statements);
+    return;
   }
-
-  await db.delete(moods).where(eq(moods.userId, user.id));
-  await db.delete(questionAnswers).where(eq(questionAnswers.userId, user.id));
-  await db.delete(challengeCompletions).where(eq(challengeCompletions.userId, user.id));
-  await db.delete(plannedDates).where(eq(plannedDates.userId, user.id));
-  await db.delete(customQuestions).where(eq(customQuestions.createdBy, user.id));
-  await db.delete(customChallenges).where(eq(customChallenges.createdBy, user.id));
-  await db.delete(wishlistItems).where(eq(wishlistItems.createdBy, user.id));
-  await db.delete(reactions).where(eq(reactions.userId, user.id));
-  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
-  await db.delete(reminderLog).where(eq(reminderLog.userId, user.id));
-  await db.delete(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id));
-  await db.delete(dailyAssignments).where(eq(dailyAssignments.coupleKey, coupleKeyFor(user)));
-
-  await db.delete(users).where(eq(users.id, user.id));
+  for (const s of statements) await s;
 }
 
 // Unlinks a couple without deleting either account. Couple-keyed content
@@ -225,10 +260,10 @@ export async function getMoodForDate(userId: string, date: string) {
 }
 
 export async function createMood(userId: string, level: number, note: string | undefined, date: string) {
-  const existing = await getMoodForDate(userId, date);
-  if (existing) return existing;
-  const [mood] = await db.insert(moods).values({ userId, level, note, date }).returning();
-  return mood;
+  // One per user per day, enforced by moods_user_date_idx — a double tap
+  // or a retried request lands on the conflict instead of a second row.
+  const [mood] = await db.insert(moods).values({ userId, level, note, date }).onConflictDoNothing().returning();
+  return mood ?? (await getMoodForDate(userId, date));
 }
 
 export async function getRecentMoods(userId: string, limit = 30) {
@@ -339,10 +374,12 @@ export async function createAnswer(
   date: string,
   source: "builtin" | "custom" = "builtin"
 ) {
-  const existing = await getAnswerForDate(userId, questionId, date);
-  if (existing) return existing;
-  const [row] = await db.insert(questionAnswers).values({ userId, questionId, answer, date, source }).returning();
-  return row;
+  const [row] = await db
+    .insert(questionAnswers)
+    .values({ userId, questionId, answer, date, source })
+    .onConflictDoNothing()
+    .returning();
+  return row ?? (await getAnswerForDate(userId, questionId, date));
 }
 
 export async function getRecentAnswers(userId: string, limit = 30) {
@@ -504,13 +541,12 @@ export async function acceptChallenge(
   date: string,
   source: "builtin" | "custom" = "builtin"
 ) {
-  const existing = await getCompletionForDate(userId, challengeId, date);
-  if (existing) return existing;
   const [row] = await db
     .insert(challengeCompletions)
     .values({ userId, challengeId, date, source })
+    .onConflictDoNothing()
     .returning();
-  return row;
+  return row ?? (await getCompletionForDate(userId, challengeId, date));
 }
 
 // Marks an already-accepted challenge as done. Returns undefined if it was
@@ -893,10 +929,12 @@ export async function getOnThisDayMemories(userIds: string[]): Promise<TimelineE
 }
 
 export async function calculateStreak(userId: string): Promise<number> {
+  // Enough rows to count past the 365-day milestone; with 60 the streak
+  // silently stopped at 60 and the 100/365 milestones could never fire.
   const [m, a, c] = await Promise.all([
-    getRecentMoods(userId, 60),
-    getRecentAnswers(userId, 60),
-    getRecentCompletions(userId, 60),
+    getRecentMoods(userId, 400),
+    getRecentAnswers(userId, 400),
+    getRecentCompletions(userId, 400),
   ]);
   const activeDays = new Set<string>([
     ...m.map((x: { date: string }) => x.date),
@@ -970,11 +1008,22 @@ export async function savePushSubscription(
   p256dh: string,
   auth: string
 ) {
+  // A browser endpoint belongs to whoever is logged in on that device now:
+  // after a logout and a different login on a shared phone, the row is
+  // re-bound instead of the first account's notifications carrying on.
   const [existing] = await db
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.endpoint, endpoint));
-  if (existing) return existing;
+  if (existing) {
+    if (existing.userId === userId && existing.p256dh === p256dh && existing.auth === auth) return existing;
+    const [updated] = await db
+      .update(pushSubscriptions)
+      .set({ userId, p256dh, auth })
+      .where(eq(pushSubscriptions.id, existing.id))
+      .returning();
+    return updated;
+  }
   const [row] = await db
     .insert(pushSubscriptions)
     .values({ userId, endpoint, p256dh, auth })
@@ -984,6 +1033,12 @@ export async function savePushSubscription(
 
 export async function getPushSubscriptionsForUser(userId: string) {
   return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+}
+
+// For endpoints the push service reports as gone (404/410): keeps the table
+// from filling with dead rows that every reminder retries.
+export async function deletePushSubscriptionByEndpoint(endpoint: string) {
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
 }
 
 // ---------------- Custom questions & challenges ----------------
@@ -1369,6 +1424,14 @@ export async function wasReminderSent(userId: string, date: string, type: string
 
 export async function markReminderSent(userId: string, date: string, type: string) {
   await db.insert(reminderLog).values({ userId, date, type }).onConflictDoNothing();
+}
+
+// Atomic "mark, then send only if we were the one who marked": two server
+// instances (e.g. during a zero-downtime deploy) both ticking at the same
+// time can't both pass a separate wasReminderSent check. True exactly once.
+export async function claimReminder(userId: string, date: string, type: string): Promise<boolean> {
+  const rows = await db.insert(reminderLog).values({ userId, date, type }).onConflictDoNothing().returning();
+  return rows.length > 0;
 }
 
 // ---------------- Feedback ----------------

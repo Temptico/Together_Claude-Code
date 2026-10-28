@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { notifyUser } from "./push.js";
+import { Sentry } from "./sentry.js";
 import { sendConnectReminderEmail, sendGamesAnnouncementEmail } from "./email.js";
 import {
   dailyReminderNotification,
@@ -90,8 +91,7 @@ export async function tick() {
         for (const milestone of [1, 3] as const) {
           if (ageDays !== milestone) continue;
           const type = `connect_reminder_${milestone}d`;
-          const alreadySent = await storage.wasReminderSent(user.id, date, type);
-          if (alreadySent) continue;
+          if (!(await storage.claimReminder(user.id, date, type))) continue;
           await sendConnectReminderEmail(user.email, user.name, user.connectCode, user.language).catch((err) =>
             console.warn("[scheduler] connect reminder email failed for user", user.id, err)
           );
@@ -102,7 +102,6 @@ export async function tick() {
               tag: type,
             }));
           }
-          await storage.markReminderSent(user.id, date, type);
         }
       }
 
@@ -114,12 +113,10 @@ export async function tick() {
         const ageDays = daysSince(new Date(user.createdAt), now);
         if (ageDays === 14) {
           const type = "games_intro_14d";
-          const alreadySent = await storage.wasReminderSent(user.id, date, type);
-          if (!alreadySent) {
+          if (await storage.claimReminder(user.id, date, type)) {
             await sendGamesAnnouncementEmail(user.email, user.name, user.language).catch((err) =>
               console.warn("[scheduler] games intro email failed for user", user.id, err)
             );
-            await storage.markReminderSent(user.id, date, type);
           }
         }
       }
@@ -130,8 +127,7 @@ export async function tick() {
       const reminderTime = storage.deriveReminderTime(user, date);
       const reminderHour = Number(reminderTime.split(":")[0]);
       if (isTopOfHour(now, reminderHour)) {
-        const alreadySent = await storage.wasReminderSent(user.id, date, "daily");
-        if (!alreadySent) {
+        if (await storage.claimReminder(user.id, date, "daily")) {
           // Nudges specifically toward the mood check-in, not "any activity" —
           // answering a question or finishing a challenge no longer silences
           // this reminder, since the point is to catch a missed mood.
@@ -143,14 +139,12 @@ export async function tick() {
               tag: "daily-reminder",
             }));
           }
-          await storage.markReminderSent(user.id, date, "daily");
         }
       }
 
       // Anniversary notification, checked once a day at 09:00.
       if (isTopOfHour(now, 9) && user.anniversaryDate) {
-        const alreadySent = await storage.wasReminderSent(user.id, date, "anniversary");
-        if (!alreadySent) {
+        if (await storage.claimReminder(user.id, date, "anniversary")) {
           const anniv = new Date(user.anniversaryDate);
           if (anniv.getMonth() === now.getMonth() && anniv.getDate() === now.getDate()) {
             const years = now.getFullYear() - anniv.getFullYear();
@@ -160,7 +154,6 @@ export async function tick() {
               tag: "anniversary",
             }));
           }
-          await storage.markReminderSent(user.id, date, "anniversary");
         }
       }
 
@@ -171,14 +164,12 @@ export async function tick() {
         for (const milestone of [30, 14] as const) {
           if (daysUntil !== milestone) continue;
           const type = `anniversary_${milestone}d`;
-          const alreadySent = await storage.wasReminderSent(user.id, date, type);
-          if (!alreadySent) {
+          if (await storage.claimReminder(user.id, date, type)) {
             await notifyUser(user.id, (lang) => ({
               title: "Together",
               body: anniversaryUpcomingNotification(lang, milestone),
               tag: type,
             }));
-            await storage.markReminderSent(user.id, date, type);
           }
         }
       }
@@ -192,20 +183,18 @@ export async function tick() {
           const daysUntil = daysUntilNextYearly(partner.birthday, now);
           if (daysUntil === 14 || daysUntil === 0) {
             const type = `partner_birthday_${daysUntil}d`;
-            if (!(await storage.wasReminderSent(user.id, date, type))) {
+            if (await storage.claimReminder(user.id, date, type)) {
               await notifyUser(user.id, (lang) => ({
                 title: "Together",
                 body: partnerBirthdayNotification(lang, partner.name, daysUntil),
                 tag: type,
               }));
-              await storage.markReminderSent(user.id, date, type);
             }
           }
         }
         if (user.birthday && daysUntilNextYearly(user.birthday, now) === 0) {
-          if (!(await storage.wasReminderSent(user.id, date, "own_birthday"))) {
+          if (await storage.claimReminder(user.id, date, "own_birthday")) {
             await notifyUser(user.id, (lang) => ({ title: "Together", body: ownBirthdayNotification(lang), tag: "own-birthday" }));
-            await storage.markReminderSent(user.id, date, "own_birthday");
           }
         }
       }
@@ -221,8 +210,7 @@ export async function tick() {
           const daysUntil = daysUntilDate(new Date(pd.scheduledAt), now);
           if (daysUntil !== 3 && daysUntil !== 0) continue;
           const type = daysUntil === 3 ? `date_reminder_3d_${pd.id}` : `date_reminder_today_${pd.id}`;
-          const alreadySent = await storage.wasReminderSent(user.id, date, type);
-          if (alreadySent) continue;
+          if (!(await storage.claimReminder(user.id, date, type))) continue;
           const idea = await storage.getDateIdeaById(pd.ideaId, user.language);
           await notifyUser(user.id, (lang) => ({
             title: "Together",
@@ -232,7 +220,6 @@ export async function tick() {
                 : dateReminderTodayNotification(lang, idea?.title || ""),
             tag: type,
           }));
-          await storage.markReminderSent(user.id, date, type);
         }
       }
 
@@ -241,8 +228,7 @@ export async function tick() {
       // assignment date) so it re-fires once per evening for as long as the
       // challenge stays open (it no longer auto-rotates to a new one).
       if (isTopOfHour(now, 19)) {
-        const alreadySent = await storage.wasReminderSent(user.id, date, "challenge_reminder");
-        if (!alreadySent) {
+        if (await storage.claimReminder(user.id, date, "challenge_reminder")) {
           const openChallenge = await storage.resolveDailyChallenge(user, date);
           if (openChallenge) {
             const completion = await storage.getCompletionForDate(user.id, openChallenge.id, openChallenge.date);
@@ -254,14 +240,12 @@ export async function tick() {
               }));
             }
           }
-          await storage.markReminderSent(user.id, date, "challenge_reminder");
         }
       }
 
       // Streak-freeze warning in the evening, if there's an active streak at risk.
       if (isTopOfHour(now, 20)) {
-        const alreadySent = await storage.wasReminderSent(user.id, date, "streak_freeze");
-        if (!alreadySent) {
+        if (await storage.claimReminder(user.id, date, "streak_freeze")) {
           const activeToday = await storage.hasActivityToday(user.id, date);
           if (!activeToday) {
             const streak = await storage.calculateStreak(user.id);
@@ -273,18 +257,27 @@ export async function tick() {
               }));
             }
           }
-          await storage.markReminderSent(user.id, date, "streak_freeze");
         }
       }
     } catch (err) {
       console.warn("[scheduler] tick failed for user", user.id, err);
+      Sentry.captureException(err, { tags: { area: "scheduler" }, extra: { userId: user.id } });
     }
   }
 }
 
+let timer: ReturnType<typeof setInterval> | undefined;
+
 export function startScheduler() {
-  setInterval(() => {
-    tick().catch((err) => console.warn("[scheduler] tick error:", err));
-  }, TICK_INTERVAL_MS);
+  const run = () => tick().catch((err) => console.warn("[scheduler] tick error:", err));
+  // One tick shortly after boot: a restart or deploy a few minutes past the
+  // hour would otherwise skip that hour's window entirely (claimReminder
+  // keeps this from double-sending if the previous instance got there).
+  setTimeout(run, 10_000);
+  timer = setInterval(run, TICK_INTERVAL_MS);
   console.log(`[scheduler] Reminder scheduler started (checks every ${TICK_INTERVAL_MS / 60_000} minutes)`);
+}
+
+export function stopScheduler() {
+  if (timer) clearInterval(timer);
 }

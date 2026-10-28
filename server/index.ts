@@ -2,6 +2,9 @@ import "./tz.js";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { timingSafeEqual } from "node:crypto";
+import { sql } from "drizzle-orm";
+import { db } from "./db.js";
 import { initSentry, Sentry } from "./sentry.js";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
@@ -18,18 +21,65 @@ import {
 import { notifyAllWithNotifications, notifyAllLocalized } from "./push.js";
 import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
 import { gamesAnnouncementNotification } from "./notificationText.js";
-import { startScheduler } from "./scheduler.js";
+import { startScheduler, stopScheduler } from "./scheduler.js";
 import { trustProxy } from "./trustedProxies.js";
 import { sendInBatches } from "./batchSend.js";
 import { GAMES, type GameSlug } from "../shared/schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Wraps an async handler so a rejected promise reaches Express's error
+// handler instead of becoming an unhandled rejection (Express 4 doesn't do
+// this itself).
+const ah =
+  (fn: (req: express.Request, res: express.Response) => Promise<void>) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    fn(req, res).catch(next);
+
+// The admin key may arrive in the body (API calls from the dashboard), the
+// query (first open of /admin) or the cookie set by that first open. The
+// comparison is constant-time so response timing can't leak the key.
+function adminKeyOk(candidate: unknown): boolean {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || typeof candidate !== "string") return false;
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function cookieValue(req: express.Request, name: string): string | undefined {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  for (const part of raw.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return decodeURIComponent(v.join("="));
+  }
+  return undefined;
+}
+
+function adminAuthorized(req: express.Request): boolean {
+  return adminKeyOk(req.body?.key) || adminKeyOk(req.query.key) || adminKeyOk(cookieValue(req, "admin_key"));
+}
+
+// Things production can't run without. Each used to fail quietly: no
+// DATABASE_URL meant an embedded database on Render's ephemeral disk (wiped
+// at every deploy), no VAPID keys meant fresh ephemeral keys per boot (every
+// push subscription broken after a restart), no RESEND_API_KEY meant nobody
+// could receive a login code.
+function assertProductionEnv() {
+  if (process.env.NODE_ENV !== "production") return;
+  const missing = ["DATABASE_URL", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "RESEND_API_KEY"].filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables in production: ${missing.join(", ")}`);
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
 async function main() {
+  assertProductionEnv();
   initSentry();
   await runMigrations();
   await runSeed();
@@ -47,10 +97,9 @@ async function main() {
 
   registerRoutes(app);
 
-  app.post("/api/admin/broadcast", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key, title, body } = req.body || {};
-    if (!secret || key !== secret) {
+  app.post("/api/admin/broadcast", ah(async (req, res) => {
+    const { title, body } = req.body || {};
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -64,12 +113,10 @@ async function main() {
       tag: "admin-broadcast",
     });
     res.json({ ok: true, recipients: result.recipients });
-  });
+  }));
 
-  app.post("/api/admin/send-welcome-emails", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key } = req.body || {};
-    if (!secret || key !== secret) {
+  app.post("/api/admin/send-welcome-emails", ah(async (req, res) => {
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -79,12 +126,10 @@ async function main() {
     // (not a plain Promise.all) to stay under Resend's 10 req/s cap.
     await sendInBatches(allUsers, 8, 1100, (u) => sendWelcomeEmail(u.email, u.name, u.language));
     res.json({ ok: true, recipients: allUsers.length });
-  });
+  }));
 
-  app.post("/api/admin/broadcast-games-notification", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key } = req.body || {};
-    if (!secret || key !== secret) {
+  app.post("/api/admin/broadcast-games-notification", ah(async (req, res) => {
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -94,12 +139,10 @@ async function main() {
       tag: "games-announcement",
     }));
     res.json({ ok: true, recipients: result.recipients });
-  });
+  }));
 
-  app.post("/api/admin/send-games-announcement-emails", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key } = req.body || {};
-    if (!secret || key !== secret) {
+  app.post("/api/admin/send-games-announcement-emails", ah(async (req, res) => {
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -107,12 +150,11 @@ async function main() {
     // Batched (not a plain Promise.all) to stay under Resend's 10 req/s cap.
     await sendInBatches(allUsers, 8, 1100, (u) => sendGamesAnnouncementEmail(u.email, u.name, u.language));
     res.json({ ok: true, recipients: allUsers.length });
-  });
+  }));
 
-  app.post("/api/admin/delete-user", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    const { key, email } = req.body || {};
-    if (!secret || key !== secret) {
+  app.post("/api/admin/delete-user", ah(async (req, res) => {
+    const { email } = req.body || {};
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -127,14 +169,13 @@ async function main() {
     }
     await deleteUserAccount(user);
     res.json({ ok: true, name: user.name, email: user.email });
-  });
+  }));
 
   // Read-only diagnostic used to investigate "my date photos disappeared"
   // reports — returns whether each planned date has a photo, not the photo
   // data itself. Temporary tool, safe to leave in place.
-  app.get("/api/admin/planned-dates-debug", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    if (!secret || req.query.key !== secret) {
+  app.get("/api/admin/planned-dates-debug", ah(async (req, res) => {
+    if (!adminAuthorized(req)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -150,15 +191,22 @@ async function main() {
     }
     const rows = await getPlannedDatesDebug(user);
     res.json({ ok: true, name: user.name, email: user.email, count: rows.length, rows });
-  });
+  }));
 
-  app.get("/admin", async (req, res) => {
-    const secret = process.env.ADMIN_SECRET;
-    if (!secret || req.query.key !== secret) {
+  app.get("/admin", ah(async (req, res) => {
+    if (!adminAuthorized(req)) {
       res.status(404).send("Not found");
       return;
     }
-    const key = String(req.query.key);
+    // Move the key from the URL (which lands in proxy/browser logs) into an
+    // httpOnly cookie, then serve the dashboard from the clean path. The
+    // dashboard's API calls send the cookie, so the page never embeds it.
+    if (typeof req.query.key === "string") {
+      res.cookie("admin_key", req.query.key, { httpOnly: true, sameSite: "strict", secure: req.secure, maxAge: 12 * 60 * 60 * 1000, path: "/" });
+      res.redirect("/admin");
+      return;
+    }
+    const key = "";
     const stats = await getAdminStats();
     const esc = escapeHtml;
     const rows = stats.recentUsers
@@ -545,7 +593,12 @@ async function main() {
     });
   </script>
 </body></html>`);
-  });
+  }));
+
+  app.get("/healthz", ah(async (_req, res) => {
+    await db.execute(sql`select 1`);
+    res.json({ ok: true });
+  }));
 
   // Reports anything that reaches Express's error pipeline to Sentry (a
   // no-op chain when SENTRY_DSN isn't set), then falls through to our own
@@ -594,12 +647,28 @@ async function main() {
   }
 
   const port = Number(process.env.PORT) || 3210;
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`[server] Together API running on http://localhost:${port}`);
   });
 
   startScheduler();
+
+  // Render sends SIGTERM on deploy/restart: stop taking new work, let
+  // in-flight requests finish, then exit — instead of being killed mid-send.
+  const shutdown = (signal: string) => {
+    console.log(`[server] ${signal} received, shutting down`);
+    stopScheduler();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 10_000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] unhandled rejection:", reason);
+  Sentry.captureException(reason);
+});
 
 main().catch(async (err) => {
   console.error("Fatal startup error:", err);

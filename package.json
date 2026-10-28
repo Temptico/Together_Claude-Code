@@ -12,7 +12,6 @@
     "dev:client": "vite",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
-    "db:push": "drizzle-kit push",
     "check": "tsc --noEmit",
     "test": "vitest run"
   },
