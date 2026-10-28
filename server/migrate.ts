@@ -218,6 +218,12 @@ const STATEMENTS = [
   `ALTER TABLE reminder_log ALTER COLUMN type TYPE text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS source text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday text`,
+  // Emails are stored lowercase now. A row that would collide with another
+  // account differing only by case is left alone (it stays reachable through
+  // the case-insensitive lookup) rather than failing the migration.
+  `UPDATE users SET email = lower(email)
+     WHERE email <> lower(email)
+       AND NOT EXISTS (SELECT 1 FROM users u2 WHERE lower(u2.email) = lower(users.email) AND u2.id <> users.id)`,
   `CREATE TABLE IF NOT EXISTS game_prompts (
       id serial PRIMARY KEY,
       game_slug varchar(32) NOT NULL,

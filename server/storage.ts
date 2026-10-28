@@ -125,7 +125,12 @@ export async function verifyLoginCode(userId: string, code: string): Promise<boo
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
-  const [user] = await db.select().from(users).where(eq(users.email, email));
+  // Case-insensitive, so accounts created before emails were normalized
+  // (see emailSchema) are still found.
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`);
   return user;
 }
 
@@ -1315,7 +1320,8 @@ export async function getRandomDateIdea(excludeId?: number, language?: string) {
   // it only draws from curated ideas with no city tied to them (not sourced
   // from OSM either) — most of the curated catalog is Ljubljana-specific,
   // which made this feature useless for anyone testing from elsewhere.
-  const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null && i.city == null);
+  // Custom ideas are one couple's private text — never another couple's surprise.
+  const curated = all.filter((i: typeof dateIdeas.$inferSelect) => i.externalId == null && i.city == null && !i.custom);
   const pool = excludeId ? curated.filter((i: typeof dateIdeas.$inferSelect) => i.id !== excludeId) : curated;
   if (pool.length === 0) return undefined;
   return pickDateIdea(pool[Math.floor(Math.random() * pool.length)], language);

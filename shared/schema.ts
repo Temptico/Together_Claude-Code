@@ -35,9 +35,16 @@ export const users = pgTable("users", {
 // accounts anymore.
 export const PIN_REGEX = /^\d{4,6}$/;
 
+// Names end up in notifications, emails and the public invite page, so they
+// get a sane cap. Emails are normalized so "Ana@x.com" and "ana@x.com" are
+// one account — mobile keyboards auto-capitalize the first letter.
+export const NAME_MAX = 50;
+export const nameSchema = z.string().trim().min(1, "Ime je obvezno").max(NAME_MAX, "Ime je predolgo");
+export const emailSchema = z.string().trim().toLowerCase().email("Neveljaven e-poštni naslov").max(254);
+
 export const insertUserSchema = createInsertSchema(users, {
-  name: z.string().min(1, "Ime je obvezno"),
-  email: z.string().email("Neveljaven e-poštni naslov"),
+  name: nameSchema,
+  email: emailSchema,
 })
   .pick({ name: true, email: true })
   .extend({
@@ -54,13 +61,13 @@ export const insertUserSchema = createInsertSchema(users, {
   });
 
 export const requestLoginCodeSchema = z.object({
-  email: z.string().email("Neveljaven e-poštni naslov"),
+  email: emailSchema,
 });
 
 export const CODE_REGEX = /^\d{6}$/;
 
 export const verifyLoginCodeSchema = z.object({
-  email: z.string().email("Neveljaven e-poštni naslov"),
+  email: emailSchema,
   code: z.string().regex(CODE_REGEX, "Koda mora imeti 6 številk"),
 });
 

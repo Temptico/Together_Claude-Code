@@ -11,13 +11,14 @@
 //    logins (multiple devices, a typo followed by the correct code) never
 //    trip it, while a brute-force of one account's 6-digit code does, even
 //    if the attacker rotates IPs to dodge the IP limiter.
-// Entries are swept lazily as they're accessed so memory never grows
+// Expired entries are swept every few hundred hits so memory never grows
 // unbounded — fine at this app's scale, and avoids a background timer.
 
 type Bucket = { count: number; resetAt: number };
 
 function makeStore() {
   const store = new Map<string, Bucket>();
+  let hits = 0;
   return {
     // Read-only: how many hits are on record right now, without counting
     // this call as one.
@@ -29,6 +30,11 @@ function makeStore() {
     // Records one hit and reports whether the key is still under `max`.
     hit(key: string, windowMs: number, max: number): { allowed: boolean; retryAfterSec: number } {
       const now = Date.now();
+      // Every so often drop expired buckets, so many distinct IPs/emails over
+      // weeks of uptime don't accumulate.
+      if (++hits % 500 === 0) {
+        for (const [k, b] of store) if (b.resetAt <= now) store.delete(k);
+      }
       const existing = store.get(key);
       if (!existing || existing.resetAt <= now) {
         store.set(key, { count: 1, resetAt: now + windowMs });
@@ -55,6 +61,7 @@ const requestCodeIpLimiter = makeStore();
 const requestCodeEmailLimiter = makeStore();
 const emailFailureLimiter = makeStore();
 const trackVisitIpLimiter = makeStore();
+const nearbyIpLimiter = makeStore();
 
 const FAILURE_WINDOW_MS = 30 * 60 * 1000;
 const FAILURE_MAX = 8;
@@ -82,6 +89,13 @@ export function checkRequestCodeIpLimit(ip: string) {
   // 10 code-request emails / 15 min per IP — each hit sends a real email, so
   // this is a bit tighter than the plain login-attempt limit above.
   return requestCodeIpLimiter.hit(`ip:${ip}`, 15 * 60 * 1000, 10);
+}
+
+export function checkNearbyIpLimit(ip: string) {
+  // 60 nearby/geocode lookups / 15 min per IP — a person browsing around a
+  // city needs a handful; a coordinate sweep that would drain the Geoapify
+  // daily quota needs hundreds.
+  return nearbyIpLimiter.hit(`ip:${ip}`, 15 * 60 * 1000, 60);
 }
 
 export function checkRequestCodeEmailLimit(email: string) {

@@ -19,10 +19,15 @@ import { notifyAllWithNotifications, notifyAllLocalized } from "./push.js";
 import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
 import { gamesAnnouncementNotification } from "./notificationText.js";
 import { startScheduler } from "./scheduler.js";
+import { trustProxy } from "./trustedProxies.js";
 import { sendInBatches } from "./batchSend.js";
 import { GAMES, type GameSlug } from "../shared/schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
 
 async function main() {
   initSentry();
@@ -33,10 +38,11 @@ async function main() {
   // The custom domain routes through two proxy hops before reaching the app
   // — Cloudflare's edge, then Render's own internal load balancer (confirmed
   // via a one-off /api/admin/ip-debug check: X-Forwarded-For carried the
-  // real client IP followed by Cloudflare's edge IP). trust proxy: 1 would
-  // stop at Cloudflare's edge and treat every visitor as the same "client",
-  // which would make the login rate limiter lock everyone out together.
-  app.set("trust proxy", 2);
+  // real client IP followed by Cloudflare's edge IP). Trusting only one hop
+  // would treat every visitor as Cloudflare's edge and lock everyone out of
+  // login together; trusting two unconditionally let direct *.onrender.com
+  // callers spoof their IP — see trustedProxies.ts.
+  app.set("trust proxy", trustProxy);
   app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
 
   registerRoutes(app);
@@ -154,7 +160,7 @@ async function main() {
     }
     const key = String(req.query.key);
     const stats = await getAdminStats();
-    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    const esc = escapeHtml;
     const rows = stats.recentUsers
       .map(
         (u) =>
@@ -561,17 +567,24 @@ async function main() {
 
     // Server-render Open Graph tags for invite links so link previews in
     // WhatsApp/Telegram/Facebook show the inviter's name.
-    app.get("/invite/:code", async (req, res) => {
-      const inviter = await getUserByConnectCode(req.params.code.toUpperCase());
-      const title = inviter ? `${inviter.name} te vabi na Together` : "Together — Ostanita povezana";
-      const description = inviter
-        ? `${inviter.name} te vabi, da se povežeta na Together in ostaneta bližje vsak dan.`
-        : "Together je aplikacija za pare, ki jima pomaga ostati povezana vsak dan.";
-      const html = indexHtmlTemplate
-        .replace(/<title>.*?<\/title>/, `<title>${title}</title>`)
-        .replace(/(<meta property="og:title" content=").*?(")/, `$1${title}$2`)
-        .replace(/(<meta property="og:description" content=").*?(")/, `$1${description}$2`);
-      res.set("Content-Type", "text/html").send(html);
+    app.get("/invite/:code", async (req, res, next) => {
+      try {
+        const inviter = await getUserByConnectCode(req.params.code.toUpperCase());
+        // The name is user-typed and lands inside HTML: escape it, and use
+        // replacer functions so "$&" or "$1" in a name can't alter the output.
+        const name = inviter ? escapeHtml(inviter.name) : "";
+        const title = inviter ? `${name} te vabi na Together` : "Together — Ostanita povezana";
+        const description = inviter
+          ? `${name} te vabi, da se povežeta na Together in ostaneta bližje vsak dan.`
+          : "Together je aplikacija za pare, ki jima pomaga ostati povezana vsak dan.";
+        const html = indexHtmlTemplate
+          .replace(/<title>.*?<\/title>/, () => `<title>${title}</title>`)
+          .replace(/(<meta property="og:title" content=").*?(")/, (_m, a, b) => `${a}${title}${b}`)
+          .replace(/(<meta property="og:description" content=").*?(")/, (_m, a, b) => `${a}${description}${b}`);
+        res.set("Content-Type", "text/html").send(html);
+      } catch (err) {
+        next(err);
+      }
     });
 
     app.use(express.static(publicDir));

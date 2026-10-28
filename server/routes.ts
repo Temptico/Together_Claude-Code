@@ -9,6 +9,7 @@ import {
   checkRequestCodeIpLimit,
   checkRequestCodeEmailLimit,
   checkTrackVisitIpLimit,
+  checkNearbyIpLimit,
   isEmailLockedOut,
   recordLoginFailure,
   clearLoginFailures,
@@ -31,6 +32,8 @@ import {
 } from "./notificationText.js";
 import {
   insertUserSchema,
+  nameSchema,
+  emailSchema,
   requestLoginCodeSchema,
   verifyLoginCodeSchema,
   trackVisitSchema,
@@ -523,6 +526,11 @@ export function registerRoutes(app: Express) {
   app.get(
     "/api/dates/nearby",
     ah(async (req, res) => {
+      const nearbyLimit = checkNearbyIpLimit(req.ip || "unknown");
+      if (!nearbyLimit.allowed) {
+        res.status(429).set("Retry-After", String(nearbyLimit.retryAfterSec)).json({ error: "Preveč iskanj. Poskusi znova čez nekaj minut." });
+        return;
+      }
       const lat = parseFloat(req.query.lat as string);
       const lng = parseFloat(req.query.lng as string);
       if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -565,6 +573,11 @@ export function registerRoutes(app: Express) {
   app.get(
     "/api/geocode",
     ah(async (req, res) => {
+      const nearbyLimit = checkNearbyIpLimit(req.ip || "unknown");
+      if (!nearbyLimit.allowed) {
+        res.status(429).set("Retry-After", String(nearbyLimit.retryAfterSec)).json({ error: "Preveč iskanj. Poskusi znova čez nekaj minut." });
+        return;
+      }
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       if (q.length < 2 || q.length > 200) {
         res.status(400).json({ error: "Neveljavno iskanje" });
@@ -612,8 +625,10 @@ export function registerRoutes(app: Express) {
         return;
       }
 
+      // Custom ideas belong to the couple that typed them in and are planned
+      // through /custom; via this route a guessed id would reveal them.
       const idea = await storage.getDateIdeaById(parsed.data.ideaId);
-      if (!idea) {
+      if (!idea || idea.custom) {
         res.status(404).json({ error: "Ideja ne obstaja" });
         return;
       }
@@ -838,8 +853,8 @@ export function registerRoutes(app: Express) {
           return year >= 1900 && year <= 9999;
         }, "Neveljavno leto");
       const schema = z.object({
-        name: z.string().min(1, "Ime ne sme biti prazno").optional(),
-        email: z.string().email("Neveljaven e-poštni naslov").optional(),
+        name: nameSchema.optional(),
+        email: emailSchema.optional(),
         anniversaryDate: calendarDate.nullable().optional(),
         birthday: calendarDate.nullable().optional(),
         notificationsEnabled: z.boolean().optional(),
@@ -941,6 +956,14 @@ export function registerRoutes(app: Express) {
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
 
+      // Only the couple's own content can be reacted to — otherwise looping
+      // over ids would push "reacted" notifications to every user.
+      const owner = await storage.getTargetOwner(parsed.data.targetType, parsed.data.targetId);
+      if (!owner || (owner !== user.id && owner !== user.partnerId)) {
+        res.status(404).json({ error: "Zapis ne obstaja" });
+        return;
+      }
+
       const result = await storage.toggleReaction(
         user.id,
         parsed.data.targetType,
@@ -949,8 +972,7 @@ export function registerRoutes(app: Express) {
       );
 
       if (result) {
-        const owner = await storage.getTargetOwner(parsed.data.targetType, parsed.data.targetId);
-        if (owner && owner !== user.id) {
+        if (owner !== user.id) {
           notifyUser(owner, (lang) => ({
             title: "Together",
             body: reactionNotification(lang, parsed.data.emoji),
