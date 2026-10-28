@@ -1,12 +1,16 @@
 import { MutationCache, QueryClient } from "@tanstack/react-query";
 import { emitToast } from "@/hooks/use-toast";
 import { translate } from "@/i18n/i18n";
+import { errorCodeFor } from "@shared/errorCodes";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // Stable code the server attaches to known messages (shared/errorCodes.ts).
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -14,6 +18,16 @@ export class ApiError extends Error {
 // network at all — offline, DNS failure, server unreachable.
 export function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError || (err instanceof Error && err.name === "AbortError");
+}
+
+// A server/zod message in the UI language. The server authors messages in
+// Slovenian and attaches a code; messages produced client-side by the
+// shared zod schemas carry no code, so those are looked up by text.
+export function localizeMessage(message: string | undefined, code?: string): string {
+  if (!message) return translate("common.error");
+  const key = `errors.${code ?? errorCodeFor(message) ?? ""}`;
+  const translated = translate(key);
+  return translated === key ? message : translated;
 }
 
 export async function apiRequest<T = any>(
@@ -33,16 +47,17 @@ export async function apiRequest<T = any>(
   const data = isJson ? await res.json() : undefined;
 
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error || translate("common.error"));
+    throw new ApiError(res.status, data?.error || translate("common.error"), data?.code);
   }
   return data as T;
 }
 
-// Message for a failed request, for toasts: the server's own reason when it
-// gave one (a 4xx), otherwise a generic/offline message in the UI language.
-export function errorMessage(err: unknown): string {
+// Text to show for a failed request: the server's own reason when it gave
+// one (a 4xx), in the user's language where known; otherwise a generic or
+// offline message.
+export function errorText(err: unknown): string {
   if (isNetworkError(err)) return translate("common.offline");
-  if (err instanceof ApiError && err.status < 500) return err.message;
+  if (err instanceof ApiError && err.status < 500) return localizeMessage(err.message, err.code);
   return translate("common.error");
 }
 
@@ -59,7 +74,7 @@ export const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (err, _vars, _ctx, mutation) => {
       if (mutation.options.onError) return;
-      emitToast({ title: errorMessage(err), variant: "destructive" });
+      emitToast({ title: errorText(err), variant: "destructive" });
     },
   }),
 });

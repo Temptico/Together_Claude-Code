@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { QrCodeDisplay } from "@/components/QrCodeDisplay";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, errorText } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 // html5-qrcode is the single biggest dependency in this page's bundle, but
@@ -78,7 +78,7 @@ export default function ConnectPartner() {
       navigate("/");
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : t("common.error"));
+      setError(errorText(err));
       setScanning(false);
     },
   });

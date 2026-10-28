@@ -25,6 +25,7 @@ import { startScheduler, stopScheduler } from "./scheduler.js";
 import { trustProxy } from "./trustedProxies.js";
 import { sendInBatches } from "./batchSend.js";
 import { GAMES, type GameSlug } from "../shared/schema.js";
+import { errorCodeFor } from "../shared/errorCodes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -94,6 +95,21 @@ async function main() {
   // callers spoof their IP — see trustedProxies.ts.
   app.set("trust proxy", trustProxy);
   app.use(express.json({ limit: "8mb" })); // accommodates base64-encoded date photos
+
+  // Error responses are `{ error: "<Slovenian text>" }` throughout; attach a
+  // stable `code` for the ones the client knows how to translate, without
+  // every route having to care.
+  app.use((_req, res, next) => {
+    const json = res.json.bind(res);
+    res.json = (body: any) => {
+      if (body && typeof body === "object" && typeof body.error === "string" && !body.code) {
+        const code = errorCodeFor(body.error);
+        if (code) body = { ...body, code };
+      }
+      return json(body);
+    };
+    next();
+  });
 
   registerRoutes(app);
 

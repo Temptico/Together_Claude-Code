@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { compressImageFile } from "@/lib/imageCompress";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, errorText } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useTranslation } from "@/i18n/i18n";
 
@@ -28,7 +28,7 @@ export function DatePhotoField({
     onSuccess: () => {
       for (const key of invalidateKeys) qc.invalidateQueries({ queryKey: key });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : t("common.error")),
+    onError: (err) => setError(errorText(err)),
   });
 
   const handleFile = async (file: File | undefined) => {

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, errorText } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { localToday } from "@/lib/locale";
 
@@ -41,7 +41,7 @@ export function PlanDateDialog({
       onOpenChange(false);
       setNotes("");
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : t("common.error")),
+    onError: (err) => setError(errorText(err)),
   });
 
   return (

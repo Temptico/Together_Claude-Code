@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, ApiError, localizeMessage } from "@/lib/queryClient";
 import { getStoredAcquisitionSource } from "@/lib/acquisition";
 import { useState } from "react";
 
@@ -81,7 +81,7 @@ export default function Register() {
             className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
             {...register("name")}
           />
-          {errors.name && <p className="text-xs font-semibold text-destructive">{errors.name.message}</p>}
+          {errors.name && <p className="text-xs font-semibold text-destructive">{localizeMessage(errors.name.message)}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email" className="text-slate-700">
@@ -94,7 +94,7 @@ export default function Register() {
             className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
             {...register("email")}
           />
-          {errors.email && <p className="text-xs font-semibold text-destructive">{errors.email.message}</p>}
+          {errors.email && <p className="text-xs font-semibold text-destructive">{localizeMessage(errors.email.message)}</p>}
           {/* No password/PIN to set here — logging back in later happens via
               a one-time code emailed to this address. */}
           <p className="text-xs text-slate-500">{t("auth.noPasswordNote")}</p>

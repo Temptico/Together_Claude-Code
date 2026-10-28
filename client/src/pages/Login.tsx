@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, ApiError, errorText, localizeMessage } from "@/lib/queryClient";
 import { useState } from "react";
 
 type EmailData = z.infer<typeof requestLoginCodeSchema>;
@@ -54,7 +54,7 @@ export default function Login() {
       if (err instanceof ApiError && err.status === 404) {
         setServerError(t("auth.notFound"));
       } else if (err instanceof ApiError && err.status === 429) {
-        setServerError(err.message);
+        setServerError(errorText(err));
       } else {
         setServerError(t("common.error"));
       }
@@ -70,7 +70,7 @@ export default function Login() {
       if (err instanceof ApiError && err.status === 401) {
         setServerError(t("auth.wrongCode"));
       } else if (err instanceof ApiError && err.status === 429) {
-        setServerError(err.message);
+        setServerError(errorText(err));
       } else {
         setServerError(t("common.error"));
       }
@@ -84,7 +84,7 @@ export default function Login() {
       await apiRequest("POST", "/api/auth/login/request-code", { email });
       setNotice(t("auth.codeSent"));
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : t("common.error"));
+      setServerError(errorText(err));
     }
   };
 
@@ -112,7 +112,7 @@ export default function Login() {
               {...emailForm.register("email")}
             />
             {emailForm.formState.errors.email && (
-              <p className="text-xs font-semibold text-destructive">{emailForm.formState.errors.email.message}</p>
+              <p className="text-xs font-semibold text-destructive">{localizeMessage(emailForm.formState.errors.email.message)}</p>
             )}
             <p className="text-xs text-slate-500">{t("auth.codeExplain")}</p>
           </div>
@@ -147,7 +147,7 @@ export default function Login() {
               {...codeForm.register("code")}
             />
             {codeForm.formState.errors.code && (
-              <p className="text-xs font-semibold text-destructive">{codeForm.formState.errors.code.message}</p>
+              <p className="text-xs font-semibold text-destructive">{localizeMessage(codeForm.formState.errors.code.message)}</p>
             )}
             <p className="text-xs text-slate-500">{t("auth.codeSentTo")} {email}</p>
           </div>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, ApiError } from "@/lib/queryClient";
+import { apiRequest, errorText } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
 
 export function EditProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -24,7 +24,7 @@ export function EditProfileDialog({ open, onOpenChange }: { open: boolean; onOpe
       qc.invalidateQueries({ queryKey: ["/api/home", user!.id] });
       onOpenChange(false);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : t("common.error")),
+    onError: (err) => setError(errorText(err)),
   });
 
   return (
