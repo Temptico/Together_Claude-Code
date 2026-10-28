@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { translations, type Language } from "./translations";
 
 const STORAGE_KEY = "together:lang";
@@ -16,6 +16,16 @@ type I18nContextValue = {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 const SUPPORTED_LANGUAGES: Language[] = ["sl", "en", "hr"];
+
+// The active language, readable outside React (query client error toasts).
+let currentLang: Language = "sl";
+
+export function translate(key: string): string {
+  const value = get(translations[currentLang], key);
+  if (typeof value === "string") return value;
+  const fallback = get(translations.sl, key);
+  return typeof fallback === "string" ? fallback : key;
+}
 
 function detectDeviceLanguage(): Language {
   const candidates = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
@@ -37,6 +47,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, l);
     setLangState(l);
   };
+
+  currentLang = lang;
+  useEffect(() => {
+    // Screen readers and browser translation pick their voice/behaviour
+    // from this; index.html hardcodes "sl".
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const t = (key: string) => {
     const value = get(translations[lang], key);

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { LoadError } from "@/components/LoadError";
 import { Heart, MessageCircle, Trophy, Smile, CalendarHeart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,13 +34,15 @@ export default function Memories() {
   const [showAllPastDates, setShowAllPastDates] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
 
-  const { data, isLoading } = useQuery<MemoriesData>({ queryKey: ["/api/memories", user!.id] });
+  const { data, isLoading, isError, error, refetch } = useQuery<MemoriesData>({ queryKey: ["/api/memories", user!.id] });
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
       <h1 className="text-xl font-extrabold">{t("memories.title")}</h1>
 
-      {isLoading || !data ? (
+      {!data && isError && !isLoading ? (
+        <LoadError error={error} onRetry={() => void refetch()} />
+      ) : isLoading || !data ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : (
         <>

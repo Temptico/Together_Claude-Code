@@ -1,16 +1,16 @@
-import { useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "@/i18n/i18n";
 import { translations } from "@/i18n/translations";
+import { useBack } from "@/lib/useBack";
 
 export default function Terms() {
   const { t, lang } = useTranslation();
-  const [, navigate] = useLocation();
+  const back = useBack("/profile");
   const terms = translations[lang].terms;
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
-      <button onClick={() => navigate("/profile")} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
+      <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
         <ChevronLeft className="h-4 w-4" /> {t("common.back")}
       </button>
 

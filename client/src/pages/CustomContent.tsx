@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useBack } from "@/lib/useBack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,14 +13,11 @@ import { apiRequest, ApiError } from "@/lib/queryClient";
 
 export default function CustomContent() {
   const { t } = useTranslation();
-  const [, navigate] = useLocation();
+  const back = useBack("/profile");
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
-      <button
-        onClick={() => navigate("/profile")}
-        className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground"
-      >
+      <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
         <ChevronLeft className="h-4 w-4" /> {t("common.back")}
       </button>
 

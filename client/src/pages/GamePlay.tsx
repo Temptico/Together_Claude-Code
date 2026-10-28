@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { LoadError } from "@/components/LoadError";
+import { useBack } from "@/lib/useBack";
 import { ChevronLeft, PartyPopper } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +107,18 @@ export default function GamePlay() {
     setTextDraft("");
   }, [current?.id]);
 
+  // While waiting on the partner's answers, pick them up on their own
+  // (every 30 s, only while this screen is open) instead of needing a
+  // reload.
+  const waitingForPartner = !!prompts && index !== null && index >= prompts.length && !prompts.every((p) => p.myAnswer && p.partnerAnswer);
+  useEffect(() => {
+    if (!waitingForPartner || !user?.partnerId) return;
+    const id = setInterval(() => void refetchPrompts().catch(() => {}), 30_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForPartner, roundId]);
+  const back = useBack();
+
   const answerMutation = useMutation({
     mutationFn: (answer: string) =>
       apiRequest("POST", "/api/games/answer", { userId: user!.id, roundId, promptId: current!.id, answer }),
@@ -125,7 +139,18 @@ export default function GamePlay() {
   }
 
   if (!prompts || index === null) {
-    return <div className="p-4 text-sm text-muted-foreground">{t("common.loading")}</div>;
+    return (
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
+          <ChevronLeft className="h-4 w-4" /> {t("common.back")}
+        </button>
+        {loadMutation.isError ? (
+          <LoadError error={loadMutation.error} onRetry={() => loadMutation.mutate({ specificRoundId: requestedRoundId })} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        )}
+      </div>
+    );
   }
 
   const total = prompts.length;
@@ -145,7 +170,7 @@ export default function GamePlay() {
         </DialogContent>
       </Dialog>
 
-      <button onClick={() => navigate("/")} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
+      <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
         <ChevronLeft className="h-4 w-4" /> {t("common.back")}
       </button>
 
@@ -299,11 +324,13 @@ export default function GamePlay() {
               ))}
           </div>
 
-          {roundComplete && (
-            <Button disabled={loadMutation.isPending} onClick={playAgain}>
-              {t("games.playAgain")}
-            </Button>
-          )}
+          {/* "Play again" is offered while waiting too — after skipping a
+              prompt, or without a partner, the round would otherwise never
+              complete and this screen had no way out. */}
+          {!roundComplete && <p className="text-xs text-muted-foreground">{t("games.waitingHint")}</p>}
+          <Button disabled={loadMutation.isPending} onClick={playAgain}>
+            {t("games.playAgain")}
+          </Button>
         </div>
       )}
     </div>

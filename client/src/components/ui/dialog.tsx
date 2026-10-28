@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { translate } from "@/i18n/i18n";
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -18,7 +19,10 @@ export function DialogContent({ className, children, ...props }: DialogPrimitive
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-60 hover:opacity-100">
+        <DialogPrimitive.Close
+          className="absolute right-3 top-3 rounded-full p-2 opacity-60 hover:opacity-100"
+          aria-label={translate("common.close")}
+        >
           <X className="h-5 w-5" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

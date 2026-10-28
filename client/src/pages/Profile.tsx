@@ -134,7 +134,7 @@ export default function Profile() {
               {user!.partnerId ? t("home.connected") : t("home.notConnected")}
             </div>
           </div>
-          <button onClick={() => setEditOpen(true)} className="rounded-full bg-white/25 p-2">
+          <button onClick={() => setEditOpen(true)} className="rounded-full bg-white/25 p-2" aria-label={t("common.edit")}>
             <Pencil className="h-5 w-5" />
           </button>
         </CardContent>

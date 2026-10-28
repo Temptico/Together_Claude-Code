@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { LoadError } from "@/components/LoadError";
+import { useBack } from "@/lib/useBack";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,8 +22,9 @@ export default function QuestionAnswer() {
   const [, navigate] = useLocation();
   const [answer, setAnswer] = useState("");
 
-  const { data } = useQuery<any>({ queryKey: ["/api/home", user!.id] });
+  const { data, isLoading, isError, error, refetch } = useQuery<any>({ queryKey: ["/api/home", user!.id] });
   const question = data?.question;
+  const back = useBack();
   const myAnswer = data?.myAnswer;
 
   const draftKey = question ? `${DRAFT_KEY_PREFIX}${question.id}` : null;
@@ -51,15 +54,32 @@ export default function QuestionAnswer() {
     },
   });
 
+  const backButton = (
+    <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
+      <ChevronLeft className="h-4 w-4" /> {t("common.back")}
+    </button>
+  );
+
   if (!question) {
-    return <div className="p-4 text-sm text-muted-foreground">{t("common.loading")}</div>;
+    // Loading, failed, or simply no question assigned today — each used to
+    // look like an endless "Loading…".
+    return (
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        {backButton}
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : isError ? (
+          <LoadError error={error} onRetry={() => void refetch()} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("question.noneToday")}</p>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
-      <button onClick={() => navigate("/")} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
-        <ChevronLeft className="h-4 w-4" /> {t("common.back")}
-      </button>
+      {backButton}
 
       <Card className="bg-together-warm text-white">
         <CardContent className="flex flex-col items-center gap-2 py-6 text-center">

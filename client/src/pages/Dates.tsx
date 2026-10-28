@@ -255,6 +255,8 @@ function PlannedTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dates/planned", user!.id] });
       qc.invalidateQueries({ queryKey: ["/api/home", user!.id] });
+      // The date (and its photo) is gone from Memories too.
+      qc.invalidateQueries({ queryKey: ["/api/memories", user!.id] });
     },
   });
 
@@ -313,11 +315,20 @@ function PlannedTab() {
         <DatePhotoField plannedDateId={d.id} photo={d.photo} invalidateKeys={[["/api/dates/planned", user!.id]]} />
         <div className="flex gap-2">
           {!d.completed && (
-            <Button size="sm" variant="secondary" onClick={() => completeMutation.mutate(d.id)}>
+            <Button size="sm" variant="secondary" disabled={completeMutation.isPending} onClick={() => completeMutation.mutate(d.id)}>
               <Check className="h-4 w-4" /> {t("dates.markComplete")}
             </Button>
           )}
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(d.id)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              // Deleting also removes the memory photo, so ask first.
+              if (window.confirm(t("dates.confirmDelete"))) deleteMutation.mutate(d.id);
+            }}
+          >
             <Trash2 className="h-4 w-4" /> {t("dates.delete")}
           </Button>
         </div>
@@ -334,11 +345,19 @@ function PlannedTab() {
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="rounded-full p-2 hover:bg-muted">
+          <button
+            onClick={() => setViewDate(new Date(year, month - 1, 1))}
+            className="rounded-full p-2 hover:bg-muted"
+            aria-label={t("dates.prevMonth")}
+          >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <p className="font-extrabold capitalize">{monthLabel}</p>
-          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="rounded-full p-2 hover:bg-muted">
+          <button
+            onClick={() => setViewDate(new Date(year, month + 1, 1))}
+            className="rounded-full p-2 hover:bg-muted"
+            aria-label={t("dates.nextMonth")}
+          >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
@@ -450,10 +469,15 @@ function WishlistTab() {
           onChange={(e) => setText(e.target.value)}
           placeholder={t("dates.wishlistPlaceholder")}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && text.trim()) addMutation.mutate();
+            if (e.key === "Enter" && text.trim() && !addMutation.isPending) addMutation.mutate();
           }}
         />
-        <Button size="icon" disabled={!text.trim() || addMutation.isPending} onClick={() => addMutation.mutate()}>
+        <Button
+          size="icon"
+          disabled={!text.trim() || addMutation.isPending}
+          onClick={() => addMutation.mutate()}
+          aria-label={t("dates.wishlistPlaceholder")}
+        >
           <Plus className="h-5 w-5" />
         </Button>
       </div>
@@ -475,8 +499,12 @@ function WishlistTab() {
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-primary/40"
                   aria-label={t("dates.markComplete")}
                 />
-                <p className="flex-1 text-sm">{item.text}</p>
-                <button onClick={() => deleteMutation.mutate(item.id)} className="text-muted-foreground hover:text-destructive">
+                <p className="min-w-0 flex-1 break-words text-sm">{item.text}</p>
+                <button
+                  onClick={() => deleteMutation.mutate(item.id)}
+                  className="rounded-full p-2 text-muted-foreground hover:text-destructive"
+                  aria-label={t("common.delete")}
+                >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </CardContent>
@@ -491,12 +519,16 @@ function WishlistTab() {
                     <button
                       onClick={() => toggleMutation.mutate({ id: item.id, completed: false })}
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                      aria-label={t("dates.markComplete")}
+                      aria-label={t("dates.markIncomplete")}
                     >
                       <Check className="h-4 w-4" />
                     </button>
-                    <p className="flex-1 text-sm line-through">{item.text}</p>
-                    <button onClick={() => deleteMutation.mutate(item.id)} className="text-muted-foreground hover:text-destructive">
+                    <p className="min-w-0 flex-1 break-words text-sm line-through">{item.text}</p>
+                    <button
+                      onClick={() => deleteMutation.mutate(item.id)}
+                      className="rounded-full p-2 text-muted-foreground hover:text-destructive"
+                      aria-label={t("common.delete")}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </CardContent>

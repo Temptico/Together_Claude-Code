@@ -919,8 +919,9 @@ export function registerRoutes(app: Express) {
       const schema = z.object({
         userId: z.string(),
         subscription: z.object({
-          endpoint: z.string(),
-          keys: z.object({ p256dh: z.string(), auth: z.string() }),
+          // Only real push-service URLs: the server later POSTs to this.
+          endpoint: z.string().url().startsWith("https://").max(2048),
+          keys: z.object({ p256dh: z.string().max(512), auth: z.string().max(512) }),
         }),
       });
       const parsed = schema.safeParse(req.body);
@@ -935,6 +936,21 @@ export function registerRoutes(app: Express) {
         parsed.data.subscription.keys.auth
       );
       res.status(201).json({ ok: true });
+    })
+  );
+
+  // Called on logout. The endpoint URL is unguessable, so knowing it is
+  // proof enough that the caller is the device it belongs to.
+  app.post(
+    "/api/push/unsubscribe",
+    ah(async (req, res) => {
+      const parsed = z.object({ endpoint: z.string().url() }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      await storage.deletePushSubscriptionByEndpoint(parsed.data.endpoint);
+      res.status(204).end();
     })
   );
 

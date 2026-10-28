@@ -81,6 +81,7 @@ export const translations = {
       invalidQr: "Skenirana koda ni veljavna.",
     },
     question: {
+      noneToday: "Danes ni novega vprašanja. Poglej jutri. 💬",
       title: "Vprašanje dneva",
       yourAnswer: "Tvoj odgovor",
       placeholder: "Deli svoje misli...",
@@ -91,6 +92,10 @@ export const translations = {
     },
     challenge: { title: "Dnevni izziv za par" },
     dates: {
+      prevMonth: "Prejšnji mesec",
+      nextMonth: "Naslednji mesec",
+      markIncomplete: "Označi kot neopravljeno",
+      confirmDelete: "Želiš izbrisati ta zmenek? Izbrisala se bo tudi fotografija.",
       title: "Zmenki",
       catalog: "Ideje",
       nearby: "Najdi v bližini",
@@ -388,13 +393,14 @@ export const translations = {
       s10Heading: "10. Kontakt",
       s10ContactNote: "Za vsa vprašanja v zvezi s temi pogoji ali obdelavo tvojih podatkov nas kontaktiraj na",
     },
-    common: { loading: "Nalaganje...", error: "Prišlo je do napake", close: "Zapri", back: "Nazaj" },
+    common: { retry: "Poskusi znova", offline: "Ni povezave z internetom.", loadFailed: "Podatkov ni bilo mogoče naložiti.", edit: "Uredi", settings: "Nastavitve", delete: "Izbriši", loading: "Nalaganje...", error: "Prišlo je do napake", close: "Zapri", back: "Nazaj" },
     celebration: {
       title: "Povezana sta! 🎉",
       body: "Ti in {name} sta zdaj povezana. Delita razpoloženja, odgovarjajta na vprašanja in igrajta igre — skupaj.",
       cta: "Začniva 💞",
     },
     games: {
+      waitingHint: "Partnerjevi odgovori se pokažejo sami, ko odgovori. Lahko pa začneta novo rundo.",
       title: "Igre",
       play: "Igraj",
       iHave: "Sem",
@@ -495,6 +501,7 @@ export const translations = {
       invalidQr: "The scanned code isn't valid.",
     },
     question: {
+      noneToday: "No new question today. Check back tomorrow. 💬",
       title: "Question of the day",
       yourAnswer: "Your answer",
       placeholder: "Share your thoughts...",
@@ -505,6 +512,10 @@ export const translations = {
     },
     challenge: { title: "Daily couple challenge" },
     dates: {
+      prevMonth: "Previous month",
+      nextMonth: "Next month",
+      markIncomplete: "Mark as not done",
+      confirmDelete: "Delete this date? Its photo will be deleted too.",
       title: "Dates",
       catalog: "Ideas",
       nearby: "Find nearby",
@@ -802,13 +813,14 @@ export const translations = {
       s10Heading: "10. Contact",
       s10ContactNote: "For any questions about these terms or the processing of your data, contact us at",
     },
-    common: { loading: "Loading...", error: "Something went wrong", close: "Close", back: "Back" },
+    common: { retry: "Try again", offline: "No internet connection.", loadFailed: "Couldn't load the data.", edit: "Edit", settings: "Settings", delete: "Delete", loading: "Loading...", error: "Something went wrong", close: "Close", back: "Back" },
     celebration: {
       title: "You're connected! 🎉",
       body: "You and {name} are now connected. Share moods, answer questions and play games — together.",
       cta: "Let's start 💞",
     },
     games: {
+      waitingHint: "Your partner's answers appear here as soon as they answer. Or start a new round.",
       title: "Games",
       play: "Play",
       iHave: "I have",
@@ -909,6 +921,7 @@ export const translations = {
       invalidQr: "Skenirani kod nije valjan.",
     },
     question: {
+      noneToday: "Danas nema novog pitanja. Provjeri sutra. 💬",
       title: "Pitanje dana",
       yourAnswer: "Tvoj odgovor",
       placeholder: "Podijeli svoje misli...",
@@ -919,6 +932,10 @@ export const translations = {
     },
     challenge: { title: "Dnevni izazov za par" },
     dates: {
+      prevMonth: "Prethodni mjesec",
+      nextMonth: "Sljedeći mjesec",
+      markIncomplete: "Označi kao neobavljeno",
+      confirmDelete: "Želiš li izbrisati ovaj spoj? Izbrisat će se i fotografija.",
       title: "Spojevi",
       catalog: "Ideje",
       nearby: "Pronađi u blizini",
@@ -1216,13 +1233,14 @@ export const translations = {
       s10Heading: "10. Kontakt",
       s10ContactNote: "Za sva pitanja vezana uz ove uvjete ili obradu tvojih podataka kontaktiraj nas na",
     },
-    common: { loading: "Učitavanje...", error: "Došlo je do pogreške", close: "Zatvori", back: "Natrag" },
+    common: { retry: "Pokušaj ponovno", offline: "Nema internetske veze.", loadFailed: "Podatke nije bilo moguće učitati.", edit: "Uredi", settings: "Postavke", delete: "Izbriši", loading: "Učitavanje...", error: "Došlo je do pogreške", close: "Zatvori", back: "Natrag" },
     celebration: {
       title: "Povezani ste! 🎉",
       body: "Ti i {name} ste sada povezani. Dijelite raspoloženja, odgovarajte na pitanja i igrajte igre — zajedno.",
       cta: "Krenimo 💞",
     },
     games: {
+      waitingHint: "Partnerovi odgovori pojavit će se čim odgovori. Ili započnite novu rundu.",
       title: "Igre",
       play: "Igraj",
       iHave: "Jesam",

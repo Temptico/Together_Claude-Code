@@ -3,6 +3,13 @@ import * as Sentry from "@sentry/react";
 import App from "./App";
 import "./index.css";
 
+// Chrome fires this once, early — before the lazily loaded pages that offer
+// an Install button have mounted. Keep it here so they can still use it.
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  (window as any).__pwaInstallPrompt = e;
+});
+
 // Opt-in like the server side (server/sentry.ts): without VITE_SENTRY_DSN
 // baked in at build time, this is a no-op and the app behaves exactly as
 // before. Tracing/replay are left off — this is here for error capture,

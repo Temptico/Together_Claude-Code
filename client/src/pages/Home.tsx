@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ReactionBar } from "@/components/ReactionBar";
+import { LoadError } from "@/components/LoadError";
 import { NotificationOptInDialog } from "@/components/NotificationOptInDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -41,7 +42,7 @@ export default function Home() {
   const { user } = useAuth();
   const { t } = useTranslation();
 
-  const { data, isLoading } = useQuery<HomeData>({
+  const { data, isLoading, isError, error, refetch } = useQuery<HomeData>({
     queryKey: ["/api/home", user!.id],
     // Polls so a partner's mood/answer/challenge shows up without a manual
     // refresh — push notifications cover the closed-app case, this covers
@@ -62,7 +63,14 @@ export default function Home() {
     }
   }, [data?.partnerMood?.id]);
 
-  if (isLoading || !data) {
+  if (!data) {
+    if (isError && !isLoading) {
+      return (
+        <div className="px-4 pt-8">
+          <LoadError error={error} onRetry={() => void refetch()} />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-1 items-center justify-center py-24 text-3xl animate-pulse">💗</div>
     );
@@ -105,7 +113,7 @@ function HomeHeader({ data }: { data: HomeData }) {
           <Flame className="h-4 w-4" />
           {data.streak}
         </div>
-        <Link href="/profile" className="rounded-full bg-white/25 p-2">
+        <Link href="/profile" className="rounded-full bg-white/25 p-2" aria-label={t("common.settings")}>
           <Settings className="h-5 w-5" />
         </Link>
       </div>

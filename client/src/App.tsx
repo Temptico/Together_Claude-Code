@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { LoadError } from "@/components/LoadError";
 import { Route, Switch, Redirect, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -36,13 +37,30 @@ function RouteLoading() {
 }
 
 function Shell() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isUnavailable, error, retry } = useAuth();
   const [location] = useLocation();
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // A new page opens at its top, not wherever the previous one was scrolled.
+  useEffect(() => {
+    scroller.current?.scrollTo(0, 0);
+  }, [location]);
 
   if (isLoading) {
     return (
       <div className="app-shell items-center justify-center bg-together-gradient">
         <div className="text-4xl animate-pulse">💗</div>
+      </div>
+    );
+  }
+
+  // Logged in on this device, but the session can't be loaded and nothing
+  // is cached (first open while offline, or the server is down): say so
+  // instead of showing the logged-out Welcome screen.
+  if (isUnavailable) {
+    return (
+      <div className="app-shell items-center justify-center bg-together-gradient px-6 safe-top safe-bottom">
+        <LoadError error={error} onRetry={retry} className="w-full max-w-sm bg-white/80" />
       </div>
     );
   }
@@ -74,7 +92,7 @@ function Shell() {
 
   return (
     <div className="app-shell bg-background safe-top">
-      <div className="content-scroll-pad flex-1 overflow-y-auto">
+      <div ref={scroller} className="content-scroll-pad flex-1 overflow-y-auto">
         <Suspense fallback={<RouteLoading />}>
           <Switch>
             <Route path="/" component={Home} />
@@ -110,6 +128,25 @@ export default function App() {
   // route change.
   useEffect(() => {
     trackLandingVisit();
+  }, []);
+
+  // After a deploy, a tab that was open before it still points at the old
+  // content-hashed chunks; opening a not-yet-visited page then 404s. Reload
+  // once to pick up the new build instead of showing the error screen.
+  useEffect(() => {
+    const onPreloadError = (e: Event) => {
+      e.preventDefault();
+      const key = "together:reloadedForPreloadError";
+      try {
+        if (sessionStorage.getItem(key)) return;
+        sessionStorage.setItem(key, "1");
+      } catch {
+        // No sessionStorage — still worth one reload attempt.
+      }
+      window.location.reload();
+    };
+    window.addEventListener("vite:preloadError", onPreloadError);
+    return () => window.removeEventListener("vite:preloadError", onPreloadError);
   }, []);
 
   return (

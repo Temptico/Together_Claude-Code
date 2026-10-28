@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { useBack } from "@/lib/useBack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Check, Share2, ChevronLeft, Camera, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ export default function ConnectPartner() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
+  const back = useBack();
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +97,7 @@ export default function ConnectPartner() {
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
-      <button onClick={() => navigate("/")} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
+      <button onClick={back} className="flex w-fit items-center gap-1 text-sm font-bold text-muted-foreground">
         <ChevronLeft className="h-4 w-4" /> {t("common.back")}
       </button>
 

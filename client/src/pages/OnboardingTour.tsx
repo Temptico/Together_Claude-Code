@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/i18n";
@@ -42,17 +42,20 @@ export default function OnboardingTour() {
   // already-connected user replaying this from Profile's "Quick app tour"
   // doesn't need to be pushed back through partner-connect, so install
   // becomes the genuine final slide for them instead.
-  const steps = useMemo(() => {
+  // Also decided once: a partner connecting mid-tour (auth polls while
+  // unconnected) or the app getting installed used to remove a step while
+  // `step` still pointed past the end, which crashed the whole app.
+  const [steps] = useState<Array<{ emoji: string; key: string }>>(() => {
     const s: Array<{ emoji: string; key: string }> = [...FEATURE_STEPS];
     if (askBirthday) s.push(BIRTHDAY_STEP);
     if (askNotifications) s.push(NOTIFICATIONS_STEP);
     if (showInstallCard) s.push(INSTALL_STEP);
     if (!user?.partnerId) s.push(CONNECT_STEP);
     return s;
-  }, [askBirthday, askNotifications, showInstallCard, user?.partnerId]);
+  });
 
-  const isLast = step === steps.length - 1;
-  const current = steps[step];
+  const isLast = step >= steps.length - 1;
+  const current = steps[Math.min(step, steps.length - 1)];
   const isInstallStep = current.key === "install";
   const isConnectStep = current.key === "connect";
   const isBirthdayStep = current.key === "birthday";

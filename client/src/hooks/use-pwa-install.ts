@@ -27,7 +27,9 @@ const RECORDED_KEY = "together:pwaInstallRecorded";
 
 export function usePwaInstall() {
   const { user } = useAuth();
-  const [prompt, setPrompt] = useState<any>(null);
+  // The event may already have fired before this component mounted (it's
+  // captured at startup in main.tsx).
+  const [prompt, setPrompt] = useState<any>(() => (window as any).__pwaInstallPrompt ?? null);
   const [installed, setInstalled] = useState(false);
   const [isIos] = useState(isIosDevice);
   const [isAndroid] = useState(isAndroidDevice);
@@ -65,6 +67,7 @@ export function usePwaInstall() {
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
+      (window as any).__pwaInstallPrompt = e;
       setPrompt(e);
     };
     const onInstalled = () => {
@@ -84,6 +87,7 @@ export function usePwaInstall() {
     if (!prompt) return;
     prompt.prompt();
     await prompt.userChoice;
+    (window as any).__pwaInstallPrompt = null;
     setPrompt(null);
   };
 

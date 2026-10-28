@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { costLabel, durationLabel, categoryLabel } from "@/lib/dateIdeaFormat";
 import { useTranslation } from "@/i18n/i18n";
+import { formatKm } from "@/lib/locale";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { DirectionsLink } from "@/components/DirectionsLink";
@@ -15,7 +16,7 @@ export function IdeaCard({
   idea: any;
   onPlan: (idea: any) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { user } = useAuth();
   const isTemptico = idea.tags?.includes("temptico");
   const trackClick = () => {
@@ -37,7 +38,7 @@ export function IdeaCard({
           <span>{costLabel(t, idea.cost)}</span>
           {idea.distanceKm != null && (
             <span className="flex items-center gap-1 text-primary">
-              <MapPin className="h-3.5 w-3.5" /> {idea.distanceKm.toFixed(1)} km
+              <MapPin className="h-3.5 w-3.5" /> {formatKm(idea.distanceKm, lang)}
             </span>
           )}
           {idea.openNow != null && (

@@ -16,3 +16,8 @@ export function localToday(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// "1,5 km" in sl/hr, "1.5 km" in en.
+export function formatKm(km: number, lang: Language): string {
+  return `${km.toLocaleString(bcp47(lang), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+}

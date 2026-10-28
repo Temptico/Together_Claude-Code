@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/i18n";
+import { formatKm } from "@/lib/locale";
 import { DirectionsLink } from "@/components/DirectionsLink";
 
 // Loaded lazily from NearbySearch, so Leaflet (and its CSS) only downloads
@@ -50,7 +51,7 @@ function FitView({ center, radiusKm, results }: Omit<Props, "onPlan">) {
 }
 
 export default function NearbyMap({ center, radiusKm, results, onPlan }: Props) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const places = useMemo(() => results.filter((r) => r.lat != null && r.lng != null), [results]);
 
   return (
@@ -80,7 +81,7 @@ export default function NearbyMap({ center, radiusKm, results, onPlan }: Props) 
               <div className="flex min-w-[180px] flex-col gap-2 font-sans">
                 <div className="text-sm font-extrabold leading-tight">{idea.title}</div>
                 <div className="flex gap-2 text-xs text-muted-foreground">
-                  {idea.distanceKm != null && <span>{idea.distanceKm.toFixed(1)} km</span>}
+                  {idea.distanceKm != null && <span>{formatKm(idea.distanceKm, lang)}</span>}
                   {idea.openNow != null && (
                     <span className={idea.openNow ? "font-bold text-emerald-600 dark:text-emerald-400" : ""}>
                       {idea.openNow ? t("dates.openNow") : t("dates.closedNow")}
