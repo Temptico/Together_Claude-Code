@@ -1204,7 +1204,12 @@ export function localizeGamePrompt(prompt: GamePrompt, language?: string) {
 }
 
 export async function getGamePrompts(gameSlug: GameSlug): Promise<GamePrompt[]> {
-  return db.select().from(gamePrompts).where(eq(gamePrompts.gameSlug, gameSlug));
+  // Only active prompts are dealt into new rounds; a round already holding
+  // a since-retired prompt still loads it by id elsewhere.
+  return db
+    .select()
+    .from(gamePrompts)
+    .where(and(eq(gamePrompts.gameSlug, gameSlug), eq(gamePrompts.active, true)));
 }
 
 function shuffle<T>(arr: T[]): T[] {

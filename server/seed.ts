@@ -526,7 +526,10 @@ const GAME_PROMPTS: Array<{
 type Row = Record<string, any>;
 
 function changed(existing: Row, wanted: Row): boolean {
-  return Object.keys(wanted).some((k) => (existing[k] ?? null) !== (wanted[k] ?? null));
+  // Arrays (date-idea tags) compare by content, not identity — otherwise
+  // every boot would "update" every row that has tags.
+  const norm = (v: unknown) => (v == null ? null : typeof v === "object" ? JSON.stringify(v) : v);
+  return Object.keys(wanted).some((k) => norm(existing[k]) !== norm(wanted[k]));
 }
 
 async function syncTable<T extends Row>(
@@ -605,5 +608,7 @@ export async function runSeed() {
   const ideas = (await db.select().from(dateIdeas)).filter((i: Row) => !i.custom && !i.externalId);
   await syncTable("date ideas", dateIdeas, DATE_IDEAS, ideas, (r) => r.title);
 
-  await syncTable("game prompts", gamePrompts, GAME_PROMPTS, await db.select().from(gamePrompts), (r) => `${r.gameSlug}::${r.text}`);
+  await syncTable("game prompts", gamePrompts, GAME_PROMPTS, await db.select().from(gamePrompts), (r) => `${r.gameSlug}::${r.text}`, {
+    deactivateOrphans: true,
+  });
 }

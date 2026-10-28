@@ -392,6 +392,7 @@ export const gamePrompts = pgTable("game_prompts", {
   optionBEn: text("option_b_en"),
   optionBHr: text("option_b_hr"),
   seedKey: text("seed_key").unique(),
+  active: boolean("active").notNull().default(true), // false = not dealt into new rounds (kept for rounds that already include it)
 });
 
 // One deck of prompts a couple is (or was) playing through for a given

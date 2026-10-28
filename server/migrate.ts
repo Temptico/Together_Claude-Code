@@ -285,6 +285,7 @@ const STATEMENTS = [
   `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS seed_key text`,
   `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS seed_key text`,
   `ALTER TABLE game_prompts ADD COLUMN IF NOT EXISTS seed_key text`,
+  `ALTER TABLE game_prompts ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true`,
   `CREATE UNIQUE INDEX IF NOT EXISTS questions_seed_key_idx ON questions (seed_key)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS challenges_seed_key_idx ON challenges (seed_key)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_seed_key_idx ON date_ideas (seed_key)`,
