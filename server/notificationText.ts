@@ -17,6 +17,16 @@ const MOOD_LABELS: Record<Lang, Record<number, string>> = {
 export function moodNotification(lang: string, level: number): string {
   const l = normLang(lang);
   const label = MOOD_LABELS[l][level] || "";
+  // A cheerful "! 🌟" after "feeling very bad" read as mockery — a low mood
+  // gets a gentle nudge to check in instead.
+  if (level <= 2) {
+    const low: Record<Lang, string> = {
+      sl: `Tvoj partner se danes počuti ${label}. Morda potrebuje objem. 💙`,
+      en: `Your partner is feeling ${label} today. Maybe check in on them. 💙`,
+      hr: `Tvoj partner se danas osjeća ${label}. Možda treba zagrljaj. 💙`,
+    };
+    return low[l];
+  }
   const bodies: Record<Lang, string> = {
     sl: `Tvoj partner se danes počuti ${label}! 🌟`,
     en: `Your partner is feeling ${label} today! 🌟`,

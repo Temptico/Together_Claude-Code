@@ -98,10 +98,12 @@ export const insertMoodSchema = createInsertSchema(moods, {
 // ---------- Daily Questions ----------
 export const questions = pgTable("questions", {
   id: serial("id").primaryKey(),
+  seedKey: text("seed_key").unique(), // stable id of the item in seed.ts; null for rows seeded before keys existed and never matched
   text: text("text").notNull(), // Slovenian, the fallback for any language
   textEn: text("text_en"),
   textHr: text("text_hr"),
   category: varchar("category", { length: 32 }).notNull(),
+  active: boolean("active").notNull().default(true), // false = out of the daily rotation (kept for the answers that reference it)
 });
 
 export const questionAnswers = pgTable("question_answers", {
@@ -121,6 +123,7 @@ export const insertAnswerSchema = createInsertSchema(questionAnswers, {
 // ---------- Challenges ----------
 export const challenges = pgTable("challenges", {
   id: serial("id").primaryKey(),
+  seedKey: text("seed_key").unique(),
   text: text("text").notNull(), // Slovenian, the fallback for any language
   textEn: text("text_en"),
   textHr: text("text_hr"),
@@ -142,6 +145,7 @@ export const challengeCompletions = pgTable("challenge_completions", {
 // ---------- Date ideas ----------
 export const dateIdeas = pgTable("date_ideas", {
   id: serial("id").primaryKey(),
+  seedKey: text("seed_key").unique(), // only curated catalog rows from seed.ts; null for OSM and custom rows
   title: text("title").notNull(), // Slovenian, the fallback for any language
   titleEn: text("title_en"),
   titleHr: text("title_hr"),
@@ -387,6 +391,7 @@ export const gamePrompts = pgTable("game_prompts", {
   optionB: text("option_b"),
   optionBEn: text("option_b_en"),
   optionBHr: text("option_b_hr"),
+  seedKey: text("seed_key").unique(),
 });
 
 // One deck of prompts a couple is (or was) playing through for a given

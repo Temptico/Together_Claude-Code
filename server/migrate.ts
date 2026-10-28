@@ -278,6 +278,17 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS reactions_target_idx ON reactions (target_type, target_id)`,
   `CREATE INDEX IF NOT EXISTS date_ideas_lat_lng_idx ON date_ideas (lat, lng)`,
   `CREATE INDEX IF NOT EXISTS users_partner_idx ON users (partner_id)`,
+  // Seeded content is matched by a stable key (see seed.ts), so text edits
+  // update rows in place instead of inserting duplicates.
+  `ALTER TABLE questions ADD COLUMN IF NOT EXISTS seed_key text`,
+  `ALTER TABLE questions ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS seed_key text`,
+  `ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS seed_key text`,
+  `ALTER TABLE game_prompts ADD COLUMN IF NOT EXISTS seed_key text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS questions_seed_key_idx ON questions (seed_key)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS challenges_seed_key_idx ON challenges (seed_key)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_seed_key_idx ON date_ideas (seed_key)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS game_prompts_seed_key_idx ON game_prompts (seed_key)`,
 ];
 
 export async function runMigrations() {

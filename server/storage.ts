@@ -272,7 +272,9 @@ export async function getRecentMoods(userId: string, limit = 30) {
 
 // ---------------- Questions ----------------
 export async function getAllQuestions() {
-  return db.select().from(questions);
+  // Deactivated questions (removed from seed.ts, e.g. a duplicate) stay in
+  // the table for old answers but leave the daily rotation.
+  return db.select().from(questions).where(eq(questions.active, true));
 }
 
 async function getBuiltinQuestionOfTheDay(date: string, coupleKey: string) {
