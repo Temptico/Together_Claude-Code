@@ -1,5 +1,6 @@
 import { eq, and, or, desc, gte, lte, lt, asc, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "./db.js";
+import { deleteStoredPhoto } from "./photoStorage.js";
 import {
   users,
   loginCodes,
@@ -157,6 +158,9 @@ export async function updateUser(id: string, patch: Partial<User>): Promise<User
 // reactions on this user's content go as well, since they point at rows
 // that no longer exist.
 export async function deleteUserAccount(user: User): Promise<void> {
+  // Collected first: once the rows are gone there's no way to find the
+  // objects in photo storage.
+  const photos = await getUserPhotoUrls(user.id);
   const myMoods = db.select({ id: moods.id }).from(moods).where(eq(moods.userId, user.id));
   const myAnswers = db.select({ id: questionAnswers.id }).from(questionAnswers).where(eq(questionAnswers.userId, user.id));
   const myCompletions = db
@@ -196,6 +200,7 @@ export async function deleteUserAccount(user: User): Promise<void> {
     db.delete(users).where(eq(users.id, user.id)),
   ];
   await runAtomically(statements);
+  for (const photo of photos) deleteStoredPhoto(photo).catch(() => {});
 }
 
 // Runs the statements as one unit where the driver supports it (neon-http
@@ -793,8 +798,31 @@ export async function updatePlannedDate(
   return row;
 }
 
+export async function getPlannedDateById(id: number, user: User) {
+  const [row] = await db
+    .select()
+    .from(plannedDates)
+    .where(and(eq(plannedDates.id, id), inArray(plannedDates.userId, coupleIds(user))));
+  return row;
+}
+
+// Returns the deleted row (so its stored photo can be removed too).
 export async function deletePlannedDate(id: number, user: User) {
-  await db.delete(plannedDates).where(and(eq(plannedDates.id, id), inArray(plannedDates.userId, coupleIds(user))));
+  const [row] = await db
+    .delete(plannedDates)
+    .where(and(eq(plannedDates.id, id), inArray(plannedDates.userId, coupleIds(user))))
+    .returning();
+  return row;
+}
+
+// Photo URLs of every date a user owns — collected before an account is
+// erased so the objects can be removed from storage afterwards.
+export async function getUserPhotoUrls(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ photo: plannedDates.photo })
+    .from(plannedDates)
+    .where(and(eq(plannedDates.userId, userId), isNotNull(plannedDates.photo)));
+  return rows.map((r: { photo: string | null }) => r.photo!).filter((p: string) => !p.startsWith("data:"));
 }
 
 // ---------------- Stats & timeline ----------------

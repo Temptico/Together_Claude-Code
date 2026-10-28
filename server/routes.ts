@@ -19,6 +19,7 @@ import { geocode } from "./geocode.js";
 import { parseRadiusKm } from "./geo.js";
 import { mergeNearby } from "./nearbyMerge.js";
 import { isOpenAt } from "./openingHours.js";
+import { storePhoto, deleteStoredPhoto } from "./photoStorage.js";
 import {
   moodNotification,
   answerNotification,
@@ -730,13 +731,25 @@ export function registerRoutes(app: Express) {
       }
       if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
       if (parsed.data.completed !== undefined) patch.completed = parsed.data.completed;
-      if (parsed.data.photo !== undefined) patch.photo = parsed.data.photo;
+      const id = Number(req.params.id);
+      const before = parsed.data.photo !== undefined ? await storage.getPlannedDateById(id, user) : undefined;
+      if (parsed.data.photo !== undefined) {
+        if (!before) {
+          res.status(404).json({ error: "Zmenek ne obstaja" });
+          return;
+        }
+        // Uploaded to object storage when configured; the row then holds
+        // just the URL (see photoStorage.ts).
+        patch.photo = parsed.data.photo ? await storePhoto(parsed.data.photo, id) : null;
+      }
 
-      const row = await storage.updatePlannedDate(Number(req.params.id), user, patch);
+      const row = await storage.updatePlannedDate(id, user, patch);
       if (!row) {
         res.status(404).json({ error: "Zmenek ne obstaja" });
         return;
       }
+      // The replaced or removed photo is no longer referenced.
+      if (before?.photo && before.photo !== row.photo) deleteStoredPhoto(before.photo).catch(() => {});
 
       if (parsed.data.photo && user.partnerId) {
         const idea = await storage.getDateIdeaById(row.ideaId);
@@ -761,7 +774,8 @@ export function registerRoutes(app: Express) {
       }
       const user = await requireUser(req, res, userId);
       if (!user) return;
-      await storage.deletePlannedDate(Number(req.params.id), user);
+      const deleted = await storage.deletePlannedDate(Number(req.params.id), user);
+      if (deleted?.photo) deleteStoredPhoto(deleted.photo).catch(() => {});
       res.status(204).end();
     })
   );
