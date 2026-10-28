@@ -72,7 +72,7 @@ export default function NearbyMap({ center, radiusKm, results, onPlan }: Props) 
         <Circle
           center={[center.lat, center.lng]}
           radius={radiusKm * 1000}
-          pathOptions={{ color: "#ff6b6b", weight: 1, fillOpacity: 0.05 }}
+          pathOptions={{ color: "#cc3a3a", weight: 1, fillOpacity: 0.05 }}
         />
         <Marker position={[center.lat, center.lng]} icon={centerIcon} interactive={false} />
         {places.map((idea) => (

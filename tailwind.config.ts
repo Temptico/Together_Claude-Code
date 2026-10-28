@@ -49,8 +49,10 @@ export default {
         display: ["'Baloo 2'", "'Mulish'", "system-ui", "sans-serif"],
       },
       backgroundImage: {
-        "together-gradient": "linear-gradient(160deg, #ffb199 0%, #ff8a65 45%, #ff6b6b 100%)",
-        "together-warm": "linear-gradient(135deg, #ff6b6b 0%, #ffa94d 100%)",
+        // Stops chosen so white text stays at 4.5:1 or better across the whole
+        // gradient (the old lighter coral/peach was 1.8–2.8:1).
+        "together-gradient": "linear-gradient(160deg, #c94a36 0%, #c74034 45%, #cc3a3a 100%)",
+        "together-warm": "linear-gradient(135deg, #cc3a3a 0%, #c0501f 100%)",
       },
     },
   },

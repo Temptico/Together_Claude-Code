@@ -1,4 +1,4 @@
-const CACHE_NAME = "together-v3";
+const CACHE_NAME = "together-v4";
 
 // Only our own build output is worth keeping: content-hashed assets, icons
 // and the manifest. Cross-origin responses (map tiles, fonts) are opaque —

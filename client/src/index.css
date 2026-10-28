@@ -9,7 +9,9 @@
     --foreground: 355 26% 22%;
     --card: 0 0% 100%;
     --card-foreground: 355 26% 22%;
-    --primary: 0 100% 71%;
+    /* #cc3a3a — white text on it is 5:1 and it reads 4.5:1 as text on the
+       cream background (the old #ff6b6b was 2.8:1 / 2.5:1). */
+    --primary: 0 59% 51%;
     --primary-foreground: 0 0% 100%;
     --secondary: 30 70% 90%;
     --secondary-foreground: 20 45% 28%;
@@ -21,7 +23,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 30 40% 88%;
     --input: 30 40% 88%;
-    --ring: 0 100% 71%;
+    --ring: 0 59% 51%;
     --radius: 1.375rem;
   }
 
