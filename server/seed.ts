@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db.js";
+import { seedAdventDays } from "./advent.js";
 import { questions, challenges, dateIdeas, gamePrompts, type GameSlug } from "../shared/schema.js";
 
 // Every item has a stable `key`: rows are matched and updated by it, so a
@@ -587,6 +588,7 @@ async function syncTable<T extends Row>(
 }
 
 export async function runSeed() {
+  await seedAdventDays();
   await syncTable("questions", questions, QUESTIONS, await db.select().from(questions), (r) => r.text, { deactivateOrphans: true });
   await syncTable("challenges", challenges, CHALLENGES, await db.select().from(challenges), (r) => r.text, { deactivateOrphans: true });
 

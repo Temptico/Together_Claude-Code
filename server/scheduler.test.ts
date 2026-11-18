@@ -5,6 +5,7 @@ vi.mock("./push.js", () => ({ notifyUser: vi.fn(async () => {}) }));
 import { notifyUser } from "./push.js";
 import * as storage from "./storage.js";
 import { tick } from "./scheduler.js";
+import { joinAdvent } from "./advent.js";
 import { createTestCouple, setupDatabase } from "./testUtils.js";
 
 type PayloadBuilder = (lang: string) => { title: string; body: string; tag?: string };
@@ -68,5 +69,33 @@ describe("quiet hours", () => {
     await tickAt("2026-10-08T03:00");
     await tickAt("2026-10-08T09:40");
     expect(notifyUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("advent reminder", () => {
+  it("nudges both partners of a couple that joined at 19:00 in December, and nobody else", async () => {
+    const { a, b } = await createTestCouple();
+    const outsider = (await createTestCouple()).a;
+    vi.setSystemTime(new Date("2026-12-03T10:00:00"));
+    await joinAdvent(a);
+
+    await tickAt("2026-12-03T19:05:00");
+    const sent = sentWithTag("advent").map((n) => n.userId);
+    expect(sent).toContain(a.id);
+    expect(sent).toContain(b.id);
+    expect(sent).not.toContain(outsider.id);
+
+    // Not twice the same evening.
+    vi.mocked(notifyUser).mockClear();
+    await tickAt("2026-12-03T19:10:00");
+    expect(sentWithTag("advent")).toHaveLength(0);
+  });
+
+  it("stays quiet outside 1–24 December", async () => {
+    const { a } = await createTestCouple();
+    vi.setSystemTime(new Date("2026-11-28T10:00:00"));
+    await joinAdvent(a);
+    await tickAt("2026-11-28T19:05:00");
+    expect(sentWithTag("advent")).toHaveLength(0);
   });
 });

@@ -233,3 +233,13 @@ export function gamesAnnouncementNotification(lang: string): string {
   };
   return bodies[normLang(lang)];
 }
+
+// Advent calendar: daily 19:00 nudge to couples who joined.
+export function adventNotification(lang: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: "Danes se je odprlo novo okence 🎄",
+    en: "A new window has opened today 🎄",
+    hr: "Danas se otvorio novi prozorčić 🎄",
+  };
+  return bodies[normLang(lang)];
+}

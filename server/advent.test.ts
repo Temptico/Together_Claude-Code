@@ -1,0 +1,118 @@
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import * as advent from "./advent.js";
+import * as storage from "./storage.js";
+import { createTestCouple, createTestUser, setupDatabase } from "./testUtils.js";
+
+beforeAll(setupDatabase);
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+function at(date: string) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(`${date}T12:00:00`));
+}
+
+describe("advent season", () => {
+  it("invites from 25 Nov, opens window N on N December, allows catch-up until 31 Dec", () => {
+    expect(advent.adventSeason(new Date(2026, 10, 24))).toMatchObject({ phase: "off" });
+    expect(advent.adventSeason(new Date(2026, 10, 25))).toMatchObject({ phase: "invite", today: 0 });
+    expect(advent.adventSeason(new Date(2026, 11, 1))).toMatchObject({ phase: "active", today: 1 });
+    expect(advent.adventSeason(new Date(2026, 11, 24))).toMatchObject({ phase: "active", today: 24 });
+    expect(advent.adventSeason(new Date(2026, 11, 28))).toMatchObject({ phase: "catchup", today: 24 });
+    expect(advent.adventSeason(new Date(2027, 0, 2))).toMatchObject({ phase: "off" });
+  });
+});
+
+describe("advent content", () => {
+  it("seeds 24 days with four Temptico days, and never overwrites an edited day", async () => {
+    const days = await advent.getAdventDays();
+    expect(days).toHaveLength(24);
+    expect(days.filter((d: { type: string }) => d.type === "temptico").map((d: { day: number }) => d.day)).toEqual([6, 13, 20, 23]);
+
+    await advent.updateAdventDay(1, { title: "Urejeno", text: "Urejeno besedilo" });
+    await advent.seedAdventDays();
+    const [first] = (await advent.getAdventDays()) as { title: string }[];
+    expect(first.title).toBe("Urejeno");
+  });
+
+  it("adds UTM parameters to the offer link", () => {
+    const url = new URL(advent.withUtm("https://www.temptico.com/hr-hr/collections/all", 13));
+    expect(url.searchParams.get("utm_campaign")).toBe("advent");
+    expect(url.searchParams.get("utm_content")).toBe("day-13");
+  });
+});
+
+describe("advent participation", () => {
+  it("shows content only to joined couples and only for open windows", async () => {
+    at("2026-12-05");
+    const { a, b } = await createTestCouple();
+
+    const before = await advent.getAdventState(a, "sl");
+    expect(before.joined).toBe(false);
+    expect(before.days.every((d: { open: boolean }) => !d.open)).toBe(true);
+
+    await advent.joinAdvent(b); // either partner joining counts for the couple
+    const after = await advent.getAdventState(a, "hr");
+    expect(after.joined).toBe(true);
+    const open = after.days.filter((d: { open: boolean }) => d.open);
+    expect(open.map((d: { day: number }) => d.day)).toEqual([1, 2, 3, 4, 5]);
+    expect((open[0] as { text: string }).text).toMatch(/uspomena/); // Croatian
+    expect("text" in after.days[5]).toBe(false); // day 6 still locked
+  });
+
+  it("counts both partners' days together and hands out exactly one code at the goal", async () => {
+    at("2026-12-20");
+    const { a, b } = await createTestCouple();
+    await advent.joinAdvent(a);
+    await advent.addAdventCodes(["TEST-CODE-0001", "TEST-CODE-0002"], 2026);
+
+    for (const day of [1, 2, 3, 4, 5]) await advent.completeAdventDay(a, day);
+    for (const day of [5, 6, 7, 8, 9]) await advent.completeAdventDay(b, day); // day 5 done by both
+    expect((await advent.getAdventState(a, "sl")).completedCount).toBe(9);
+    expect(await advent.ensureAdventReward(a)).toBeNull();
+
+    await advent.completeAdventDay(b, 10);
+    const [x, y] = await Promise.all([advent.ensureAdventReward(a), advent.ensureAdventReward(b)]);
+    expect([x, y].filter(Boolean)).toHaveLength(1);
+
+    const stateA = await advent.getAdventState(a, "sl");
+    const stateB = await advent.getAdventState(b, "sl");
+    expect(stateA.reward?.code).toBeTruthy();
+    expect(stateB.reward?.code).toBe(stateA.reward?.code);
+    expect(await advent.ensureAdventReward(a)).toBeNull(); // no second code
+  });
+
+  it("gives a waiting couple its code once codes are added", async () => {
+    at("2026-12-22");
+    const solo = await createTestUser("Advent");
+    await advent.joinAdvent(solo);
+    for (let day = 11; day <= 20; day++) await advent.completeAdventDay(solo, day);
+    // Pool may be empty here (earlier test took one of two) — drain it.
+    while (await advent.ensureAdventReward(await createDrainUser())) {}
+    expect(await advent.ensureAdventReward(solo)).toBeNull();
+    await advent.addAdventCodes(["TEST-CODE-LATE"], 2026);
+    expect(await advent.ensureAdventReward(solo)).toBe("TEST-CODE-LATE");
+  });
+});
+
+describe("marketing consent", () => {
+  it("is off unless given, and records when it was given", async () => {
+    const none = await storage.createUser("Brez", "brez-privolitve@test.local", "sl");
+    expect(none.marketingConsent).toBe(false);
+    const yes = await storage.createUser("Z", "z-privolitvijo@test.local", "sl", undefined, true);
+    expect(yes.marketingConsent).toBe(true);
+    expect(yes.marketingConsentAt).toBeTruthy();
+  });
+});
+
+// A throwaway user who reached the goal, used to use up leftover codes.
+let drainCounter = 0;
+async function createDrainUser() {
+  const u = await createTestUser(`Drain${++drainCounter}`);
+  await advent.joinAdvent(u);
+  for (let day = 1; day <= 10; day++) await advent.completeAdventDay(u, day);
+  return u;
+}
+

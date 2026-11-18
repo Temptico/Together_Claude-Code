@@ -79,13 +79,23 @@ export function coupleKeyFor(user: User): string {
 }
 
 // ---------------- Users ----------------
-export async function createUser(name: string, email: string, language?: string, source?: string): Promise<User> {
+export async function createUser(
+  name: string,
+  email: string,
+  language?: string,
+  source?: string,
+  marketingConsent?: boolean
+): Promise<User> {
   let connectCode = codeGen();
   // extremely unlikely collision, but guard anyway
   while (await getUserByConnectCode(connectCode)) connectCode = codeGen();
   const values: typeof users.$inferInsert = { id: idGen(), name, email, connectCode };
   if (language) values.language = language;
   if (source) values.source = source;
+  if (marketingConsent) {
+    values.marketingConsent = true;
+    values.marketingConsentAt = new Date();
+  }
   const [user] = await db.insert(users).values(values).returning();
   return user;
 }

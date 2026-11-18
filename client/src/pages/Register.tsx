@@ -9,6 +9,7 @@ import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, ApiError, localizeMessage } from "@/lib/queryClient";
 import { getStoredAcquisitionSource } from "@/lib/acquisition";
+import { ConsentCheckbox } from "@/components/AdventInviteDialog";
 import { useState } from "react";
 
 export default function Register() {
@@ -16,6 +17,7 @@ export default function Register() {
   const { setUser } = useAuth();
   const [, navigate] = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   const {
     register,
@@ -30,6 +32,7 @@ export default function Register() {
         ...data,
         language: lang,
         source: getStoredAcquisitionSource(),
+        marketingConsent,
       });
       setUser(user);
       // Always show onboarding, even for someone registering via a partner's
@@ -99,6 +102,8 @@ export default function Register() {
               a one-time code emailed to this address. */}
           <p className="text-xs text-slate-500">{t("auth.noPasswordNote")}</p>
         </div>
+
+        <ConsentCheckbox checked={marketingConsent} onChange={setMarketingConsent} className="text-slate-500" />
 
         {serverError && <p className="text-sm font-semibold text-destructive">{serverError}</p>}
 

@@ -267,6 +267,18 @@ export default function Profile() {
         </CardContent>
       </Card>
 
+      {/* Withdrawing consent has to be as easy as giving it. */}
+      <Card>
+        <CardContent className="flex items-center justify-between gap-3 py-4">
+          <p className="text-sm text-muted-foreground">{t("profile.marketingConsent")}</p>
+          <Switch
+            checked={user!.marketingConsent}
+            disabled={updateMutation.isPending}
+            onCheckedChange={(v) => updateMutation.mutate({ marketingConsent: v })}
+          />
+        </CardContent>
+      </Card>
+
       {showInstallCard && (
         <Card>
           <CardContent className="flex items-center justify-between gap-3 py-4">

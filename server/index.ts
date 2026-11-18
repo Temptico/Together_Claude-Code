@@ -23,6 +23,7 @@ import { sendWelcomeEmail, sendGamesAnnouncementEmail } from "./email.js";
 import { gamesAnnouncementNotification } from "./notificationText.js";
 import { startScheduler, stopScheduler } from "./scheduler.js";
 import { trustProxy } from "./trustedProxies.js";
+import { registerAdventAdmin } from "./adventAdmin.js";
 import { sendInBatches } from "./batchSend.js";
 import { GAMES, type GameSlug } from "../shared/schema.js";
 import { errorCodeFor } from "../shared/errorCodes.js";
@@ -112,6 +113,7 @@ async function main() {
   });
 
   registerRoutes(app);
+  registerAdventAdmin(app, { ah, adminAuthorized, escapeHtml });
 
   app.post("/api/admin/broadcast", ah(async (req, res) => {
     const { title, body } = req.body || {};
@@ -333,6 +335,7 @@ async function main() {
 </style></head>
 <body>
   <h1>💗 Together — Admin</h1>
+  <p><a href="/admin/advent" style="color:#cc3a3a;font-weight:700;">🎄 Adventni koledar →</a></p>
 
   <div class="hero">
     <div class="card"><div class="value">${stats.totalUsers}</div><div class="label">Uporabnikov</div></div>

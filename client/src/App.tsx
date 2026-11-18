@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { BottomNav } from "@/components/BottomNav";
 import { InstallReminderDialog } from "@/components/InstallReminderDialog";
 import { ConnectionCelebration } from "@/components/ConnectionCelebration";
+import { AdventInviteDialog } from "@/components/AdventInviteDialog";
 import { trackLandingVisit } from "@/lib/acquisition";
 
 import Welcome from "@/pages/Welcome";
@@ -118,6 +119,7 @@ function Shell() {
       <BottomNav />
       <InstallReminderDialog />
       <ConnectionCelebration />
+      <AdventInviteDialog />
     </div>
   );
 }

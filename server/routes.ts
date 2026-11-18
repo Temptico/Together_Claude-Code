@@ -2,7 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as storage from "./storage.js";
 import { getVapidPublicKey, notifyUser } from "./push.js";
-import { sendWelcomeEmail, sendLoginCodeEmail } from "./email.js";
+import { sendWelcomeEmail, sendLoginCodeEmail, sendAdventRewardEmail } from "./email.js";
+import * as advent from "./advent.js";
 import {
   checkLoginIpLimit,
   checkRegisterIpLimit,
@@ -120,7 +121,13 @@ export function registerRoutes(app: Express) {
         res.status(409).json({ error: "Ta e-poštni naslov je že v uporabi. Prosimo, prijavi se." });
         return;
       }
-      const user = await storage.createUser(parsed.data.name, parsed.data.email, parsed.data.language, parsed.data.source);
+      const user = await storage.createUser(
+        parsed.data.name,
+        parsed.data.email,
+        parsed.data.language,
+        parsed.data.source,
+        parsed.data.marketingConsent
+      );
       sendWelcomeEmail(user.email, user.name, user.language).catch(() => {});
       res.status(201).json(storage.omitPin(user));
     })
@@ -875,6 +882,7 @@ export function registerRoutes(app: Express) {
         reminderTime: z.enum(REMINDER_TIMES).optional(),
         language: z.enum(["sl", "en", "hr"]).optional(),
         pwaInstalled: z.literal(true).optional(),
+        marketingConsent: z.boolean().optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -890,8 +898,12 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const { pwaInstalled, ...rest } = parsed.data;
+      const { pwaInstalled, marketingConsent, ...rest } = parsed.data;
       const patch: any = { ...rest };
+      if (marketingConsent !== undefined && marketingConsent !== user.marketingConsent) {
+        patch.marketingConsent = marketingConsent;
+        patch.marketingConsentAt = marketingConsent ? new Date() : null;
+      }
       // Only ever moves forward — never overwrite an existing install
       // timestamp with a later one from, say, a second device installing.
       if (pwaInstalled && !user.pwaInstalledAt) patch.pwaInstalledAt = new Date();
@@ -1323,5 +1335,78 @@ export function registerRoutes(app: Express) {
       await storage.recordTempticoClick(user.id, parsed.data.source);
       res.status(204).end();
     })
+  );  // ---------------- Advent calendar ----------------
+  app.get(
+    "/api/advent/:userId",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      // A couple that reached the goal while the code pool was empty gets
+      // its code as soon as the admin adds more.
+      const newCode = await advent.ensureAdventReward(user);
+      if (newCode) void sendAdventReward(user, newCode);
+      const lang = typeof req.query.lang === "string" ? req.query.lang : user.language;
+      res.json(await advent.getAdventState(user, lang));
+    })
+  );
+
+  app.post(
+    "/api/advent/join",
+    ah(async (req, res) => {
+      const parsed = z.object({ userId: z.string(), marketingConsent: z.boolean().optional() }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const { phase } = advent.adventSeason();
+      if (phase === "off") {
+        res.status(400).json({ error: "Adventni koledar trenutno ni na voljo" });
+        return;
+      }
+      await advent.joinAdvent(user);
+      if (parsed.data.marketingConsent && !user.marketingConsent) {
+        await storage.updateUser(user.id, { marketingConsent: true, marketingConsentAt: new Date() });
+      }
+      const fresh = (await storage.getUserById(user.id))!;
+      res.json(await advent.getAdventState(fresh, fresh.language));
+    })
+  );
+
+  app.post(
+    "/api/advent/complete",
+    ah(async (req, res) => {
+      const parsed = z.object({ userId: z.string(), day: z.number().int().min(1).max(24) }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const { phase, today, year } = advent.adventSeason();
+      if ((phase !== "active" && phase !== "catchup") || parsed.data.day > today || !(await advent.isCoupleJoined(user, year))) {
+        res.status(400).json({ error: "Okence še ni odprto" });
+        return;
+      }
+      await advent.completeAdventDay(user, parsed.data.day);
+      const newCode = await advent.ensureAdventReward(user);
+      if (newCode) void sendAdventReward(user, newCode);
+      res.json(await advent.getAdventState(user, user.language));
+    })
   );
 }
+
+// Emails a freshly assigned advent code to both partners, each in their
+// own language. Best-effort: the code is also shown in the app.
+async function sendAdventReward(user: User, code: string) {
+  const recipients = [user];
+  if (user.partnerId) {
+    const partner = await storage.getUserById(user.partnerId);
+    if (partner) recipients.push(partner);
+  }
+  for (const r of recipients) {
+    await sendAdventRewardEmail(r.email, r.name, code, r.language).catch(() => {});
+  }
+}
+

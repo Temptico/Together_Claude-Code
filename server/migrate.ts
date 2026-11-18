@@ -290,6 +290,46 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS challenges_seed_key_idx ON challenges (seed_key)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS date_ideas_seed_key_idx ON date_ideas (seed_key)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS game_prompts_seed_key_idx ON game_prompts (seed_key)`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent_at timestamp`,
+  // Advent calendar (see shared/schema.ts).
+  `CREATE TABLE IF NOT EXISTS advent_days (
+      day integer PRIMARY KEY,
+      type varchar(16) NOT NULL,
+      title text NOT NULL,
+      title_en text,
+      title_hr text,
+      text text NOT NULL,
+      text_en text,
+      text_hr text,
+      offer_url text,
+      offer_url_en text,
+      offer_url_hr text,
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS advent_participants (
+      id serial PRIMARY KEY,
+      user_id varchar(24) NOT NULL,
+      year integer NOT NULL,
+      joined_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS advent_participants_user_year_idx ON advent_participants (user_id, year)`,
+  `CREATE TABLE IF NOT EXISTS advent_completions (
+      id serial PRIMARY KEY,
+      user_id varchar(24) NOT NULL,
+      year integer NOT NULL,
+      day integer NOT NULL,
+      completed_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS advent_completions_user_year_day_idx ON advent_completions (user_id, year, day)`,
+  `CREATE TABLE IF NOT EXISTS advent_reward_codes (
+      id serial PRIMARY KEY,
+      year integer NOT NULL,
+      code text NOT NULL UNIQUE,
+      user_id varchar(24),
+      assigned_at timestamp
+    )`,
+  `CREATE INDEX IF NOT EXISTS advent_reward_codes_user_idx ON advent_reward_codes (user_id)`,
 ];
 
 export async function runMigrations() {

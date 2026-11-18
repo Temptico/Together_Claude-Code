@@ -13,7 +13,9 @@ import {
   challengeUnfinishedNotification,
   partnerBirthdayNotification,
   ownBirthdayNotification,
+  adventNotification,
 } from "./notificationText.js";
+import { adventSeason, getAdventReminderUserIds } from "./advent.js";
 
 const TICK_INTERVAL_MS = 15 * 60_000;
 
@@ -76,6 +78,12 @@ export async function tick() {
 
   const users = await storage.getAllUsers();
   const usersById = new Map(users.map((u) => [u.id, u]));
+
+  // Advent calendar: couples where either partner joined get a nudge at
+  // 19:00 on each of 1–24 December.
+  const season = adventSeason(now);
+  const adventJoined =
+    season.phase === "active" && isTopOfHour(now, 19) ? await getAdventReminderUserIds(season.year) : new Set<string>();
 
   for (const user of users) {
     try {
@@ -240,6 +248,12 @@ export async function tick() {
               }));
             }
           }
+        }
+      }
+
+      if (adventJoined.size > 0 && (adventJoined.has(user.id) || (user.partnerId && adventJoined.has(user.partnerId)))) {
+        if (await storage.claimReminder(user.id, date, "advent")) {
+          await notifyUser(user.id, (lang) => ({ title: "Together", body: adventNotification(lang), tag: "advent" }));
         }
       }
 

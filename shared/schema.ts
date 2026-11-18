@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   pwaInstalledAt: timestamp("pwa_installed_at"), // set the first time the client detects standalone/installed mode
   source: text("source"), // acquisition source at registration, e.g. "paket" — see landingVisits below
+  // Opt-in to occasional promotional messages. Never pre-ticked (a pre-ticked
+  // box isn't valid consent under GDPR); the timestamp records when it was given.
+  marketingConsent: boolean("marketing_consent").notNull().default(false),
+  marketingConsentAt: timestamp("marketing_consent_at"),
 });
 
 // PIN_REGEX/pin are legacy — login moved to an emailed one-time code (see
@@ -58,6 +62,7 @@ export const insertUserSchema = createInsertSchema(users, {
     // so the admin dashboard can show actual signups per acquisition channel,
     // not just raw landing visits.
     source: z.string().max(64).optional(),
+    marketingConsent: z.boolean().optional(),
   });
 
 export const requestLoginCodeSchema = z.object({
@@ -284,7 +289,7 @@ export const milestoneEvents = pgTable("milestone_events", {
 // milestone celebration card) — Shopify's TOGETHER10 code usage shows
 // completed purchases, but not how many people saw/clicked the offer
 // without buying, so this fills that funnel gap.
-export const TEMPTICO_CLICK_SOURCES = ["date_idea", "milestone"] as const;
+export const TEMPTICO_CLICK_SOURCES = ["date_idea", "milestone", "advent"] as const;
 export const tempticoClicks = pgTable("temptico_clicks", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id", { length: 24 }).notNull(),
@@ -454,3 +459,54 @@ export const MOOD_LEVELS = [
   { level: 4, emoji: "😊", label: "Dobro" },
   { level: 5, emoji: "🥰", label: "Odlično" },
 ] as const;
+
+// ---------- Advent calendar ----------
+// 24 daily windows (1–24 December). Content lives in the database and is
+// edited in /admin/advent; server/advent.ts seeds defaults once. A couple
+// takes part once either partner taps "Join"; progress is the union of both
+// partners' completed days, and ADVENT_GOAL completed days earn a one-time
+// Temptico discount code from a pool the admin uploads.
+export const ADVENT_TYPES = ["task", "question", "temptico"] as const;
+export type AdventType = (typeof ADVENT_TYPES)[number];
+export const ADVENT_GOAL = 10;
+
+export const adventDays = pgTable("advent_days", {
+  day: integer("day").primaryKey(), // 1..24
+  type: varchar("type", { length: 16 }).notNull(),
+  title: text("title").notNull(),
+  titleEn: text("title_en"),
+  titleHr: text("title_hr"),
+  text: text("text").notNull(),
+  textEn: text("text_en"),
+  textHr: text("text_hr"),
+  // "Poglej ponudbo" target per app language (Temptico days); UTM is added when served.
+  offerUrl: text("offer_url"),
+  offerUrlEn: text("offer_url_en"),
+  offerUrlHr: text("offer_url_hr"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const adventParticipants = pgTable("advent_participants", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  year: integer("year").notNull(),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+});
+
+export const adventCompletions = pgTable("advent_completions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  year: integer("year").notNull(),
+  day: integer("day").notNull(),
+  completedAt: timestamp("completed_at").notNull().defaultNow(),
+});
+
+// Pool of single-use discount codes (created in Shopify, pasted in admin).
+// userId is set when a code is handed out.
+export const adventRewardCodes = pgTable("advent_reward_codes", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  code: text("code").notNull().unique(),
+  userId: varchar("user_id", { length: 24 }),
+  assignedAt: timestamp("assigned_at"),
+});

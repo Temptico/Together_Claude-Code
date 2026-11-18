@@ -357,3 +357,42 @@ export async function sendGamesAnnouncementEmail(to: string, name: string, langu
   const lang = normLang(language);
   await sendEmail(to, GAMES_ANNOUNCEMENT_SUBJECTS[lang], gamesAnnouncementHtml(name, lang), "games-announcement");
 }
+
+const ADVENT_REWARD_SUBJECTS: Record<Lang, string> = {
+  sl: "Vajino darilo iz adventnega koledarja 🎁",
+  en: "Your advent calendar gift 🎁",
+  hr: "Vaš dar iz adventskog kalendara 🎁",
+};
+
+const ADVENT_REWARD_COPY: Record<Lang, CodeEmailCopy> = {
+  sl: {
+    greeting: "Čestitamo",
+    intro: "Skupaj sta opravila 10 dni adventnega koledarja. Za nagrado vama podarjamo 20 % popust v trgovini Temptico:",
+    codeLabel: "Koda za popust",
+    cta: "Odpri Together",
+    tip: "Kodo vnesita ob nakupu na temptico.com. Velja za en nakup.",
+    signoff: "Lepe praznike,<br>ekipa Temptico",
+  },
+  en: {
+    greeting: "Congratulations",
+    intro: "You've completed 10 days of the advent calendar together. As a thank-you, here's 20% off at the Temptico shop:",
+    codeLabel: "Discount code",
+    cta: "Open Together",
+    tip: "Enter the code at checkout on temptico.com. It's valid for one purchase.",
+    signoff: "Happy holidays,<br>the Temptico team",
+  },
+  hr: {
+    greeting: "Čestitamo",
+    intro: "Zajedno ste odradili 10 dana adventskog kalendara. Kao nagradu poklanjamo vam 20 % popusta u trgovini Temptico:",
+    codeLabel: "Kod za popust",
+    cta: "Otvori Together",
+    tip: "Kod unesite pri kupnji na temptico.com. Vrijedi za jednu kupnju.",
+    signoff: "Sretni blagdani,<br>tim Temptico",
+  },
+};
+
+export async function sendAdventRewardEmail(to: string, name: string, code: string, language: string) {
+  const lang = normLang(language);
+  const html = codeEmailHtml(name, code, ADVENT_REWARD_COPY[lang], "🎁");
+  await sendEmail(to, ADVENT_REWARD_SUBJECTS[lang], html, "advent-reward");
+}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ReactionBar } from "@/components/ReactionBar";
 import { LoadError } from "@/components/LoadError";
+import { AdventCard } from "@/components/AdventCard";
 import { NotificationOptInDialog } from "@/components/NotificationOptInDialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -81,6 +82,7 @@ export default function Home() {
       <HomeHeader data={data} />
       {data.pendingMilestone && <MilestoneCard milestone={data.pendingMilestone} userId={data.user.id} />}
       {!data.partner && <ConnectBanner />}
+      <AdventCard />
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
