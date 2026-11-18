@@ -68,7 +68,7 @@ export function AdventJoinDialog({ open, onOpenChange }: { open: boolean; onOpen
       <DialogContent>
         <DialogHeader>
           <div className="text-4xl">🎄</div>
-          <DialogTitle>{t("advent.title")}</DialogTitle>
+          <DialogTitle>{t("advent.inviteTitle")}</DialogTitle>
           <DialogDescription>{t("advent.inviteBody")}</DialogDescription>
         </DialogHeader>
         <p className="text-sm font-semibold text-primary">{t("advent.inviteReward")}</p>

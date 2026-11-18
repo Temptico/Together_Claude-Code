@@ -237,9 +237,19 @@ export function gamesAnnouncementNotification(lang: string): string {
 // Advent calendar: daily 19:00 nudge to couples who joined.
 export function adventNotification(lang: string): string {
   const bodies: Record<Lang, string> = {
-    sl: "Danes se je odprlo novo okence 🎄",
-    en: "A new window has opened today 🎄",
-    hr: "Danas se otvorio novi prozorčić 🎄",
+    sl: "Vajino današnje adventno presenečenje že čaka! 🎁",
+    en: "Your advent surprise for today is waiting! 🎁",
+    hr: "Vaše današnje adventsko iznenađenje već čeka! 🎁",
   };
   return bodies[normLang(lang)];
+}
+
+// Advent calendar: both partners when the couple earns the discount code.
+export function adventRewardNotification(lang: string): { title: string; body: string } {
+  const texts: Record<Lang, { title: string; body: string }> = {
+    sl: { title: "Uspelo vama je! 🎁", body: "Skupaj sta ustvarila že 10 posebnih trenutkov. Vajin popust vaju čaka v aplikaciji." },
+    en: { title: "You did it! 🎁", body: "Together you've created 10 special moments. Your discount is waiting in the app." },
+    hr: { title: "Uspjeli ste! 🎁", body: "Zajedno ste stvorili već 10 posebnih trenutaka. Vaš popust čeka vas u aplikaciji." },
+  };
+  return texts[normLang(lang)];
 }

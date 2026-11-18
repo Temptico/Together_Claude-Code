@@ -41,23 +41,30 @@ export function AdventCard() {
     );
   }
 
+  const total = data.days.length;
   const reached = data.completedCount >= data.goal;
-  const progressPct = Math.min(100, Math.round((data.completedCount / data.goal) * 100));
+  const progressPct = Math.min(100, Math.round((data.completedCount / total) * 100));
+  const goalPct = Math.round((data.goal / total) * 100);
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="flex flex-col gap-3 py-4">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex items-end justify-between gap-2">
           <p className="text-lg font-extrabold">🎄 {t("advent.title")}</p>
-          <span className="text-xs font-bold text-muted-foreground">
-            {reached
-              ? fill(t("advent.progressDone"), { n: data.completedCount })
-              : fill(t("advent.progress"), { n: data.completedCount, goal: data.goal })}
+          <span className="text-sm font-extrabold text-primary">
+            {fill(t("advent.progress"), { n: data.completedCount, total })}
           </span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+        {/* Whole season (n/24), with a marker where the gift unlocks. */}
+        <div className="relative pt-1" aria-hidden>
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className="absolute top-0 w-0.5 -translate-x-1/2 rounded bg-foreground/40" style={{ left: `${goalPct}%`, height: "18px" }} />
         </div>
+        <span className="text-xs font-bold text-muted-foreground">
+          {reached ? t("advent.progressDone") : fill(t("advent.toGift"), { k: data.goal - data.completedCount })}
+        </span>
 
         {data.phase === "invite" && <p className="text-sm text-muted-foreground">{t("advent.opensDec1")}</p>}
 
@@ -123,9 +130,15 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
               <p className="text-xs font-bold uppercase tracking-wide text-primary">
                 {fill(t("advent.day"), { day: current.day })} · {typeLabel}
               </p>
-              <DialogTitle>{current.open ? current.title : "🔒"}</DialogTitle>
+              <DialogTitle>{current.open ? current.title : t("advent.lockedTitle")}</DialogTitle>
               <DialogDescription className="text-base text-foreground">
-                {current.open ? current.text : state.phase === "invite" ? t("advent.opensDec1") : fill(t("advent.locked"), { day: current.day })}
+                {current.open
+                  ? current.text
+                  : state.phase === "invite"
+                    ? t("advent.opensDec1")
+                    : current.day === state.today + 1
+                      ? t("advent.lockedTomorrow")
+                      : fill(t("advent.locked"), { day: current.day })}
               </DialogDescription>
             </DialogHeader>
             {current.open && (
@@ -139,9 +152,9 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={trackOffer}
-                    className="flex items-center justify-center gap-1.5 rounded-full border-2 border-primary py-2.5 text-sm font-bold text-primary"
+                    className="mx-auto flex items-center gap-1 py-1.5 text-xs font-semibold text-muted-foreground underline underline-offset-4"
                   >
-                    <Gift className="h-4 w-4" /> {t("advent.viewOffer")}
+                    <Gift className="h-3.5 w-3.5" /> {t("advent.viewOffer")}
                   </a>
                 )}
               </div>
@@ -167,13 +180,14 @@ function RewardBox({ code }: { code: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-2xl bg-accent p-3">
       <p className="font-extrabold">{t("advent.rewardTitle")}</p>
+      <p className="text-sm">{t("advent.rewardBody")}</p>
       <div className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2">
         <span className="min-w-0 select-all break-all font-mono text-base font-extrabold tracking-wide">{code}</span>
         <Button size="icon" variant="ghost" onClick={copy} aria-label={t("advent.copy")}>
           <Copy className="h-4 w-4" />
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">{t("advent.rewardBody")}</p>
+      <p className="text-xs text-muted-foreground">{t("advent.rewardNote")}</p>
     </div>
   );
 }

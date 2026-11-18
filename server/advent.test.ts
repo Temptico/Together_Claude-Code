@@ -58,7 +58,7 @@ describe("advent participation", () => {
     expect(after.joined).toBe(true);
     const open = after.days.filter((d: { open: boolean }) => d.open);
     expect(open.map((d: { day: number }) => d.day)).toEqual([1, 2, 3, 4, 5]);
-    expect((open[0] as { text: string }).text).toMatch(/uspomena/); // Croatian
+    expect((open[0] as { text: string }).text).toMatch(/sjećanju/); // Croatian
     expect("text" in after.days[5]).toBe(false); // day 6 still locked
   });
 

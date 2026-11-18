@@ -31,6 +31,7 @@ import {
   milestoneNotification,
   gameStartedNotification,
   gameCompletedNotification,
+  adventRewardNotification,
 } from "./notificationText.js";
 import {
   insertUserSchema,
@@ -1398,7 +1399,8 @@ export function registerRoutes(app: Express) {
 }
 
 // Emails a freshly assigned advent code to both partners, each in their
-// own language. Best-effort: the code is also shown in the app.
+// own language, plus a push notification. Best-effort: the code is also
+// shown in the app.
 async function sendAdventReward(user: User, code: string) {
   const recipients = [user];
   if (user.partnerId) {
@@ -1407,6 +1409,7 @@ async function sendAdventReward(user: User, code: string) {
   }
   for (const r of recipients) {
     await sendAdventRewardEmail(r.email, r.name, code, r.language).catch(() => {});
+    await notifyUser(r.id, (lang) => ({ ...adventRewardNotification(lang), tag: "advent-reward" })).catch(() => {});
   }
 }
 
