@@ -10,6 +10,7 @@
 
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "./db.js";
+import { sendAdventPoolAlert } from "./email.js";
 import {
   adventCompletions,
   adventDays,
@@ -291,6 +292,11 @@ export async function ensureAdventReward(user: User): Promise<string | null> {
     .returning();
   if (!assigned) {
     console.warn("[advent] reward due but no codes left in the pool for", year);
+    // At most once a day: every app open of a waiting couple lands here.
+    if (Date.now() - lastEmptyPoolAlert > 24 * 60 * 60 * 1000) {
+      lastEmptyPoolAlert = Date.now();
+      void sendAdventPoolAlert(0, true).catch(() => {});
+    }
     return null;
   }
   // A partner finishing at the same instant could have claimed too; keep
@@ -304,7 +310,23 @@ export async function ensureAdventReward(user: User): Promise<string | null> {
     await db.update(adventRewardCodes).set({ userId: null, assignedAt: null }).where(eq(adventRewardCodes.id, assigned.id));
     return null;
   }
+  const remaining = await freeCodeCount(year);
+  if (POOL_ALERT_AT.has(remaining)) void sendAdventPoolAlert(remaining, false).catch(() => {});
   return assigned.code;
+}
+
+// Warn the admin when the pool drops below 20 free codes, and again at 10,
+// 5 and when the last one is gone. Each assignment lowers the count by one,
+// so every threshold is crossed exactly once.
+export const POOL_ALERT_AT = new Set([19, 10, 5, 0]);
+let lastEmptyPoolAlert = 0;
+
+export async function freeCodeCount(year: number): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(adventRewardCodes)
+    .where(and(eq(adventRewardCodes.year, year), isNull(adventRewardCodes.userId)));
+  return Number(row?.n ?? 0);
 }
 
 // ---------------- Admin ----------------

@@ -2,6 +2,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import * as advent from "./advent.js";
 import * as storage from "./storage.js";
 import { createTestCouple, createTestUser, setupDatabase } from "./testUtils.js";
+import { sendAdventPoolAlert } from "./email.js";
+
+vi.mock("./email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./email.js")>()),
+  sendAdventPoolAlert: vi.fn(async () => {}),
+}));
 
 beforeAll(setupDatabase);
 
@@ -94,6 +100,29 @@ describe("advent participation", () => {
     expect(await advent.ensureAdventReward(solo)).toBeNull();
     await advent.addAdventCodes(["TEST-CODE-LATE"], 2026);
     expect(await advent.ensureAdventReward(solo)).toBe("TEST-CODE-LATE");
+  });
+});
+
+describe("code pool alert", () => {
+  it("warns once when the pool drops below 20 free codes", async () => {
+    at("2027-12-20"); // its own year, so its own pool
+    const alert = vi.mocked(sendAdventPoolAlert);
+    alert.mockClear();
+    await advent.addAdventCodes(Array.from({ length: 20 }, (_, i) => `POOL-2027-${String(i).padStart(2, "0")}`), 2027);
+
+    const finisher = async () => {
+      const u = await createTestUser("Pool");
+      await advent.joinAdvent(u);
+      for (let day = 1; day <= 10; day++) await advent.completeAdventDay(u, day);
+      return u;
+    };
+    expect(await advent.ensureAdventReward(await finisher())).toBeTruthy(); // 19 left
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert).toHaveBeenLastCalledWith(19, false);
+
+    expect(await advent.ensureAdventReward(await finisher())).toBeTruthy(); // 18 left: quiet
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(await advent.freeCodeCount(2027)).toBe(18);
   });
 });
 

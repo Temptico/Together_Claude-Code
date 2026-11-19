@@ -396,3 +396,30 @@ export async function sendAdventRewardEmail(to: string, name: string, code: stri
   const html = codeEmailHtml(name, code, ADVENT_REWARD_COPY[lang], "🎁");
   await sendEmail(to, ADVENT_REWARD_SUBJECTS[lang], html, "advent-reward");
 }
+
+// Advent calendar: tells the admin (ADMIN_EMAIL) that the pool of discount
+// codes is running low or empty, so couples never wait long for their gift.
+// Without ADMIN_EMAIL it only logs.
+export async function sendAdventPoolAlert(remaining: number, waiting: boolean) {
+  const to = process.env.ADMIN_EMAIL;
+  const subject = waiting
+    ? "Together: zmanjkalo je kod za adventni koledar – par čaka na darilo"
+    : remaining === 0
+      ? "Together: porabljena je zadnja koda za adventni koledar"
+      : `Together: ostalo je še ${remaining} kod za adventni koledar`;
+  if (!to) {
+    console.warn(`[advent] ${subject} (set ADMIN_EMAIL to get this by email)`);
+    return;
+  }
+  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#3b2f2a">
+<p><strong>${subject}</strong></p>
+<p>${
+    waiting
+      ? "Vsaj en par je opravil 10 dni, a v bazenu ni več prostih kod. Ko dodaš nove, jih bodo pari, ki čakajo, dobili samodejno (v aplikaciji in po e-pošti)."
+      : `V bazenu adventnega koledarja je ostalo še <strong>${remaining}</strong> prostih kod za popust.`
+  }</p>
+<p>Kaj narediti: v Shopifyju dodaj nove kode v adventni popust (npr. »Together advent 2026 (20 %)«) in iste kode prilepi v
+<a href="${APP_URL}/admin/advent">administracijo koledarja</a> (razdelek »Kode za popust«).</p>
+</div>`;
+  await sendEmail(to, subject, html, "advent-pool-alert");
+}
