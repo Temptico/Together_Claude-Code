@@ -104,7 +104,7 @@ describe("advent participation", () => {
 });
 
 describe("tester mode", () => {
-  it("opens all 24 windows now, in a separate test year", async () => {
+  it("opens all 24 windows now (minus the test-locked ones), in a separate test year", async () => {
     at("2026-11-19"); // season not started
     const u = await createTestUser("Tester");
     await storage.updateUser(u.id, { adventTester: true });
@@ -113,7 +113,7 @@ describe("tester mode", () => {
     await advent.completeAdventDay(tester, 24);
     const state = await advent.getAdventState(tester, "sl");
     expect(state).toMatchObject({ year: advent.ADVENT_TEST_YEAR, phase: "active", today: 24, joined: true, completedCount: 1 });
-    expect(state.days.every((d) => d.open)).toBe(true);
+    expect(state.days.filter((d) => !d.open).map((d) => d.day)).toEqual([...advent.ADVENT_TEST_LOCKED_DAYS]);
     // The real season sees nothing of it.
     const real = await advent.getAdventState({ ...tester, adventTester: false }, "sl");
     expect(real).toMatchObject({ phase: "off", joined: false, completedCount: 0 });

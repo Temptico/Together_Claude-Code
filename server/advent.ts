@@ -55,6 +55,15 @@ export function adventSeasonFor(user: User): { year: number; phase: AdventPhase;
   return adventSeason();
 }
 
+// Doors kept shut for testers so they can see the "not yet" message even
+// though tester mode opens everything. Empty this once testing is done.
+export const ADVENT_TEST_LOCKED_DAYS = new Set<number>([8]);
+
+export function isAdventDayOpen(user: User, day: number, today: number): boolean {
+  if (day > today) return false;
+  return !(user.adventTester && ADVENT_TEST_LOCKED_DAYS.has(day));
+}
+
 // Launch switch: in production the calendar stays hidden from everyone but
 // testers until ADVENT_PUBLIC=true is set (Render env). Dev and tests
 // always show it, so ADVENT_TODAY keeps working locally.
@@ -242,7 +251,7 @@ export async function getAdventState(user: User, lang: string) {
     reward: rewards[0] ? { code: rewards[0].code as string } : null,
     // Content only for couples who joined, and only for windows already open.
     days: days.map((d: DayRow) => {
-      const open = joined && phase !== "invite" && phase !== "off" && d.day <= today;
+      const open = joined && phase !== "invite" && phase !== "off" && isAdventDayOpen(user, d.day, today);
       const base = { day: d.day, type: d.type as AdventType, open, completed: completedDays.includes(d.day) };
       if (!open) return base;
       const url = pick(lang, d.offerUrl, d.offerUrlEn, d.offerUrlHr);

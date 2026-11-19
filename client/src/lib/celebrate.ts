@@ -1,7 +1,8 @@
 import confetti from "canvas-confetti";
 
-// Little celebration for an advent day marked done: sleigh bells and a
-// burst of confetti. The bells are synthesized (no audio file to load).
+// Little celebration for an advent day marked done: a few bars of Jingle
+// Bells with sleigh bells, and a burst of confetti. All synthesized, so
+// there is no audio file to load.
 //
 // iOS only lets a page make sound after an AudioContext was started inside
 // a tap, so call unlockAudio() in the click handler and celebrate() once
@@ -20,34 +21,69 @@ export function unlockAudio() {
   }
 }
 
-// One bell strike: a few inharmonic high partials that die away fast.
-function strike(at: number, gain: number) {
+// A glockenspiel note: a pure tone with a soft octave and a bright
+// overtone, ringing out for about a second.
+function chime(at: number, freq: number, gain: number) {
   if (!ctx) return;
   const out = ctx.createGain();
   out.gain.setValueAtTime(0, at);
-  out.gain.linearRampToValueAtTime(gain, at + 0.004);
-  out.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
+  out.gain.linearRampToValueAtTime(gain, at + 0.005);
+  out.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
   out.connect(ctx.destination);
-  const base = 2300 + Math.random() * 300;
-  for (const ratio of [1, 1.47, 2.09, 2.76]) {
+  for (const [ratio, level] of [[1, 1], [2, 0.25], [2.76, 0.12]] as const) {
     const osc = ctx.createOscillator();
+    const g = ctx.createGain();
     osc.type = "sine";
-    osc.frequency.value = base * ratio;
-    osc.connect(out);
+    osc.frequency.value = freq * ratio;
+    g.gain.value = level;
+    osc.connect(g).connect(out);
     osc.start(at);
-    osc.stop(at + 0.25);
+    osc.stop(at + 1.15);
   }
 }
 
+// Sleigh bells: a short burst of bright, high noise.
+let noise: AudioBuffer | null = null;
+function sleigh(at: number, gain: number) {
+  if (!ctx) return;
+  if (!noise) {
+    noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
+    const data = noise.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 6500;
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0, at);
+  out.gain.linearRampToValueAtTime(gain, at + 0.01);
+  out.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+  src.connect(hp).connect(out).connect(ctx.destination);
+  src.start(at);
+  src.stop(at + 0.2);
+}
+
+// The opening of "Jingle Bells" (traditional) on chimes, with the sleigh
+// bells shaking on every beat. About three and a half seconds.
+const E = 659.25, G = 783.99, C = 523.25, D = 587.33;
+const TUNE: [number, number][] = [
+  [E, 1], [E, 1], [E, 2],
+  [E, 1], [E, 1], [E, 2],
+  [E, 1], [G, 1], [C, 1.5], [D, 0.5], [E, 4],
+];
+
 function jingle() {
   if (!ctx || ctx.state !== "running") return;
-  const t0 = ctx.currentTime + 0.02;
-  // Two shakes of the sleigh bells, each a quick cluster of strikes.
-  for (const shake of [0, 0.38]) {
-    for (let i = 0; i < 9; i++) {
-      strike(t0 + shake + i * 0.028 + Math.random() * 0.015, 0.05 + Math.random() * 0.04);
-    }
+  const beat = 0.2;
+  const t0 = ctx.currentTime + 0.03;
+  let t = t0;
+  for (const [freq, len] of TUNE) {
+    chime(t, freq, 0.22);
+    t += len * beat;
   }
+  for (let i = 0; i < 16; i++) sleigh(t0 + i * beat, i % 2 === 0 ? 0.09 : 0.05);
 }
 
 export function celebrate() {

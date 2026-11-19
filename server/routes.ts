@@ -1386,7 +1386,7 @@ export function registerRoutes(app: Express) {
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
       const { phase, today, year } = advent.adventSeasonFor(user);
-      if ((phase !== "active" && phase !== "catchup") || parsed.data.day > today || !(await advent.isCoupleJoined(user, year))) {
+      if ((phase !== "active" && phase !== "catchup") || !advent.isAdventDayOpen(user, parsed.data.day, today) || !(await advent.isCoupleJoined(user, year))) {
         res.status(400).json({ error: "Okence še ni odprto" });
         return;
       }
