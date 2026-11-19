@@ -103,6 +103,23 @@ describe("advent participation", () => {
   });
 });
 
+describe("tester mode", () => {
+  it("opens all 24 windows now, in a separate test year", async () => {
+    at("2026-11-19"); // season not started
+    const u = await createTestUser("Tester");
+    await storage.updateUser(u.id, { adventTester: true });
+    const tester = (await storage.getUserById(u.id))!;
+    await advent.joinAdvent(tester);
+    await advent.completeAdventDay(tester, 24);
+    const state = await advent.getAdventState(tester, "sl");
+    expect(state).toMatchObject({ year: advent.ADVENT_TEST_YEAR, phase: "active", today: 24, joined: true, completedCount: 1 });
+    expect(state.days.every((d) => d.open)).toBe(true);
+    // The real season sees nothing of it.
+    const real = await advent.getAdventState({ ...tester, adventTester: false }, "sl");
+    expect(real).toMatchObject({ phase: "off", joined: false, completedCount: 0 });
+  });
+});
+
 describe("gift code", () => {
   it("shows a day gift code with its note only once the window is open", async () => {
     at("2026-12-13");

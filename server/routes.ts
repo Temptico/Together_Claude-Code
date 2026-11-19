@@ -1361,7 +1361,7 @@ export function registerRoutes(app: Express) {
       }
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
-      const { phase } = advent.adventSeason();
+      const { phase } = advent.adventSeasonFor(user);
       if (phase === "off") {
         res.status(400).json({ error: "Adventni koledar trenutno ni na voljo" });
         return;
@@ -1385,7 +1385,7 @@ export function registerRoutes(app: Express) {
       }
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
-      const { phase, today, year } = advent.adventSeason();
+      const { phase, today, year } = advent.adventSeasonFor(user);
       if ((phase !== "active" && phase !== "catchup") || parsed.data.day > today || !(await advent.isCoupleJoined(user, year))) {
         res.status(400).json({ error: "Okence še ni odprto" });
         return;

@@ -292,6 +292,7 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS game_prompts_seed_key_idx ON game_prompts (seed_key)`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent boolean NOT NULL DEFAULT false`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent_at timestamp`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS advent_tester boolean NOT NULL DEFAULT false`,
   // Advent calendar (see shared/schema.ts).
   `CREATE TABLE IF NOT EXISTS advent_days (
       day integer PRIMARY KEY,

@@ -31,6 +31,9 @@ export const users = pgTable("users", {
   // box isn't valid consent under GDPR); the timestamp records when it was given.
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   marketingConsentAt: timestamp("marketing_consent_at"),
+  // Sees every advent window open right away, in a separate test year
+  // (ADVENT_TEST_YEAR), so testing never touches real progress or codes.
+  adventTester: boolean("advent_tester").notNull().default(false),
 });
 
 // PIN_REGEX/pin are legacy — login moved to an emailed one-time code (see

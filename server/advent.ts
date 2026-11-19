@@ -45,6 +45,15 @@ export function adventSeason(now: Date = adventNow()): { year: number; phase: Ad
   return { year, phase: "off", today: 0 };
 }
 
+// Testers (users.advent_tester) get the whole calendar open now, in a
+// separate year so their progress and reward live apart from the real one.
+export const ADVENT_TEST_YEAR = 1;
+
+export function adventSeasonFor(user: User): { year: number; phase: AdventPhase; today: number } {
+  if (user.adventTester) return { year: ADVENT_TEST_YEAR, phase: "active", today: 24 };
+  return adventSeason();
+}
+
 // ---------------- Default content ----------------
 // Inserted only for days that don't exist yet: once a day is edited in
 // /admin/advent, the database is the source of truth.
@@ -201,7 +210,7 @@ function coupleIds(user: User): string[] {
 }
 
 export async function getAdventState(user: User, lang: string) {
-  const { year, phase, today } = adventSeason();
+  const { year, phase, today } = adventSeasonFor(user);
   const ids = coupleIds(user);
 
   const [participants, completions, rewards, days] = await Promise.all([
@@ -242,7 +251,7 @@ export async function getAdventState(user: User, lang: string) {
 
 // ---------------- Writes ----------------
 export async function joinAdvent(user: User) {
-  const { year } = adventSeason();
+  const { year } = adventSeasonFor(user);
   await db.insert(adventParticipants).values({ userId: user.id, year }).onConflictDoNothing();
 }
 
@@ -255,7 +264,7 @@ export async function isCoupleJoined(user: User, year: number): Promise<boolean>
 }
 
 export async function completeAdventDay(user: User, day: number) {
-  const { year } = adventSeason();
+  const { year } = adventSeasonFor(user);
   await db.insert(adventCompletions).values({ userId: user.id, year, day }).onConflictDoNothing();
 }
 
@@ -265,7 +274,7 @@ export async function completeAdventDay(user: User, day: number) {
 // at the same moment can't both take one. Returns the newly assigned code
 // (to email it), or null when nothing was assigned now.
 export async function ensureAdventReward(user: User): Promise<string | null> {
-  const { year } = adventSeason();
+  const { year } = adventSeasonFor(user);
   const ids = coupleIds(user);
   const completions = await db
     .select({ day: adventCompletions.day })
