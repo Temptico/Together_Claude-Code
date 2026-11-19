@@ -47,6 +47,11 @@ export function registerAdventAdmin(app: Express, { ah, adminAuthorized, escapeH
           <div><h4>EN</h4>${field("titleEn", "Title", d.titleEn)}${field("textEn", "Text", d.textEn, true)}${field("offerUrlEn", "Offer link", d.offerUrlEn)}</div>
           <div><h4>HR</h4>${field("titleHr", "Naslov", d.titleHr)}${field("textHr", "Tekst", d.textHr, true)}${field("offerUrlHr", "Poveznica", d.offerUrlHr)}</div>
         </div>
+        <div class="grid">
+          <div>${field("giftCode", "Koda za darilo (neobvezno)", d.giftCode)}${field("giftNote", "Opis darila SL", d.giftNote, true)}</div>
+          <div>${field("giftNoteEn", "Gift note EN", d.giftNoteEn, true)}</div>
+          <div>${field("giftNoteHr", "Opis dara HR", d.giftNoteHr, true)}</div>
+        </div>
         <div class="actions"><button type="submit">Shrani</button><span class="msg"></span></div>
       </form>`
         )
@@ -171,6 +176,10 @@ export function registerAdventAdmin(app: Express, { ah, adminAuthorized, escapeH
         offerUrl: url(b.offerUrl),
         offerUrlEn: url(b.offerUrlEn),
         offerUrlHr: url(b.offerUrlHr),
+        giftCode: opt(b.giftCode, 60),
+        giftNote: opt(b.giftNote, 300),
+        giftNoteEn: opt(b.giftNoteEn, 300),
+        giftNoteHr: opt(b.giftNoteHr, 300),
       });
       res.json({ ok: true, day: row?.day });
     })

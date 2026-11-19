@@ -103,6 +103,20 @@ describe("advent participation", () => {
   });
 });
 
+describe("gift code", () => {
+  it("shows a day gift code with its note only once the window is open", async () => {
+    at("2026-12-13");
+    await advent.updateAdventDay(13, { giftCode: "GIFT-TEST", giftNote: "Darilce", giftNoteEn: "Small gift" });
+    const u = await createTestUser("Gift");
+    await advent.joinAdvent(u);
+    const day = (s: Awaited<ReturnType<typeof advent.getAdventState>>, n: number) => s.days.find((d) => d.day === n) as any;
+    expect(day(await advent.getAdventState(u, "en"), 13).gift).toEqual({ code: "GIFT-TEST", note: "Small gift" });
+    at("2026-12-12");
+    expect(day(await advent.getAdventState(u, "sl"), 13).gift).toBeUndefined();
+    await advent.updateAdventDay(13, { giftCode: null, giftNote: null, giftNoteEn: null });
+  });
+});
+
 describe("code pool alert", () => {
   it("warns once when the pool drops below 20 free codes", async () => {
     at("2027-12-20"); // its own year, so its own pool

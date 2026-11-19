@@ -146,6 +146,7 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                 <Button disabled={current.completed || complete.isPending} onClick={() => complete.mutate(current.day)}>
                   {current.completed ? t("advent.doneAlready") : t("advent.done")}
                 </Button>
+                {current.gift && <GiftCodeBox code={current.gift.code} note={current.gift.note} />}
                 {current.offerUrl && (
                   <a
                     href={current.offerUrl}
@@ -163,6 +164,32 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// A small extra from a Temptico day (e.g. a free gift with an order):
+// a short note and the code, kept below the day itself.
+function GiftCodeBox({ code, note }: { code: string; note: string | null }) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: t("advent.copied") });
+    } catch {
+      // Clipboard blocked: the code is on screen to copy by hand.
+    }
+  };
+  return (
+    <div className="mt-1 flex flex-col gap-1.5 rounded-2xl bg-accent/60 p-3 text-sm">
+      {note && <p>{note}</p>}
+      <div className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-1.5">
+        <span className="min-w-0 select-all break-all font-mono font-extrabold tracking-wide">{code}</span>
+        <Button size="icon" variant="ghost" onClick={copy} aria-label={t("advent.copy")}>
+          <Copy className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }
 

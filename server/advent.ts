@@ -234,6 +234,7 @@ export async function getAdventState(user: User, lang: string) {
         title: pick(lang, d.title, d.titleEn, d.titleHr)!,
         text: pick(lang, d.text, d.textEn, d.textHr)!,
         offerUrl: d.type === "temptico" && url ? withUtm(url, d.day) : null,
+        gift: d.giftCode ? { code: d.giftCode, note: pick(lang, d.giftNote, d.giftNoteEn, d.giftNoteHr) } : null,
       };
     }),
   };

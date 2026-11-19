@@ -483,6 +483,11 @@ export const adventDays = pgTable("advent_days", {
   offerUrl: text("offer_url"),
   offerUrlEn: text("offer_url_en"),
   offerUrlHr: text("offer_url_hr"),
+  // Optional code shown in the window (e.g. a free gift with an order).
+  giftCode: text("gift_code"),
+  giftNote: text("gift_note"),
+  giftNoteEn: text("gift_note_en"),
+  giftNoteHr: text("gift_note_hr"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

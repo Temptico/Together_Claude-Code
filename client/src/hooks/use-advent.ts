@@ -11,6 +11,7 @@ export type AdventDay = {
   title?: string;
   text?: string;
   offerUrl?: string | null;
+  gift?: { code: string; note: string | null } | null;
 };
 
 export type AdventState = {

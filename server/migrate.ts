@@ -307,6 +307,10 @@ const STATEMENTS = [
       offer_url_hr text,
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
+  `ALTER TABLE advent_days ADD COLUMN IF NOT EXISTS gift_code text`,
+  `ALTER TABLE advent_days ADD COLUMN IF NOT EXISTS gift_note text`,
+  `ALTER TABLE advent_days ADD COLUMN IF NOT EXISTS gift_note_en text`,
+  `ALTER TABLE advent_days ADD COLUMN IF NOT EXISTS gift_note_hr text`,
   `CREATE TABLE IF NOT EXISTS advent_participants (
       id serial PRIMARY KEY,
       user_id varchar(24) NOT NULL,
