@@ -123,3 +123,95 @@ input[type="time"]::-webkit-date-and-time-value {
 .leaflet-container .leaflet-popup-content a {
   color: hsl(var(--primary));
 }
+
+/* ---------- Advent calendar: snowy cabin with 24 little doors ---------- */
+.advent-house { --wall: #fbf3e6; --wood: #2f5e46; --today: #c8102e; }
+.dark .advent-house { --wall: #3a2f26; }
+.advent-roof {
+  position: relative;
+  height: 52px;
+  margin: 0 -10px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: var(--wood);
+}
+.advent-snow {
+  position: relative;
+  height: 9px;
+  margin: -5px -14px 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.advent-chimney {
+  position: absolute;
+  right: 22%;
+  top: -14px;
+  width: 16px;
+  height: 34px;
+  background: #8e2f27;
+  border-top: 6px solid #fff;
+  border-radius: 2px 2px 0 0;
+}
+.advent-lights { display: flex; justify-content: space-around; margin: 3px 2px 0; }
+.advent-lights span {
+  width: 7px; height: 9px; border-radius: 50% 50% 45% 45%;
+  animation: advent-twinkle 2.4s ease-in-out infinite;
+}
+.advent-lights span:nth-child(3n + 1) { background: #f4c542; }
+.advent-lights span:nth-child(3n + 2) { background: #e24b4a; animation-delay: 0.8s; }
+.advent-lights span:nth-child(3n) { background: #5dcaa5; animation-delay: 1.6s; }
+@keyframes advent-twinkle { 50% { opacity: 0.45; } }
+.advent-wall {
+  background: var(--wall);
+  border: 3px solid var(--wood);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  padding: 8px 8px 10px;
+}
+
+.advent-door { position: relative; aspect-ratio: 3 / 4; perspective: 300px; }
+.advent-door-inside {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px 999px 4px 4px;
+  background: #f4c542; color: #7a4a10;
+  box-shadow: inset 0 2px 6px rgba(122, 74, 16, 0.45);
+}
+.advent-door-leaf {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px 999px 4px 4px;
+  background: var(--wood); color: #fff;
+  font-size: 0.8rem; font-weight: 800;
+  transform-origin: left center;
+  transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.4, 1);
+  backface-visibility: hidden;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+/* Two panels and a knob make it read as a door, not a tile. */
+.advent-door-leaf::before {
+  content: ""; position: absolute; left: 22%; right: 22%; top: 20%; bottom: 14%;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px 999px 2px 2px;
+}
+.advent-door-leaf::after {
+  content: ""; position: absolute; right: 12%; top: 58%;
+  width: 4px; height: 4px; border-radius: 50%; background: #f4c542;
+}
+.advent-door.is-today .advent-door-leaf { background: var(--today); }
+.advent-door.is-locked .advent-door-leaf { filter: saturate(0.35) brightness(1.15); color: rgba(255, 255, 255, 0.75); }
+.advent-door.is-open .advent-door-leaf { transform: rotateY(-78deg); }
+.advent-door.is-swinging .advent-door-leaf { transform: rotateY(-100deg); }
+.advent-door.is-shaking { animation: advent-shake 0.4s ease; }
+@keyframes advent-shake {
+  20%, 60% { transform: translateX(-2px) rotate(-2deg); }
+  40%, 80% { transform: translateX(2px) rotate(2deg); }
+}
+.advent-wreath {
+  position: absolute; top: 14%; left: 50%; width: 11px; height: 11px; margin-left: -5.5px;
+  border-radius: 50%; border: 2.5px solid #2f7d4f; z-index: 1; pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .advent-door-leaf { transition: none; }
+  .advent-door.is-shaking, .advent-lights span { animation: none; }
+}

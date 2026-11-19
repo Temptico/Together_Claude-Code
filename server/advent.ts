@@ -51,7 +51,15 @@ export const ADVENT_TEST_YEAR = 1;
 
 export function adventSeasonFor(user: User): { year: number; phase: AdventPhase; today: number } {
   if (user.adventTester) return { year: ADVENT_TEST_YEAR, phase: "active", today: 24 };
+  if (!adventIsPublic()) return { ...adventSeason(), phase: "off", today: 0 };
   return adventSeason();
+}
+
+// Launch switch: in production the calendar stays hidden from everyone but
+// testers until ADVENT_PUBLIC=true is set (Render env). Dev and tests
+// always show it, so ADVENT_TODAY keeps working locally.
+export function adventIsPublic(): boolean {
+  return process.env.NODE_ENV !== "production" || process.env.ADVENT_PUBLIC === "true";
 }
 
 // ---------------- Default content ----------------

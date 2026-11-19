@@ -120,6 +120,20 @@ describe("tester mode", () => {
   });
 });
 
+describe("launch switch", () => {
+  it("hides the calendar in production until ADVENT_PUBLIC=true, except for testers", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ADVENT_PUBLIC", "");
+    const user = { adventTester: false } as Parameters<typeof advent.adventSeasonFor>[0];
+    expect(advent.adventSeasonFor(user).phase).toBe("off");
+    expect(advent.adventSeasonFor({ ...user, adventTester: true }).phase).toBe("active");
+    vi.stubEnv("ADVENT_PUBLIC", "true");
+    vi.stubEnv("ADVENT_TODAY", "");
+    expect(advent.adventIsPublic()).toBe(true);
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("gift code", () => {
   it("shows a day gift code with its note only once the window is open", async () => {
     at("2026-12-13");

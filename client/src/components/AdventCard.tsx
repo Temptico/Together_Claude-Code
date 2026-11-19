@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Gift, Lock } from "lucide-react";
+import { Check, Copy, Gift } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { adventQueryKey, fill, useAdvent, type AdventDay, type AdventState } from "@/hooks/use-advent";
 import { AdventJoinDialog } from "@/components/AdventInviteDialog";
+import { celebrate, unlockAudio } from "@/lib/celebrate";
 
 // Home-screen advent calendar: progress toward the gift, a 24-window grid
 // (today and earlier open, later ones locked) and the reward once earned.
@@ -68,33 +69,85 @@ export function AdventCard() {
 
         {data.phase === "invite" && <p className="text-sm text-muted-foreground">{t("advent.opensDec1")}</p>}
 
-        <div className="grid grid-cols-6 gap-1.5">
-          {data.days.map((d) => (
-            <button
-              key={d.day}
-              onClick={() => setOpenDay(d)}
-              aria-label={fill(t("advent.day"), { day: d.day })}
-              className={cn(
-                "relative flex aspect-square items-center justify-center rounded-xl text-sm font-extrabold",
-                d.completed
-                  ? "bg-primary text-primary-foreground"
-                  : d.open
-                    ? d.day === data.today
-                      ? "bg-together-warm text-white ring-2 ring-primary ring-offset-2 ring-offset-card"
-                      : "bg-accent text-accent-foreground"
-                    : "bg-muted text-muted-foreground"
-              )}
-            >
-              {d.completed ? <Check className="h-4 w-4" /> : !d.open ? <Lock className="h-3.5 w-3.5 opacity-60" /> : d.day}
-              {d.type === "temptico" && d.open && !d.completed && <span className="absolute -right-0.5 -top-0.5 text-[10px]">🎁</span>}
-            </button>
-          ))}
-        </div>
+        <AdventHouse state={data} onPick={setOpenDay} />
 
         {data.reward ? <RewardBox code={data.reward.code} /> : reached ? <p className="text-sm text-muted-foreground">{t("advent.rewardPending")}</p> : null}
       </CardContent>
       <DayDialog day={openDay} state={data} onClose={() => setOpenDay(null)} />
     </Card>
+  );
+}
+
+// The calendar as a snowy cabin: 24 doors. Done days stay ajar with a tick
+// inside; tapping an open day swings its door before the day pops up; a
+// locked door just shakes and Santa says no.
+function AdventHouse({ state, onPick }: { state: AdventState; onPick: (d: AdventDay) => void }) {
+  const { t } = useTranslation();
+  const [swinging, setSwinging] = useState<number | null>(null);
+  const [shaking, setShaking] = useState<number | null>(null);
+
+  const pick = (d: AdventDay) => {
+    if (swinging) return;
+    if (!d.open) {
+      setShaking(d.day);
+      setTimeout(() => setShaking(null), 400);
+      onPick(d);
+      return;
+    }
+    if (d.completed) {
+      onPick(d);
+      return;
+    }
+    setSwinging(d.day);
+    setTimeout(() => {
+      setSwinging(null);
+      onPick(d);
+    }, 450);
+  };
+
+  return (
+    <div className="advent-house mx-auto w-full max-w-sm px-3 pt-4">
+      <div className="relative">
+        <div className="advent-chimney" aria-hidden />
+        <div className="advent-roof" aria-hidden />
+      </div>
+      <div className="advent-snow" aria-hidden />
+      <div className="advent-lights" aria-hidden>
+        {Array.from({ length: 9 }, (_, i) => <span key={i} />)}
+      </div>
+      <div className="advent-wall">
+        <div className="grid grid-cols-6 gap-x-2 gap-y-2.5">
+          {state.days.map((d) => (
+            <button
+              key={d.day}
+              onClick={() => pick(d)}
+              aria-label={fill(t("advent.day"), { day: d.day })}
+              className={cn(
+                "advent-door",
+                d.day === state.today && !d.completed && "is-today",
+                !d.open && "is-locked",
+                d.completed && "is-open",
+                swinging === d.day && "is-swinging",
+                shaking === d.day && "is-shaking"
+              )}
+            >
+              <span className="advent-door-inside">
+                {d.completed ? <Check className="h-4 w-4" /> : <span className="text-sm">⭐</span>}
+              </span>
+              <span className="advent-door-leaf">
+                {d.day === state.today && !d.completed && <span className="advent-wreath" aria-hidden />}
+                {d.day}
+              </span>
+              {d.type === "temptico" && d.open && !d.completed && (
+                <span className="absolute -right-1.5 -top-1.5 z-10 text-[10px]" aria-hidden>
+                  🎁
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -108,6 +161,7 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
     onSuccess: (next) => {
       qc.setQueryData(adventQueryKey(user!.id, lang), next);
       onClose();
+      celebrate();
     },
   });
 
@@ -143,7 +197,11 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
             </DialogHeader>
             {current.open && (
               <div className="mt-4 flex flex-col gap-2">
-                <Button disabled={current.completed || complete.isPending} onClick={() => complete.mutate(current.day)}>
+                <Button disabled={current.completed || complete.isPending} onClick={() => {
+                    unlockAudio();
+                    complete.mutate(current.day);
+                  }}
+                >
                   {current.completed ? t("advent.doneAlready") : t("advent.done")}
                 </Button>
                 {current.gift && <GiftCodeBox code={current.gift.code} note={current.gift.note} />}
