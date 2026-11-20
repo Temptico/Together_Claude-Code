@@ -140,7 +140,7 @@ input[type="time"]::-webkit-date-and-time-value {
   margin: -5px -14px 0;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 0 #c9dcea, inset 0 -1px 0 #dde9f2;
 }
 .advent-chimney {
   position: absolute;
@@ -151,6 +151,7 @@ input[type="time"]::-webkit-date-and-time-value {
   background: #8e2f27;
   border-top: 6px solid #fff;
   border-radius: 2px 2px 0 0;
+  box-shadow: 0 -2px 0 #c9dcea;
 }
 .advent-lights { display: flex; justify-content: space-around; margin: 3px 2px 0; }
 .advent-lights span {

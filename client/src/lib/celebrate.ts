@@ -74,8 +74,15 @@ const TUNE: [number, number][] = [
   [E, 1], [G, 1], [C, 1.5], [D, 0.5], [E, 4],
 ];
 
+// Plays once the context is running (the first tap may still be resuming it).
+function whenRunning(play: () => void) {
+  if (!ctx) return;
+  if (ctx.state === "running") play();
+  else void ctx.resume().then(play, () => {});
+}
+
 function jingle() {
-  if (!ctx || ctx.state !== "running") return;
+  if (!ctx) return;
   const beat = 0.2;
   const t0 = ctx.currentTime + 0.03;
   let t = t0;
@@ -86,8 +93,17 @@ function jingle() {
   for (let i = 0; i < 16; i++) sleigh(t0 + i * beat, i % 2 === 0 ? 0.09 : 0.05);
 }
 
+// A locked door: two falling chimes, a friendly "uh-oh".
+export function denied() {
+  whenRunning(() => {
+    const t0 = ctx!.currentTime + 0.03;
+    chime(t0, 783.99, 0.25);
+    chime(t0 + 0.25, 622.25, 0.25);
+  });
+}
+
 export function celebrate() {
-  jingle();
+  whenRunning(jingle);
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   if (reduceMotion) return;
   const colors = ["#c8102e", "#e8a33d", "#2f7d4f", "#ffffff", "#f4c542"];

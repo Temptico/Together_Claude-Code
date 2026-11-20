@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { adventQueryKey, fill, useAdvent, type AdventDay, type AdventState } from "@/hooks/use-advent";
 import { AdventJoinDialog } from "@/components/AdventInviteDialog";
-import { celebrate, unlockAudio } from "@/lib/celebrate";
+import { celebrate, denied, unlockAudio } from "@/lib/celebrate";
 
 // Home-screen advent calendar: progress toward the gift, a 24-window grid
 // (today and earlier open, later ones locked) and the reward once earned.
@@ -89,6 +89,8 @@ function AdventHouse({ state, onPick }: { state: AdventState; onPick: (d: Advent
   const pick = (d: AdventDay) => {
     if (swinging) return;
     if (!d.open) {
+      unlockAudio();
+      denied();
       setShaking(d.day);
       setTimeout(() => setShaking(null), 400);
       onPick(d);
