@@ -20,7 +20,7 @@ import { geocode } from "./geocode.js";
 import { parseRadiusKm } from "./geo.js";
 import { mergeNearby } from "./nearbyMerge.js";
 import { isOpenAt } from "./openingHours.js";
-import { storePhoto, deleteStoredPhoto } from "./photoStorage.js";
+import { storePhoto, deleteStoredPhoto, isOwnPhotoUrl } from "./photoStorage.js";
 import {
   moodNotification,
   answerNotification,
@@ -33,7 +33,11 @@ import {
   gameCompletedNotification,
   adventRewardNotification,
   adventMessageNotification,
+  loveTapNotification,
+  quizNotification,
+  bucketDoneNotification,
 } from "./notificationText.js";
+import { isValidQuizAnswers } from "../shared/coupleQuiz.js";
 import {
   insertUserSchema,
   nameSchema,
@@ -322,6 +326,11 @@ export function registerRoutes(app: Express) {
         storage.getUpcomingPlannedDates(user, 3),
         storage.getPendingMilestone(user.id),
       ]);
+      const [loveTaps, myQuiz, partnerQuiz] = await Promise.all([
+        storage.getLoveTapSummary(user),
+        storage.getQuizAnswers(user.id),
+        partner ? storage.getQuizAnswers(partner.id) : Promise.resolve(null),
+      ]);
 
       const myAnswer = question ? await storage.getAnswerForDate(user.id, question.id, date) : undefined;
       // challenge.date is the assignment's own date, not necessarily today —
@@ -349,6 +358,8 @@ export function registerRoutes(app: Express) {
         challengeCompleted: !!completion?.completedAt,
         upcomingDates: upcomingWithIdeas,
         pendingMilestone: pendingMilestone || null,
+        loveTaps,
+        quiz: { mine: !!myQuiz, partner: !!partnerQuiz },
       });
     })
   );
@@ -799,11 +810,12 @@ export function registerRoutes(app: Express) {
       const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
       const stats = await storage.getStats(user.id);
       const ids = user.partnerId ? [user.id, user.partnerId] : [user.id];
-      const [activity, pastDates, onThisDay, games] = await Promise.all([
+      const [activity, pastDates, onThisDay, games, bucketDone] = await Promise.all([
         storage.getActivityTimeline(ids, 20),
         storage.getPastDatesTimeline(ids, 20),
         storage.getOnThisDayMemories(ids),
         storage.getCompletedGameRounds(user, 10),
+        storage.getCompletedWishlist(user, 20),
       ]);
       const all = [...activity, ...pastDates, ...onThisDay];
 
@@ -857,6 +869,7 @@ export function registerRoutes(app: Express) {
         pastDates: pastDates.map(enrich),
         onThisDay: onThisDay.map(enrich),
         games,
+        bucketDone,
         partnerName: partner?.name || null,
       });
     })
@@ -1278,18 +1291,46 @@ export function registerRoutes(app: Express) {
   app.patch(
     "/api/wishlist/:id",
     ah(async (req, res) => {
-      const schema = z.object({ userId: z.string(), completed: z.boolean() });
+      const schema = z.object({
+        userId: z.string(),
+        completed: z.boolean().optional(),
+        photo: z
+          .string()
+          .max(7_000_000, "Slika je prevelika")
+          .regex(/^data:image\//, "Neveljavna slika")
+          .nullable()
+          .optional(),
+      });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: "Neveljavni podatki" });
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
         return;
       }
       const user = await requireUser(req, res, parsed.data.userId);
       if (!user) return;
-      const item = await storage.updateWishlistItem(Number(req.params.id), user, parsed.data.completed);
+      const id = Number(req.params.id);
+      const before = await storage.getWishlistItem(id, user);
+      if (!before) {
+        res.status(404).json({ error: "Ni najdeno" });
+        return;
+      }
+      const patch: { completed?: boolean; photo?: string | null } = {};
+      if (parsed.data.completed !== undefined) patch.completed = parsed.data.completed;
+      if (parsed.data.photo !== undefined) {
+        patch.photo = parsed.data.photo ? await storePhoto(parsed.data.photo, `bucket/${id}`) : null;
+      }
+      const item = await storage.updateWishlistItem(id, user, patch);
       if (!item) {
         res.status(404).json({ error: "Ni najdeno" });
         return;
+      }
+      if (before.photo && before.photo !== item.photo) deleteStoredPhoto(before.photo).catch(() => {});
+      if (patch.completed && !before.completed && user.partnerId) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: bucketDoneNotification(lang, user.name, item.text),
+          tag: "bucket-done",
+        })).catch(() => {});
       }
       res.json(item);
     })
@@ -1301,8 +1342,104 @@ export function registerRoutes(app: Express) {
       const userId = req.query.userId as string;
       const user = await requireUser(req, res, userId);
       if (!user) return;
-      await storage.deleteWishlistItem(Number(req.params.id), user);
+      const deleted = await storage.deleteWishlistItem(Number(req.params.id), user);
+      if (deleted?.photo) deleteStoredPhoto(deleted.photo).catch(() => {});
       res.status(204).end();
+    })
+  );
+
+  // Our own stored photos, served from this origin so a share card can draw
+  // them on a canvas (the bucket isn't set up for cross-origin reads).
+  app.get(
+    "/api/photo",
+    ah(async (req, res) => {
+      const src = typeof req.query.src === "string" ? req.query.src : "";
+      if (!isOwnPhotoUrl(src)) {
+        res.status(404).end();
+        return;
+      }
+      const upstream = await fetch(src);
+      const type = upstream.headers.get("content-type") || "";
+      if (!upstream.ok || !type.startsWith("image/")) {
+        res.status(404).end();
+        return;
+      }
+      res.set("Content-Type", type).set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(await upstream.arrayBuffer()));
+    })
+  );
+
+  // ---------------- "Thinking of you" ----------------
+  app.post(
+    "/api/love-tap",
+    ah(async (req, res) => {
+      const parsed = z.object({ userId: z.string() }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      if (!user.partnerId) {
+        res.status(400).json({ error: "Najprej se poveži s partnerjem" });
+        return;
+      }
+      const { push } = await storage.sendLoveTap(user);
+      if (push) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: loveTapNotification(lang, user.name),
+          tag: "love-tap",
+        })).catch(() => {});
+      }
+      res.json(await storage.getLoveTapSummary(user));
+    })
+  );
+
+  // ---------------- Couple quiz ----------------
+  // The partner's answers are only handed out once you've answered yourself,
+  // so nobody can peek and copy.
+  app.get(
+    "/api/quiz/:userId",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
+      const [mine, theirs] = await Promise.all([
+        storage.getQuizAnswers(user.id),
+        partner ? storage.getQuizAnswers(partner.id) : Promise.resolve(null),
+      ]);
+      res.json({
+        mine,
+        partner: partner ? { name: partner.name, done: !!theirs, answers: mine ? theirs : null } : null,
+      });
+    })
+  );
+
+  app.post(
+    "/api/quiz",
+    ah(async (req, res) => {
+      const parsed = z.object({ userId: z.string(), answers: z.array(z.number().int()) }).safeParse(req.body);
+      if (!parsed.success || !isValidQuizAnswers(parsed.data.answers)) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const { first } = await storage.saveQuizAnswers(user.id, parsed.data.answers);
+      const partner = user.partnerId ? await storage.getUserById(user.partnerId) : undefined;
+      const theirs = partner ? await storage.getQuizAnswers(partner.id) : null;
+      if (first && partner) {
+        notifyUser(partner.id, (lang) => ({
+          title: "Together",
+          body: quizNotification(lang, user.name, !!theirs),
+          tag: "couple-quiz",
+        })).catch(() => {});
+      }
+      res.json({
+        mine: parsed.data.answers,
+        partner: partner ? { name: partner.name, done: !!theirs, answers: theirs } : null,
+      });
     })
   );
 

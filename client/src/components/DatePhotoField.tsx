@@ -11,10 +11,13 @@ export function DatePhotoField({
   plannedDateId,
   photo,
   invalidateKeys,
+  endpoint,
 }: {
   plannedDateId: number;
   photo: string | null | undefined;
   invalidateKeys: unknown[][];
+  /** Where the photo is PATCHed; defaults to the planned date. */
+  endpoint?: string;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -24,7 +27,7 @@ export function DatePhotoField({
 
   const mutation = useMutation({
     mutationFn: (nextPhoto: string | null) =>
-      apiRequest("PATCH", `/api/dates/planned/${plannedDateId}`, { userId: user!.id, photo: nextPhoto }),
+      apiRequest("PATCH", endpoint ?? `/api/dates/planned/${plannedDateId}`, { userId: user!.id, photo: nextPhoto }),
     onSuccess: () => {
       for (const key of invalidateKeys) qc.invalidateQueries({ queryKey: key });
     },

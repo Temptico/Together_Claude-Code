@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Heart, Flame, Settings, Trophy, MessageCircle, CalendarHeart, ChevronRight, Check, X, PartyPopper } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { ReactionBar } from "@/components/ReactionBar";
 import { LoadError } from "@/components/LoadError";
 import { AdventCard } from "@/components/AdventCard";
 import { NotificationOptInDialog } from "@/components/NotificationOptInDialog";
+import { ShareStoryButton } from "@/components/ShareStoryButton";
+import { heartPing, unlockAudio } from "@/lib/celebrate";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,7 +33,11 @@ type HomeData = {
   challengeCompleted: boolean;
   upcomingDates: any[];
   pendingMilestone: { id: number; type: string; value: number } | null;
+  loveTaps: LoveTaps | null;
+  quiz: { mine: boolean; partner: boolean };
 };
+
+type LoveTaps = { sentToday: number; receivedToday: number; lastReceived: { id: number; createdAt: string } | null };
 
 // Same product + discount code used in the Temptico catalog date-idea,
 // tagged with a separate utm_campaign so Shopify/analytics can tell
@@ -83,6 +89,8 @@ export default function Home() {
       {data.pendingMilestone && <MilestoneCard milestone={data.pendingMilestone} userId={data.user.id} />}
       {!data.partner && <ConnectBanner />}
       <AdventCard />
+      {!data.quiz.mine && <QuizCard data={data} />}
+      {data.partner && <LoveTapCard data={data} />}
       {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
       <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
       <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
@@ -93,6 +101,7 @@ export default function Home() {
         userId={data.user.id}
       />
       <GamesRow userId={data.user.id} />
+      {data.quiz.mine && <QuizCard data={data} />}
       <UpcomingDatesCard dates={data.upcomingDates} />
       <NotificationOptInDialog />
     </div>
@@ -151,6 +160,16 @@ function MilestoneCard({ milestone, userId }: { milestone: { id: number; value: 
           </button>
         </div>
         <p className="text-sm text-white/90">{t("home.milestoneBody")}</p>
+        <ShareStoryButton
+          variant="secondary"
+          className="self-start bg-white/20 text-white hover:bg-white/30"
+          card={{
+            emoji: "🔥",
+            kicker: t("share.streakKicker"),
+            title: `${milestone.value} ${t("home.days")} ${t("home.milestoneInARow")}`,
+            subtitle: t("share.streakSub"),
+          }}
+        />
         <Button
           asChild
           variant="secondary"
@@ -166,6 +185,158 @@ function MilestoneCard({ milestone, userId }: { milestone: { id: number; value: 
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+const SEEN_TAP_KEY = "together:lastSeenLoveTapId";
+
+function storeGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storeSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // No storage: the heart just shows again next time.
+  }
+}
+
+// "Thinking of you": one tap sends the partner a heart and a push. A heart
+// that arrived since the last visit floats up on its own.
+function LoveTapCard({ data }: { data: HomeData }) {
+  const { t, lang } = useTranslation();
+  const qc = useQueryClient();
+  const userId = data.user.id;
+  const taps = data.loveTaps;
+  const partnerName = data.partner.name;
+  const [hearts, setHearts] = useState<{ id: number; x: number; d: number }[]>([]);
+  const [fresh, setFresh] = useState(false);
+
+  const burst = () => {
+    const base = Date.now();
+    const next = Array.from({ length: 9 }, (_, i) => ({ id: base + i, x: Math.round((Math.random() - 0.5) * 160), d: i * 70 }));
+    setHearts((h) => [...h, ...next]);
+    setTimeout(() => setHearts((h) => h.filter((x) => x.id < base || x.id > base + 8)), 1900);
+  };
+
+  const lastId = taps?.lastReceived?.id;
+  useEffect(() => {
+    if (!lastId) return;
+    if (storeGet(SEEN_TAP_KEY) !== String(lastId)) {
+      setFresh(true);
+      burst();
+      storeSet(SEEN_TAP_KEY, String(lastId));
+    }
+  }, [lastId]);
+
+  const send = useMutation({
+    mutationFn: () => apiRequest<LoveTaps>("POST", "/api/love-tap", { userId }),
+    onSuccess: (summary) => qc.setQueryData<HomeData>(["/api/home", userId], (old) => (old ? { ...old, loveTaps: summary } : old)),
+  });
+
+  const tap = () => {
+    unlockAudio();
+    heartPing();
+    navigator.vibrate?.(30);
+    burst();
+    send.mutate();
+  };
+
+  const last = taps?.lastReceived ? new Date(taps.lastReceived.createdAt) : null;
+  const lastLabel = last
+    ? last.toDateString() === new Date().toDateString()
+      ? last.toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })
+      : last.toLocaleDateString(bcp47(lang), { day: "numeric", month: "long" })
+    : null;
+
+  return (
+    <Card className={cn("relative overflow-visible", fresh && "ring-2 ring-primary/50")}>
+      <CardContent className="flex items-center gap-4 py-4">
+        <div className="min-w-0 flex-1">
+          <p className="font-extrabold">{t("love.title")}</p>
+          {last && (taps!.receivedToday > 0 || fresh) ? (
+            <p className="text-sm font-semibold text-primary">
+              {t("love.received").replace("{name}", partnerName)} · {lastLabel}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("love.hint").replace("{name}", partnerName)}</p>
+          )}
+          {taps && (taps.sentToday > 0 || taps.receivedToday > 0) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("love.today").replace("{sent}", String(taps.sentToday)).replace("{received}", String(taps.receivedToday))}
+            </p>
+          )}
+        </div>
+        <div className="relative">
+          <button
+            onClick={tap}
+            aria-label={t("love.button")}
+            className="love-tap-button flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform active:scale-90"
+          >
+            <Heart className="h-8 w-8 fill-current" />
+          </button>
+          {hearts.map((h) => (
+            <span
+              key={h.id}
+              aria-hidden
+              className="love-float pointer-events-none absolute left-1/2 top-1/2 text-2xl"
+              style={{ ["--x" as string]: `${h.x}px`, animationDelay: `${h.d}ms` }}
+            >
+              💗
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// The couple quiz: a big invitation until you've taken it, then a small
+// link to the result (or to "waiting for your partner").
+function QuizCard({ data }: { data: HomeData }) {
+  const { t } = useTranslation();
+  const partnerName = data.partner?.name;
+  if (!data.quiz.mine) {
+    return (
+      <Link href="/quiz">
+        <Card className="border-none bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-md">
+          <CardContent className="flex items-center gap-4 py-5">
+            <span className="text-5xl">💑</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-extrabold leading-tight">{t("quiz.title")}</p>
+              <p className="text-sm text-white/90">
+                {data.quiz.partner && partnerName ? t("quiz.partnerDone").replace("{name}", partnerName) : t("quiz.homeBody")}
+              </p>
+              <span className="mt-2 inline-block rounded-full bg-white px-4 py-1.5 text-sm font-extrabold text-rose-600">
+                {t("quiz.start")}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    );
+  }
+  const waiting = !!partnerName && !data.quiz.partner;
+  return (
+    <Link href="/quiz">
+      <Card>
+        <CardContent className="flex items-center gap-3 py-3">
+          <span className="text-2xl">💑</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold">{t("quiz.title")}</p>
+            <p className="text-xs text-muted-foreground">
+              {waiting ? t("quiz.waitingTitle").replace("{name}", partnerName!) : partnerName ? t("quiz.seeResult") : t("quiz.seeYourType")}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

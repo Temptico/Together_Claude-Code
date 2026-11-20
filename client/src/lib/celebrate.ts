@@ -113,3 +113,20 @@ export function celebrate() {
     void confetti({ particleCount: 40, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors, zIndex: 9999, disableForReducedMotion: true });
   }, 180);
 }
+
+// Everyday wins (a bucket list item, a quiz result): a bright rising
+// arpeggio and warm-coloured confetti, no Christmas bells.
+export function cheer() {
+  whenRunning(() => {
+    const t0 = ctx!.currentTime + 0.03;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => chime(t0 + i * 0.11, f, 0.2));
+  });
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const colors = ["#cc3a3a", "#f08a5d", "#f4c542", "#ffffff", "#e85d75"];
+  void confetti({ particleCount: 100, spread: 80, startVelocity: 40, origin: { y: 0.7 }, colors, zIndex: 9999, disableForReducedMotion: true });
+}
+
+// "Thinking of you": one soft, high note.
+export function heartPing() {
+  whenRunning(() => chime(ctx!.currentTime + 0.02, 1046.5, 0.15));
+}

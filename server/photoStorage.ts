@@ -39,14 +39,16 @@ const DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/s;
 // Stores a data: URL photo and returns its public URL. Returns the data URL
 // itself when storage isn't configured, so callers can save whichever they
 // get. Throws on an upload failure (the caller reports it to the user).
-export async function storePhoto(dataUrl: string, plannedDateId: number): Promise<string> {
+export async function storePhoto(dataUrl: string, plannedDateId: number | string): Promise<string> {
   const cfg = config();
   if (!cfg) return dataUrl;
   const m = DATA_URL.exec(dataUrl);
   if (!m) throw new Error("Neveljavna slika");
   const [, contentType, base64] = m;
   const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
-  const key = `dates/${plannedDateId}/${nanoid(12)}.${ext}`;
+  // A number is a planned date's id; a string is a folder of its own ("bucket/12").
+  const folder = typeof plannedDateId === "number" ? `dates/${plannedDateId}` : plannedDateId;
+  const key = `${folder}/${nanoid(12)}.${ext}`;
   await getClient(cfg).send(
     new PutObjectCommand({
       Bucket: cfg.bucket,
@@ -70,4 +72,11 @@ export async function deleteStoredPhoto(photo: string | null | undefined): Promi
   } catch (err) {
     console.warn("[photos] failed to delete", key, err instanceof Error ? err.message : err);
   }
+}
+
+// Whether a URL points into our own photo bucket (for the same-origin proxy
+// that lets the browser draw a photo onto a share card).
+export function isOwnPhotoUrl(url: string): boolean {
+  const cfg = config();
+  return !!cfg && url.startsWith(`${cfg.publicUrl}/`) && !url.includes("..");
 }

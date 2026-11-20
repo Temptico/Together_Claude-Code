@@ -223,3 +223,17 @@ input[type="time"]::-webkit-date-and-time-value {
   nav, [role="dialog"], [data-sonner-toaster] { display: none !important; }
   body { background: #fff !important; }
 }
+
+/* "Thinking of you" hearts floating up from the button. */
+@keyframes love-float {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--x, 0px)), -190px) scale(1.25); opacity: 0; }
+}
+.love-float {
+  animation: love-float 1.4s ease-out both;
+  z-index: 20;
+}
+@media (prefers-reduced-motion: reduce) {
+  .love-float { animation-duration: 0.01s; }
+}

@@ -345,6 +345,24 @@ const STATEMENTS = [
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS advent_messages_user_year_day_idx ON advent_messages (user_id, year, day)`,
+  // Bucket list: who ticked an item off, when, and an optional photo.
+  `ALTER TABLE wishlist_items ADD COLUMN IF NOT EXISTS completed_at timestamp`,
+  `ALTER TABLE wishlist_items ADD COLUMN IF NOT EXISTS completed_by varchar(24)`,
+  `ALTER TABLE wishlist_items ADD COLUMN IF NOT EXISTS photo text`,
+  `CREATE TABLE IF NOT EXISTS love_taps (
+      id serial PRIMARY KEY,
+      from_user_id varchar(24) NOT NULL,
+      to_user_id varchar(24) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS love_taps_to_idx ON love_taps (to_user_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS love_taps_from_idx ON love_taps (from_user_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS couple_quiz_answers (
+      user_id varchar(24) PRIMARY KEY,
+      answers text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
 ];
 
 export async function runMigrations() {

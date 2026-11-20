@@ -29,6 +29,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const Terms = lazy(() => import("@/pages/Terms"));
 const CustomContent = lazy(() => import("@/pages/CustomContent"));
 const AdventFinale = lazy(() => import("@/pages/AdventFinale"));
+const CoupleQuiz = lazy(() => import("@/pages/CoupleQuiz"));
 const OnboardingTour = lazy(() => import("@/pages/OnboardingTour"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -108,6 +109,7 @@ function Shell() {
             <Route path="/terms" component={Terms} />
             <Route path="/custom-content" component={CustomContent} />
             <Route path="/advent" component={AdventFinale} />
+            <Route path="/quiz" component={CoupleQuiz} />
             <Route path="/register">
               <Redirect to="/" />
             </Route>

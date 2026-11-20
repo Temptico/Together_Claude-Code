@@ -201,11 +201,32 @@ export const wishlistItems = pgTable("wishlist_items", {
   createdBy: varchar("created_by", { length: 24 }).notNull(),
   text: text("text").notNull(),
   completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by", { length: 24 }),
+  photo: text("photo"), // public URL in photo storage, or a data: URL without it
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertWishlistItemSchema = z.object({
   text: z.string().min(2, "Prekratko").max(200, "Predolgo"),
+});
+
+// ---------- "Thinking of you" taps ----------
+// One tap on Home sends the partner a little heart (and a push).
+export const loveTaps = pgTable("love_taps", {
+  id: serial("id").primaryKey(),
+  fromUserId: varchar("from_user_id", { length: 24 }).notNull(),
+  toUserId: varchar("to_user_id", { length: 24 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ---------- "What kind of couple are you?" quiz ----------
+// Each person's own answers (option index per question, see coupleQuiz.ts).
+export const coupleQuizAnswers = pgTable("couple_quiz_answers", {
+  userId: varchar("user_id", { length: 24 }).primaryKey(),
+  answers: text("answers").notNull(), // JSON array of option indexes
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ---------- Reactions ----------

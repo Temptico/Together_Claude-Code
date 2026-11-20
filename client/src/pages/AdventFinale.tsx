@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Check, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ShareStoryButton } from "@/components/ShareStoryButton";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -32,6 +33,20 @@ export default function AdventFinalePage() {
           <Button size="sm" variant="outline" onClick={() => window.print()}>
             <Download className="mr-1 h-4 w-4" /> {t("advent.finaleSave")}
           </Button>
+        )}
+      </div>
+      <div className="flex justify-center print:hidden">
+        {data && (
+          <ShareStoryButton
+            variant="default"
+            card={{
+              emoji: "🎄",
+              kicker: fill(t("advent.finaleTitle"), { year: data.year }),
+              title: data.names.filter(Boolean).join(" ❤️ "),
+              big: `${data.completedCount}/${data.days.length}`,
+              subtitle: t("share.finaleSub"),
+            }}
+          />
         )}
       </div>
 

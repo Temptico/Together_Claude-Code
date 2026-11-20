@@ -5,6 +5,7 @@ import { Check, Copy, Gift } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ShareStoryButton } from "@/components/ShareStoryButton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -229,6 +230,16 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                 >
                   {current.completed ? t("advent.doneAlready") : t("advent.done")}
                 </Button>
+                {current.completed && (
+                  <ShareStoryButton
+                    card={{
+                      emoji: "🎄",
+                      kicker: fill(t("share.adventKicker"), { day: current.day }),
+                      title: current.title ?? "",
+                      subtitle: fill(t("advent.progress"), { n: state.completedCount, total: state.days.length }),
+                    }}
+                  />
+                )}
                 {current.gift && <GiftCodeBox code={current.gift.code} note={current.gift.note} />}
                 {current.offerUrl && (
                   <a

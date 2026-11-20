@@ -263,3 +263,39 @@ export function adventMessageNotification(lang: string, name: string, day: numbe
   };
   return bodies[normLang(lang)];
 }
+
+// "Thinking of you" tap from the partner.
+export function loveTapNotification(lang: string, name: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `${name} misli nate 💗`,
+    en: `${name} is thinking of you 💗`,
+    hr: `${name} misli na tebe 💗`,
+  };
+  return bodies[normLang(lang)];
+}
+
+// Couple quiz: the partner finished it first (your turn) or second (results).
+export function quizNotification(lang: string, name: string, resultReady: boolean): string {
+  const l = normLang(lang);
+  const turn: Record<Lang, string> = {
+    sl: `${name} je rešil/a kviz »Kakšen par sta?«. Zdaj si na vrsti ti 💑`,
+    en: `${name} took the "What kind of couple are you?" quiz. Your turn 💑`,
+    hr: `${name} je riješio/la kviz »Kakav ste par?«. Sada si ti na redu 💑`,
+  };
+  const ready: Record<Lang, string> = {
+    sl: `${name} je rešil/a kviz. Vajin rezultat je tu! 💑`,
+    en: `${name} finished the quiz. Your result is here! 💑`,
+    hr: `${name} je riješio/la kviz. Vaš rezultat je tu! 💑`,
+  };
+  return (resultReady ? ready : turn)[l];
+}
+
+// Bucket list: the partner ticked something off.
+export function bucketDoneNotification(lang: string, name: string, item: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `${name} je obkljukal/a na vajinem bucket listu: ${item} ✅`,
+    en: `${name} ticked off your bucket list: ${item} ✅`,
+    hr: `${name} je označio/la na vašem bucket listu: ${item} ✅`,
+  };
+  return bodies[normLang(lang)];
+}

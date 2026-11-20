@@ -22,6 +22,7 @@ type MemoriesData = {
   pastDates: any[];
   onThisDay: any[];
   games: CompletedGame[];
+  bucketDone?: { id: number; text: string; completedAt: string | null; completedBy: string | null; photo: string | null }[];
   partnerName: string | null;
 };
 
@@ -91,6 +92,17 @@ export default function Memories() {
             </div>
           )}
 
+          {data.bucketDone && data.bucketDone.length > 0 && (
+            <>
+              <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">🗺️ {t("bucket.memoriesSection")}</h2>
+              <div className="flex flex-col gap-3">
+                {data.bucketDone.map((b) => (
+                  <BucketMemoryCard key={b.id} item={b} isMe={b.completedBy === user!.id} partnerName={data.partnerName} />
+                ))}
+              </div>
+            </>
+          )}
+
           {data.games.length > 0 && (
             <>
               <h2 className="mt-2 text-sm font-extrabold text-muted-foreground">{t("memories.gamesSection")}</h2>
@@ -133,6 +145,38 @@ export default function Memories() {
         </>
       )}
     </div>
+  );
+}
+
+function BucketMemoryCard({
+  item,
+  isMe,
+  partnerName,
+}: {
+  item: NonNullable<MemoriesData["bucketDone"]>[number];
+  isMe: boolean;
+  partnerName: string | null;
+}) {
+  const { t, lang } = useTranslation();
+  const who = isMe ? t("memories.you") : partnerName || t("memories.partner");
+  const when = item.completedAt
+    ? new Date(item.completedAt).toLocaleDateString(bcp47(lang), { day: "numeric", month: "long", year: "numeric" })
+    : "";
+  return (
+    <Link href="/dates?tab=wishlist">
+      <Card>
+        <CardContent className="flex flex-col gap-2 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">✅</span>
+            <div className="flex-1">
+              <p className="text-sm font-extrabold">{item.text}</p>
+              {when && <p className="text-xs text-muted-foreground">{t("bucket.doneOn").replace("{date}", when).replace("{who}", who)}</p>}
+            </div>
+          </div>
+          {item.photo && <img src={item.photo} alt="" className="w-full rounded-2xl object-cover" style={{ maxHeight: 220 }} />}
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

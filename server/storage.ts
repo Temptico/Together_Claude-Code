@@ -18,6 +18,8 @@ import {
   dailyAssignments,
   reminderLog,
   wishlistItems,
+  loveTaps,
+  coupleQuizAnswers,
   milestoneEvents,
   feedback,
   tempticoClicks,
@@ -199,6 +201,8 @@ export async function deleteUserAccount(user: User): Promise<void> {
     db.delete(customQuestions).where(eq(customQuestions.createdBy, user.id)),
     db.delete(customChallenges).where(eq(customChallenges.createdBy, user.id)),
     db.delete(wishlistItems).where(eq(wishlistItems.createdBy, user.id)),
+    db.delete(loveTaps).where(or(eq(loveTaps.fromUserId, user.id), eq(loveTaps.toUserId, user.id))),
+    db.delete(coupleQuizAnswers).where(eq(coupleQuizAnswers.userId, user.id)),
     db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
     db.delete(reminderLog).where(eq(reminderLog.userId, user.id)),
     db.delete(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id)),
@@ -828,11 +832,11 @@ export async function deletePlannedDate(id: number, user: User) {
 // Photo URLs of every date a user owns — collected before an account is
 // erased so the objects can be removed from storage afterwards.
 export async function getUserPhotoUrls(userId: string): Promise<string[]> {
-  const rows = await db
-    .select({ photo: plannedDates.photo })
-    .from(plannedDates)
-    .where(and(eq(plannedDates.userId, userId), isNotNull(plannedDates.photo)));
-  return rows.map((r: { photo: string | null }) => r.photo!).filter((p: string) => !p.startsWith("data:"));
+  const [dates, bucket] = await Promise.all([
+    db.select({ photo: plannedDates.photo }).from(plannedDates).where(and(eq(plannedDates.userId, userId), isNotNull(plannedDates.photo))),
+    db.select({ photo: wishlistItems.photo }).from(wishlistItems).where(and(eq(wishlistItems.createdBy, userId), isNotNull(wishlistItems.photo))),
+  ]);
+  return [...dates, ...bucket].map((r: { photo: string | null }) => r.photo!).filter((p: string) => !p.startsWith("data:"));
 }
 
 // ---------------- Stats & timeline ----------------
@@ -1141,17 +1145,119 @@ export async function createWishlistItem(user: User, text: string) {
   return row;
 }
 
-export async function updateWishlistItem(id: number, user: User, completed: boolean) {
+export async function getWishlistItem(id: number, user: User) {
+  const [row] = await db
+    .select()
+    .from(wishlistItems)
+    .where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))));
+  return row;
+}
+
+// Ticking an item off records who did it and when; unticking clears both
+// (and the photo stays, in case it was a mis-tap).
+export async function updateWishlistItem(
+  id: number,
+  user: User,
+  patch: { completed?: boolean; photo?: string | null }
+) {
+  const set: Record<string, unknown> = {};
+  if (patch.completed !== undefined) {
+    set.completed = patch.completed;
+    set.completedAt = patch.completed ? new Date() : null;
+    set.completedBy = patch.completed ? user.id : null;
+  }
+  if (patch.photo !== undefined) set.photo = patch.photo;
+  if (Object.keys(set).length === 0) return getWishlistItem(id, user);
   const [row] = await db
     .update(wishlistItems)
-    .set({ completed })
+    .set(set)
     .where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))))
     .returning();
   return row;
 }
 
 export async function deleteWishlistItem(id: number, user: User) {
-  await db.delete(wishlistItems).where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))));
+  const [row] = await db
+    .delete(wishlistItems)
+    .where(and(eq(wishlistItems.id, id), eq(wishlistItems.coupleKey, coupleKeyFor(user))))
+    .returning();
+  return row;
+}
+
+// Ticked-off bucket list items, newest first — a section of Memories.
+export async function getCompletedWishlist(user: User, limit: number) {
+  return db
+    .select()
+    .from(wishlistItems)
+    .where(and(eq(wishlistItems.coupleKey, coupleKeyFor(user)), eq(wishlistItems.completed, true)))
+    .orderBy(desc(wishlistItems.completedAt), desc(wishlistItems.createdAt))
+    .limit(limit);
+}
+
+// ---------------- "Thinking of you" ----------------
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Records a tap and says whether to push it: a burst of taps sends one
+// notification, not ten.
+export const LOVE_TAP_PUSH_GAP_MS = 60_000;
+export async function sendLoveTap(user: User): Promise<{ push: boolean }> {
+  const [last] = await db
+    .select({ createdAt: loveTaps.createdAt })
+    .from(loveTaps)
+    .where(and(eq(loveTaps.fromUserId, user.id), eq(loveTaps.toUserId, user.partnerId!)))
+    .orderBy(desc(loveTaps.createdAt))
+    .limit(1);
+  await db.insert(loveTaps).values({ fromUserId: user.id, toUserId: user.partnerId! });
+  return { push: !last || Date.now() - last.createdAt.getTime() >= LOVE_TAP_PUSH_GAP_MS };
+}
+
+export async function getLoveTapSummary(user: User) {
+  if (!user.partnerId) return null;
+  const since = startOfToday();
+  const [sent, received, [last]] = await Promise.all([
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loveTaps)
+      .where(and(eq(loveTaps.fromUserId, user.id), eq(loveTaps.toUserId, user.partnerId), gte(loveTaps.createdAt, since))),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loveTaps)
+      .where(and(eq(loveTaps.fromUserId, user.partnerId), eq(loveTaps.toUserId, user.id), gte(loveTaps.createdAt, since))),
+    db
+      .select({ id: loveTaps.id, createdAt: loveTaps.createdAt })
+      .from(loveTaps)
+      .where(and(eq(loveTaps.fromUserId, user.partnerId), eq(loveTaps.toUserId, user.id)))
+      .orderBy(desc(loveTaps.createdAt))
+      .limit(1),
+  ]);
+  return { sentToday: Number(sent[0]?.n ?? 0), receivedToday: Number(received[0]?.n ?? 0), lastReceived: last ?? null };
+}
+
+// ---------------- Couple quiz ----------------
+export async function getQuizAnswers(userId: string): Promise<number[] | null> {
+  const [row] = await db.select().from(coupleQuizAnswers).where(eq(coupleQuizAnswers.userId, userId));
+  if (!row) return null;
+  try {
+    return JSON.parse(row.answers);
+  } catch {
+    return null;
+  }
+}
+
+// Returns whether this is the user's first time (a retake doesn't re-notify).
+export async function saveQuizAnswers(userId: string, answers: number[]): Promise<{ first: boolean }> {
+  const existing = await getQuizAnswers(userId);
+  const value = JSON.stringify(answers);
+  if (existing) {
+    await db.update(coupleQuizAnswers).set({ answers: value, updatedAt: new Date() }).where(eq(coupleQuizAnswers.userId, userId));
+    return { first: false };
+  }
+  await db.insert(coupleQuizAnswers).values({ userId, answers: value }).onConflictDoNothing();
+  return { first: true };
 }
 
 // ---------------- Reactions ----------------
