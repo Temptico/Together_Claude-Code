@@ -216,3 +216,10 @@ input[type="time"]::-webkit-date-and-time-value {
   .advent-door-leaf { transition: none; }
   .advent-door.is-shaking, .advent-lights span { animation: none; }
 }
+
+/* Advent finale "Save as PDF": print just the page, not the app chrome. */
+@media print {
+  .app-shell, .content-scroll-pad { height: auto !important; overflow: visible !important; padding-bottom: 0 !important; }
+  nav, [role="dialog"], [data-sonner-toaster] { display: none !important; }
+  body { background: #fff !important; }
+}

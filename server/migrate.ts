@@ -335,6 +335,16 @@ const STATEMENTS = [
       assigned_at timestamp
     )`,
   `CREATE INDEX IF NOT EXISTS advent_reward_codes_user_idx ON advent_reward_codes (user_id)`,
+  `CREATE TABLE IF NOT EXISTS advent_messages (
+      id serial PRIMARY KEY,
+      user_id varchar(24) NOT NULL,
+      year integer NOT NULL,
+      day integer NOT NULL,
+      text text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS advent_messages_user_year_day_idx ON advent_messages (user_id, year, day)`,
 ];
 
 export async function runMigrations() {

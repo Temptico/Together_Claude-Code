@@ -253,3 +253,13 @@ export function adventRewardNotification(lang: string): { title: string; body: s
   };
   return texts[normLang(lang)];
 }
+
+// Advent calendar: the partner hid a message behind a door.
+export function adventMessageNotification(lang: string, name: string, day: number): string {
+  const bodies: Record<Lang, string> = {
+    sl: `V vratcih ${day} te čaka skrito sporočilo od ${name} 💌`,
+    en: `${name} hid a message for you behind door ${day} 💌`,
+    hr: `Iza vratašca ${day} čeka te skrivena poruka od ${name} 💌`,
+  };
+  return bodies[normLang(lang)];
+}

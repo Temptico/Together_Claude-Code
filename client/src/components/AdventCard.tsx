@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Gift } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -70,6 +72,15 @@ export function AdventCard() {
         {data.phase === "invite" && <p className="text-sm text-muted-foreground">{t("advent.opensDec1")}</p>}
 
         <AdventHouse state={data} onPick={setOpenDay} />
+
+        {data.days.some((d) => d.canHideMessage) && data.today < 24 && (
+          <p className="text-xs text-muted-foreground">{t("advent.hideTeaser")}</p>
+        )}
+        {data.today >= 24 && (data.phase === "active" || data.phase === "catchup") && (
+          <Button asChild variant="outline">
+            <Link href="/advent">{t("advent.finaleButton")}</Link>
+          </Button>
+        )}
 
         {data.reward ? <RewardBox code={data.reward.code} /> : reached ? <p className="text-sm text-muted-foreground">{t("advent.rewardPending")}</p> : null}
       </CardContent>
@@ -140,6 +151,11 @@ function AdventHouse({ state, onPick }: { state: AdventState; onPick: (d: Advent
                 {d.day === state.today && !d.completed && <span className="advent-wreath" aria-hidden />}
                 {d.day}
               </span>
+              {d.hasMessage && !d.completed && (
+                <span className="absolute -left-1.5 -top-1.5 z-10 text-[10px]" aria-hidden>
+                  💌
+                </span>
+              )}
               {d.type === "temptico" && d.open && !d.completed && (
                 <span className="absolute -right-1.5 -top-1.5 z-10 text-[10px]" aria-hidden>
                   🎁
@@ -197,6 +213,13 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                       : fill(t("advent.locked"), { day: current.day })}
               </DialogDescription>
             </DialogHeader>
+            {!current.open && current.hasMessage && <p className="text-sm font-semibold text-primary">{t("advent.sealed")}</p>}
+            {current.open && current.message && (
+              <div className="mt-1 flex flex-col gap-1 rounded-2xl bg-accent/60 p-3">
+                <p className="text-xs font-bold text-primary">{t("advent.messageForYou")}</p>
+                <p className="whitespace-pre-line text-base">{current.message}</p>
+              </div>
+            )}
             {current.open && (
               <div className="mt-4 flex flex-col gap-2">
                 <Button disabled={current.completed || complete.isPending} onClick={() => {
@@ -220,10 +243,65 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                 )}
               </div>
             )}
+            {current.canHideMessage && <HideMessageBox key={current.day} day={current.day} existing={current.myMessage} />}
           </>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Write (or change, or remove) the note the partner finds behind this door.
+function HideMessageBox({ day, existing }: { day: number; existing: string | null }) {
+  const { t, lang } = useTranslation();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [text, setText] = useState(existing ?? "");
+  const [editing, setEditing] = useState(!existing);
+  useEffect(() => setText(existing ?? ""), [existing]);
+
+  const save = useMutation({
+    mutationFn: (value: string) => apiRequest<AdventState>("POST", "/api/advent/message", { userId: user!.id, day, text: value }),
+    onSuccess: (next, value) => {
+      qc.setQueryData(adventQueryKey(user!.id, lang), next);
+      toast({ title: value.trim() ? t("advent.hideSaved") : t("advent.hideRemoved") });
+      setEditing(!value.trim());
+    },
+  });
+
+  if (existing && !editing) {
+    return (
+      <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
+        <p className="text-xs font-bold text-primary">{t("advent.myHidden")}</p>
+        <p className="whitespace-pre-line text-sm">{existing}</p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            {t("common.edit")}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => save.mutate("")}>
+            {t("advent.hideDelete")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <p className="text-sm font-bold">{t("advent.hideTitle")}</p>
+      <p className="text-xs text-muted-foreground">{t("advent.hideHint")}</p>
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={300}
+        rows={3}
+        placeholder={t("advent.hidePlaceholder")}
+      />
+      <Button variant="outline" disabled={!text.trim() || save.isPending} onClick={() => save.mutate(text)}>
+        {existing ? t("advent.hideUpdate") : t("advent.hideSave")}
+      </Button>
+    </div>
   );
 }
 

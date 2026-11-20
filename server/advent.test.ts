@@ -134,6 +134,56 @@ describe("launch switch", () => {
   });
 });
 
+describe("hidden messages", () => {
+  type D = { day: number; open: boolean; hasMessage: boolean; myMessage: string | null; canHideMessage: boolean; message?: string | null };
+  it("keeps a partner's note sealed until its door opens", async () => {
+    at("2026-11-26"); // before the season: every door can take a note
+    const { a, b } = await createTestCouple();
+    await advent.joinAdvent(a);
+    expect(await advent.setAdventMessage(a, 3, "  Rada te imam  ")).toBe("created");
+    expect(await advent.setAdventMessage(a, 3, "Rada te imam ❤️")).toBe("updated");
+
+    const mine = (await advent.getAdventState(a, "sl")).days[2] as D;
+    expect(mine).toMatchObject({ myMessage: "Rada te imam ❤️", hasMessage: false, canHideMessage: true });
+    const sealed = (await advent.getAdventState(b, "sl")).days[2] as D;
+    expect(sealed).toMatchObject({ hasMessage: true, open: false });
+    expect("message" in sealed).toBe(false);
+
+    at("2026-12-03");
+    const opened = (await advent.getAdventState(b, "sl")).days[2] as D;
+    expect(opened).toMatchObject({ open: true, message: "Rada te imam ❤️" });
+    // Door 3 is open now: no more notes behind it, but today's and later ones are fine.
+    const days = (await advent.getAdventState(a, "sl")).days as D[];
+    expect(days.filter((d) => d.canHideMessage).map((d) => d.day)[0]).toBe(3);
+    expect(advent.canHideAdventMessage(a, "active", 2, 3)).toBe(false);
+
+    expect(await advent.setAdventMessage(a, 3, "   ")).toBe("deleted");
+    expect(((await advent.getAdventState(b, "sl")).days[2] as D).message).toBeNull();
+  });
+});
+
+describe("finale", () => {
+  it("opens with the last door and gathers the days and every note", async () => {
+    at("2026-12-10");
+    const { a, b } = await createTestCouple();
+    await advent.joinAdvent(b);
+    await advent.completeAdventDay(a, 1);
+    await advent.completeAdventDay(b, 2);
+    await advent.setAdventMessage(a, 20, "Za tebe");
+    await advent.setAdventMessage(b, 15, "Zate");
+    expect(await advent.getAdventFinale(a, "sl")).toBeNull();
+
+    at("2026-12-24");
+    const finale = await advent.getAdventFinale(b, "en");
+    expect(finale).toMatchObject({ year: 2026, completedCount: 2 });
+    expect(finale!.days).toHaveLength(24);
+    expect(finale!.messages).toEqual([
+      { day: 15, from: b.name, text: "Zate" },
+      { day: 20, from: a.name, text: "Za tebe" },
+    ]);
+  });
+});
+
 describe("gift code", () => {
   it("shows a day gift code with its note only once the window is open", async () => {
     at("2026-12-13");

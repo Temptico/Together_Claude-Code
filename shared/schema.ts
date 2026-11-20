@@ -509,6 +509,20 @@ export const adventCompletions = pgTable("advent_completions", {
   completedAt: timestamp("completed_at").notNull().defaultNow(),
 });
 
+// A short note one partner hides behind a door for the other, shown to the
+// partner only once that door opens. One per author per door.
+export const adventMessages = pgTable("advent_messages", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 24 }).notNull(),
+  year: integer("year").notNull(),
+  day: integer("day").notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const ADVENT_MESSAGE_MAX = 300;
+
 // Pool of single-use discount codes (created in Shopify, pasted in admin).
 // userId is set when a code is handed out.
 export const adventRewardCodes = pgTable("advent_reward_codes", {

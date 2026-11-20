@@ -28,6 +28,7 @@ const Memories = lazy(() => import("@/pages/Memories"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Terms = lazy(() => import("@/pages/Terms"));
 const CustomContent = lazy(() => import("@/pages/CustomContent"));
+const AdventFinale = lazy(() => import("@/pages/AdventFinale"));
 const OnboardingTour = lazy(() => import("@/pages/OnboardingTour"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -106,6 +107,7 @@ function Shell() {
             <Route path="/profile" component={Profile} />
             <Route path="/terms" component={Terms} />
             <Route path="/custom-content" component={CustomContent} />
+            <Route path="/advent" component={AdventFinale} />
             <Route path="/register">
               <Redirect to="/" />
             </Route>

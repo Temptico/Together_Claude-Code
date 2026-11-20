@@ -14,11 +14,13 @@ import { sendAdventPoolAlert } from "./email.js";
 import {
   adventCompletions,
   adventDays,
+  adventMessages,
   adventParticipants,
   adventRewardCodes,
   ADVENT_GOAL,
   type AdventType,
   type User,
+  users,
 } from "../shared/schema.js";
 
 export type AdventPhase = "off" | "invite" | "active" | "catchup";
@@ -230,12 +232,16 @@ export async function getAdventState(user: User, lang: string) {
   const { year, phase, today } = adventSeasonFor(user);
   const ids = coupleIds(user);
 
-  const [participants, completions, rewards, days] = await Promise.all([
+  const [participants, completions, rewards, days, messages] = await Promise.all([
     db.select().from(adventParticipants).where(and(inArray(adventParticipants.userId, ids), eq(adventParticipants.year, year))),
     db.select().from(adventCompletions).where(and(inArray(adventCompletions.userId, ids), eq(adventCompletions.year, year))),
     db.select().from(adventRewardCodes).where(and(inArray(adventRewardCodes.userId, ids), eq(adventRewardCodes.year, year))),
     getAdventDays(),
+    db.select().from(adventMessages).where(and(inArray(adventMessages.userId, ids), eq(adventMessages.year, year))),
   ]);
+  type MsgRow = typeof adventMessages.$inferSelect;
+  const mine = new Map<number, string>((messages as MsgRow[]).filter((m) => m.userId === user.id).map((m) => [m.day, m.text]));
+  const fromPartner = new Map<number, string>((messages as MsgRow[]).filter((m) => m.userId !== user.id).map((m) => [m.day, m.text]));
 
   const joined = participants.length > 0;
   const completedDays = [...new Set<number>(completions.map((c: { day: number }) => c.day))].sort((a, b) => a - b);
@@ -252,7 +258,16 @@ export async function getAdventState(user: User, lang: string) {
     // Content only for couples who joined, and only for windows already open.
     days: days.map((d: DayRow) => {
       const open = joined && phase !== "invite" && phase !== "off" && isAdventDayOpen(user, d.day, today);
-      const base = { day: d.day, type: d.type as AdventType, open, completed: completedDays.includes(d.day) };
+      const base = {
+        day: d.day,
+        type: d.type as AdventType,
+        open,
+        completed: completedDays.includes(d.day),
+        // The partner's note stays sealed until the door opens; only that one exists.
+        hasMessage: fromPartner.has(d.day),
+        myMessage: mine.get(d.day) ?? null,
+        canHideMessage: joined && !!user.partnerId && canHideAdventMessage(user, phase, d.day, today),
+      };
       if (!open) return base;
       const url = pick(lang, d.offerUrl, d.offerUrlEn, d.offerUrlHr);
       return {
@@ -260,9 +275,63 @@ export async function getAdventState(user: User, lang: string) {
         title: pick(lang, d.title, d.titleEn, d.titleHr)!,
         text: pick(lang, d.text, d.textEn, d.textHr)!,
         offerUrl: d.type === "temptico" && url ? withUtm(url, d.day) : null,
+        message: fromPartner.get(d.day) ?? null,
         gift: d.giftCode ? { code: d.giftCode, note: pick(lang, d.giftNote, d.giftNoteEn, d.giftNoteHr) } : null,
       };
     }),
+  };
+}
+
+// A note can go behind any door the partner hasn't opened yet, or today's
+// (so it can still be a same-day surprise). Older doors are already open.
+export function canHideAdventMessage(user: User, phase: AdventPhase, day: number, today: number): boolean {
+  if (phase === "off") return false;
+  return day === today || !isAdventDayOpen(user, day, today);
+}
+
+// Saves (or, with empty text, removes) the user's note behind a door.
+// Says whether the note is new, so the caller can tell the partner.
+export async function setAdventMessage(user: User, day: number, text: string): Promise<"created" | "updated" | "deleted"> {
+  const { year } = adventSeasonFor(user);
+  const where = and(eq(adventMessages.userId, user.id), eq(adventMessages.year, year), eq(adventMessages.day, day));
+  const clean = text.trim();
+  if (!clean) {
+    await db.delete(adventMessages).where(where);
+    return "deleted";
+  }
+  const existing = await db.select({ id: adventMessages.id }).from(adventMessages).where(where);
+  if (existing.length) {
+    await db.update(adventMessages).set({ text: clean, updatedAt: new Date() }).where(where);
+    return "updated";
+  }
+  await db.insert(adventMessages).values({ userId: user.id, year, day, text: clean }).onConflictDoNothing();
+  return "created";
+}
+
+// The keepsake for the end of the season: which days the couple did and
+// every note they hid for each other. Available once the last door opens.
+export async function getAdventFinale(user: User, lang: string) {
+  const { year, phase, today } = adventSeasonFor(user);
+  const ids = coupleIds(user);
+  const available = (phase === "active" || phase === "catchup") && today >= 24 && (await isCoupleJoined(user, year));
+  if (!available) return null;
+  const [completions, days, messages, people] = await Promise.all([
+    db.select().from(adventCompletions).where(and(inArray(adventCompletions.userId, ids), eq(adventCompletions.year, year))),
+    getAdventDays(),
+    db.select().from(adventMessages).where(and(inArray(adventMessages.userId, ids), eq(adventMessages.year, year))),
+    db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids)),
+  ]);
+  const done = new Set<number>(completions.map((c: { day: number }) => c.day));
+  const nameOf = new Map<string, string>(people.map((p: { id: string; name: string }) => [p.id, p.name]));
+  type MsgRow = typeof adventMessages.$inferSelect;
+  return {
+    year,
+    completedCount: done.size,
+    names: ids.map((id) => nameOf.get(id) ?? ""),
+    days: days.map((d: DayRow) => ({ day: d.day, title: pick(lang, d.title, d.titleEn, d.titleHr)!, completed: done.has(d.day) })),
+    messages: (messages as MsgRow[])
+      .sort((a, b) => a.day - b.day || a.createdAt.getTime() - b.createdAt.getTime())
+      .map((m) => ({ day: m.day, from: nameOf.get(m.userId) ?? "", text: m.text })),
   };
 }
 

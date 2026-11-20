@@ -8,6 +8,12 @@ export type AdventDay = {
   type: "task" | "question" | "temptico";
   open: boolean;
   completed: boolean;
+  // Hidden notes: whether the partner left one here (sealed until open),
+  // the note itself once open, and the user's own note for this door.
+  hasMessage: boolean;
+  myMessage: string | null;
+  canHideMessage: boolean;
+  message?: string | null;
   title?: string;
   text?: string;
   offerUrl?: string | null;
@@ -45,3 +51,11 @@ export function useAdvent() {
 export function fill(text: string, values: Record<string, string | number>): string {
   return text.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ""));
 }
+
+export type AdventFinale = {
+  year: number;
+  completedCount: number;
+  names: string[];
+  days: { day: number; title: string; completed: boolean }[];
+  messages: { day: number; from: string; text: string }[];
+};

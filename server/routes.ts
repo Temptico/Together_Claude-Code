@@ -32,6 +32,7 @@ import {
   gameStartedNotification,
   gameCompletedNotification,
   adventRewardNotification,
+  adventMessageNotification,
 } from "./notificationText.js";
 import {
   insertUserSchema,
@@ -49,6 +50,7 @@ import {
   insertFeedbackSchema,
   submitGameAnswerSchema,
   TEMPTICO_CLICK_SOURCES,
+  ADVENT_MESSAGE_MAX,
   REACTION_EMOJIS,
   REMINDER_TIMES,
   GAME_SLUGS,
@@ -1394,6 +1396,56 @@ export function registerRoutes(app: Express) {
       const newCode = await advent.ensureAdventReward(user);
       if (newCode) void sendAdventReward(user, newCode);
       res.json(await advent.getAdventState(user, user.language));
+    })
+  );
+
+  app.post(
+    "/api/advent/message",
+    ah(async (req, res) => {
+      const parsed = z
+        .object({ userId: z.string(), day: z.number().int().min(1).max(24), text: z.string().max(ADVENT_MESSAGE_MAX) })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const { phase, today, year } = advent.adventSeasonFor(user);
+      if (!user.partnerId || !(await advent.isCoupleJoined(user, year))) {
+        res.status(400).json({ error: "Najprej se povežita in pridružita koledarju" });
+        return;
+      }
+      if (!advent.canHideAdventMessage(user, phase, parsed.data.day, today)) {
+        res.status(400).json({ error: "Ta vratca so že odprta" });
+        return;
+      }
+      const result = await advent.setAdventMessage(user, parsed.data.day, parsed.data.text);
+      if (result === "created") {
+        const partnerId = user.partnerId;
+        const day = parsed.data.day;
+        notifyUser(partnerId, (lang) => ({
+          title: "Together",
+          body: adventMessageNotification(lang, user.name, day),
+          tag: "advent-message",
+        })).catch(() => {});
+      }
+      res.json(await advent.getAdventState(user, user.language));
+    })
+  );
+
+  app.get(
+    "/api/advent/:userId/finale",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      const lang = typeof req.query.lang === "string" ? req.query.lang : user.language;
+      const finale = await advent.getAdventFinale(user, lang);
+      if (!finale) {
+        res.status(404).json({ error: "Finale še ni na voljo" });
+        return;
+      }
+      res.json(finale);
     })
   );
 }
