@@ -34,6 +34,8 @@ export function LoveJarCard({ userId, partnerName }: { userId: string; partnerNa
   const [writing, setWriting] = useState(false);
   const [history, setHistory] = useState(false);
   const [justDrawn, setJustDrawn] = useState(false);
+  // Bumped when you add a note, so it visibly drops into the partner's jar.
+  const [dropped, setDropped] = useState(0);
 
   const draw = useMutation({
     mutationFn: () => apiRequest<Jar>("POST", "/api/jar/draw", { userId }),
@@ -46,7 +48,6 @@ export function LoveJarCard({ userId, partnerName }: { userId: string; partnerNa
   });
 
   if (!jar) return null;
-  const slips = Math.min(jar.waiting, 14);
 
   return (
     <Card className="overflow-hidden">
@@ -75,23 +76,7 @@ export function LoveJarCard({ userId, partnerName }: { userId: string; partnerNa
           </div>
         ) : (
           <div className="flex items-center gap-4">
-            <div className="love-jar relative h-28 w-24 shrink-0" aria-hidden>
-              <div className="love-jar-lid" />
-              <div className="love-jar-glass">
-                {Array.from({ length: slips }, (_, i) => (
-                  <span
-                    key={i}
-                    className="love-jar-slip"
-                    style={{
-                      background: SLIP_COLORS[i % SLIP_COLORS.length],
-                      left: `${8 + ((i * 37) % 60)}%`,
-                      bottom: `${4 + Math.floor(i / 3) * 12}%`,
-                      transform: `rotate(${((i * 53) % 70) - 35}deg)`,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
+            <JarGlass count={jar.waiting} />
             <div className="flex flex-1 flex-col gap-2">
               {jar.waiting > 0 ? (
                 <Button
@@ -110,8 +95,16 @@ export function LoveJarCard({ userId, partnerName }: { userId: string; partnerNa
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 border-t border-border pt-3">
+          <div className="flex shrink-0 flex-col items-center gap-0.5">
+            <div className="h-[70px] w-[60px]">
+              <div style={{ transform: "scale(0.62)", transformOrigin: "top left" }}>
+                <JarGlass count={jar.mineWaiting} drop={dropped} />
+              </div>
+            </div>
+            <span className="max-w-[72px] truncate text-[10px] font-bold text-muted-foreground">{partnerName}</span>
+          </div>
+          <p className="flex-1 text-xs text-muted-foreground">
             {jar.mineWaiting > 0
               ? t("jar.mineWaiting").replace("{name}", partnerName).replace("{n}", String(jar.mineWaiting))
               : t("jar.writeHint").replace("{name}", partnerName)}
@@ -122,21 +115,57 @@ export function LoveJarCard({ userId, partnerName }: { userId: string; partnerNa
         </div>
       </CardContent>
 
-      <WriteDialog open={writing} onClose={() => setWriting(false)} userId={userId} partnerName={partnerName} jar={jar} />
+      <WriteDialog
+        open={writing}
+        onClose={() => setWriting(false)}
+        onAdded={() => {
+          setWriting(false);
+          setTimeout(() => setDropped((n) => n + 1), 250);
+        }} userId={userId} partnerName={partnerName} jar={jar} />
       <HistoryDialog open={history} onClose={() => setHistory(false)} jar={jar} partnerName={partnerName} />
     </Card>
+  );
+}
+
+// A glass jar with one paper slip per note still inside (up to 14 shown).
+// When `drop` changes, the newest slip falls in from above.
+function JarGlass({ count, drop = 0 }: { count: number; drop?: number }) {
+  const slips = Math.min(count, 14);
+  return (
+    <div className="love-jar relative h-28 w-24 shrink-0" aria-hidden>
+      <div className="love-jar-lid" />
+      <div className="love-jar-glass">
+        {Array.from({ length: slips }, (_, i) => {
+          const newest = drop > 0 && i === slips - 1;
+          return (
+            <span
+              key={newest ? `drop-${drop}` : i}
+              className={cn("love-jar-slip", newest && "love-jar-slip-drop")}
+              style={{
+                background: SLIP_COLORS[i % SLIP_COLORS.length],
+                left: `${8 + ((i * 37) % 60)}%`,
+                bottom: `${4 + Math.floor(i / 3) * 12}%`,
+                ["--r" as string]: `${((i * 53) % 70) - 35}deg`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
 function WriteDialog({
   open,
   onClose,
+  onAdded,
   userId,
   partnerName,
   jar,
 }: {
   open: boolean;
   onClose: () => void;
+  onAdded: () => void;
   userId: string;
   partnerName: string;
   jar: Jar;
@@ -154,6 +183,7 @@ function WriteDialog({
       qc.setQueryData(queryKey, next);
       setText("");
       toast({ title: t("jar.added") });
+      onAdded();
     },
     onError: (err) => toast({ title: errorText(err), variant: "destructive" }),
   });

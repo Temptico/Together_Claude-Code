@@ -278,3 +278,14 @@ input[type="time"]::-webkit-date-and-time-value {
 @media (prefers-reduced-motion: reduce) {
   .love-note-pop { animation: none; }
 }
+.love-jar-slip { transform: rotate(var(--r, 0deg)); }
+@keyframes love-jar-slip-drop {
+  0% { transform: translateY(-120px) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  75% { transform: translateY(6px) rotate(var(--r, 0deg)); }
+  100% { transform: rotate(var(--r, 0deg)); }
+}
+.love-jar-slip-drop { animation: love-jar-slip-drop 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .love-jar-slip-drop { animation: none; }
+}
