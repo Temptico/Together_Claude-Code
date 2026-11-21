@@ -117,3 +117,38 @@ describe("bucket list", () => {
     expect(await storage.getLoveTapSummary({ ...fresh!, partnerId: a.id })).toMatchObject({ sentToday: 0, receivedToday: 0 });
   });
 });
+
+describe("love jar", () => {
+  it("lets the partner draw one random note a day and keeps exes out", async () => {
+    const { a, b } = await createTestCouple();
+    await storage.addLoveNote(a, "Rad te imam, ker se smejiš");
+    await storage.addLoveNote(a, "Hvala za kavo");
+    expect(await storage.getLoveJar(b)).toMatchObject({ waiting: 2, today: null });
+    expect(await storage.getLoveJar(a)).toMatchObject({ waiting: 0, mineWaiting: 2 });
+
+    expect(await storage.drawLoveNote(b)).toBe("drawn");
+    expect(await storage.drawLoveNote(b)).toBe("already");
+    const jar = await storage.getLoveJar(b);
+    expect(jar).toMatchObject({ waiting: 1 });
+    expect(jar!.today).not.toBeNull();
+    expect(jar!.drawn).toHaveLength(1);
+
+    // A drawn note can't be taken back; one still in the jar can.
+    const mine = (await storage.getLoveJar(a))!.mine;
+    const read = mine.find((n) => n.drawnAt)!;
+    const unread = mine.find((n) => !n.drawnAt)!;
+    expect(await storage.deleteLoveNote(a, read.id)).toBe(false);
+    expect(await storage.deleteLoveNote(b, unread.id)).toBe(false);
+    expect(await storage.deleteLoveNote(a, unread.id)).toBe(true);
+    expect(await storage.getLoveJar(b)).toMatchObject({ waiting: 0 });
+
+    await storage.disconnectPartner(a);
+    const solo = (await storage.getUserById(b.id))!;
+    expect(await storage.getLoveJar(solo)).toBeNull();
+  });
+
+  it("draws nothing from an empty jar", async () => {
+    const { b } = await createTestCouple();
+    expect(await storage.drawLoveNote(b)).toBe("empty");
+  });
+});

@@ -220,6 +220,20 @@ export const loveTaps = pgTable("love_taps", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ---------- Love jar ----------
+// Little notes ("why I love you") one partner drops in the other's jar;
+// the other draws one a day.
+export const loveNotes = pgTable("love_notes", {
+  id: serial("id").primaryKey(),
+  fromUserId: varchar("from_user_id", { length: 24 }).notNull(),
+  toUserId: varchar("to_user_id", { length: 24 }).notNull(),
+  text: text("text").notNull(),
+  drawnAt: timestamp("drawn_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const LOVE_NOTE_MAX = 200;
+
 // ---------- "What kind of couple are you?" quiz ----------
 // Each person's own answers (option index per question, see coupleQuiz.ts).
 export const coupleQuizAnswers = pgTable("couple_quiz_answers", {

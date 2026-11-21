@@ -19,6 +19,7 @@ import {
   reminderLog,
   wishlistItems,
   loveTaps,
+  loveNotes,
   coupleQuizAnswers,
   milestoneEvents,
   feedback,
@@ -203,6 +204,7 @@ export async function deleteUserAccount(user: User): Promise<void> {
     db.delete(wishlistItems).where(eq(wishlistItems.createdBy, user.id)),
     db.delete(loveTaps).where(or(eq(loveTaps.fromUserId, user.id), eq(loveTaps.toUserId, user.id))),
     db.delete(coupleQuizAnswers).where(eq(coupleQuizAnswers.userId, user.id)),
+    db.delete(loveNotes).where(or(eq(loveNotes.fromUserId, user.id), eq(loveNotes.toUserId, user.id))),
     db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
     db.delete(reminderLog).where(eq(reminderLog.userId, user.id)),
     db.delete(gameRoundAnswers).where(eq(gameRoundAnswers.userId, user.id)),
@@ -1235,6 +1237,76 @@ export async function getLoveTapSummary(user: User) {
       .limit(1),
   ]);
   return { sentToday: Number(sent[0]?.n ?? 0), receivedToday: Number(received[0]?.n ?? 0), lastReceived: last ?? null };
+}
+
+// ---------------- Love jar ----------------
+type NoteRow = typeof loveNotes.$inferSelect;
+
+// Notes the partner wrote to this user (and the other way round) while
+// they're a couple; an ex's notes never show up.
+export async function getLoveJar(user: User) {
+  if (!user.partnerId) return null;
+  const since = startOfToday();
+  const [toMe, fromMe] = await Promise.all([
+    db
+      .select()
+      .from(loveNotes)
+      .where(and(eq(loveNotes.fromUserId, user.partnerId), eq(loveNotes.toUserId, user.id)))
+      .orderBy(desc(loveNotes.drawnAt)),
+    db
+      .select()
+      .from(loveNotes)
+      .where(and(eq(loveNotes.fromUserId, user.id), eq(loveNotes.toUserId, user.partnerId)))
+      .orderBy(desc(loveNotes.createdAt)),
+  ]);
+  const drawn = (toMe as NoteRow[]).filter((n) => n.drawnAt);
+  const today = drawn.find((n) => n.drawnAt! >= since) ?? null;
+  return {
+    waiting: (toMe as NoteRow[]).filter((n) => !n.drawnAt).length,
+    today: today ? { id: today.id, text: today.text, createdAt: today.createdAt } : null,
+    drawn: drawn.slice(0, 50).map((n) => ({ id: n.id, text: n.text, drawnAt: n.drawnAt })),
+    mine: (fromMe as NoteRow[]).slice(0, 50).map((n) => ({ id: n.id, text: n.text, drawnAt: n.drawnAt })),
+    mineWaiting: (fromMe as NoteRow[]).filter((n) => !n.drawnAt).length,
+  };
+}
+
+// Says whether to tell the partner: a few notes written in one go send
+// one push, not one each.
+export const LOVE_NOTE_PUSH_GAP_MS = 10 * 60_000;
+export async function addLoveNote(user: User, text: string): Promise<{ push: boolean }> {
+  const [last] = await db
+    .select({ createdAt: loveNotes.createdAt })
+    .from(loveNotes)
+    .where(and(eq(loveNotes.fromUserId, user.id), eq(loveNotes.toUserId, user.partnerId!)))
+    .orderBy(desc(loveNotes.createdAt))
+    .limit(1);
+  await db.insert(loveNotes).values({ fromUserId: user.id, toUserId: user.partnerId!, text: text.trim() });
+  return { push: !last || Date.now() - last.createdAt.getTime() >= LOVE_NOTE_PUSH_GAP_MS };
+}
+
+// One note a day, picked at random from the ones still in the jar.
+export async function drawLoveNote(user: User): Promise<"drawn" | "already" | "empty"> {
+  const jar = await getLoveJar(user);
+  if (!jar) return "empty";
+  if (jar.today) return "already";
+  const [pick] = await db
+    .select({ id: loveNotes.id })
+    .from(loveNotes)
+    .where(and(eq(loveNotes.fromUserId, user.partnerId!), eq(loveNotes.toUserId, user.id), isNull(loveNotes.drawnAt)))
+    .orderBy(sql`random()`)
+    .limit(1);
+  if (!pick) return "empty";
+  await db.update(loveNotes).set({ drawnAt: new Date() }).where(eq(loveNotes.id, pick.id));
+  return "drawn";
+}
+
+// Only your own notes that are still in the jar can be taken back.
+export async function deleteLoveNote(user: User, id: number): Promise<boolean> {
+  const rows = await db
+    .delete(loveNotes)
+    .where(and(eq(loveNotes.id, id), eq(loveNotes.fromUserId, user.id), isNull(loveNotes.drawnAt)))
+    .returning();
+  return rows.length > 0;
 }
 
 // ---------------- Couple quiz ----------------

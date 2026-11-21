@@ -357,6 +357,15 @@ const STATEMENTS = [
     )`,
   `CREATE INDEX IF NOT EXISTS love_taps_to_idx ON love_taps (to_user_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS love_taps_from_idx ON love_taps (from_user_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS love_notes (
+      id serial PRIMARY KEY,
+      from_user_id varchar(24) NOT NULL,
+      to_user_id varchar(24) NOT NULL,
+      text text NOT NULL,
+      drawn_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS love_notes_to_idx ON love_notes (to_user_id, drawn_at)`,
   `CREATE TABLE IF NOT EXISTS couple_quiz_answers (
       user_id varchar(24) PRIMARY KEY,
       answers text NOT NULL,

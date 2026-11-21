@@ -237,3 +237,44 @@ input[type="time"]::-webkit-date-and-time-value {
 @media (prefers-reduced-motion: reduce) {
   .love-float { animation-duration: 0.01s; }
 }
+
+/* Love jar: a glass jar with paper slips, and the drawn note. */
+.love-jar-lid {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 0;
+  height: 14px;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, #e0a15a, #b8742f);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  z-index: 2;
+}
+.love-jar-glass {
+  position: absolute;
+  inset: 12px 4% 0 4%;
+  border-radius: 18px 18px 26px 26px;
+  border: 2px solid rgba(200, 220, 235, 0.75);
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.35), rgba(200, 225, 240, 0.18) 40%, rgba(255, 255, 255, 0.28));
+  overflow: hidden;
+}
+.love-jar-slip {
+  position: absolute;
+  width: 26px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.love-note {
+  background: #fff6d8;
+  background-image: repeating-linear-gradient(180deg, transparent 0 23px, rgba(168, 53, 43, 0.08) 23px 24px);
+}
+@keyframes love-note-pop {
+  0% { transform: translateY(40px) scale(0.3) rotate(-8deg); opacity: 0; }
+  60% { transform: translateY(-6px) scale(1.04) rotate(2deg); opacity: 1; }
+  100% { transform: none; }
+}
+.love-note-pop { animation: love-note-pop 0.7s cubic-bezier(0.2, 0.8, 0.3, 1.2) both; }
+@media (prefers-reduced-motion: reduce) {
+  .love-note-pop { animation: none; }
+}

@@ -299,3 +299,22 @@ export function bucketDoneNotification(lang: string, name: string, item: string)
   };
   return bodies[normLang(lang)];
 }
+
+// Love jar: a new note waiting, or the partner drew one of yours.
+export function jarNoteNotification(lang: string, name: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `${name} ti je v kozarček ljubezni dodal/a listek 🫙`,
+    en: `${name} put a note in your love jar 🫙`,
+    hr: `${name} ti je u staklenku ljubavi ubacio/la papirić 🫙`,
+  };
+  return bodies[normLang(lang)];
+}
+
+export function jarDrawnNotification(lang: string, name: string): string {
+  const bodies: Record<Lang, string> = {
+    sl: `${name} je ravnokar prebral/a tvoj listek iz kozarčka 💌`,
+    en: `${name} just read your note from the love jar 💌`,
+    hr: `${name} je upravo pročitao/la tvoj papirić iz staklenke 💌`,
+  };
+  return bodies[normLang(lang)];
+}

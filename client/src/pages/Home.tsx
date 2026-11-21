@@ -10,6 +10,7 @@ import { LoadError } from "@/components/LoadError";
 import { AdventCard } from "@/components/AdventCard";
 import { NotificationOptInDialog } from "@/components/NotificationOptInDialog";
 import { ShareStoryButton } from "@/components/ShareStoryButton";
+import { LoveJarCard } from "@/components/LoveJarCard";
 import { heartPing, unlockAudio } from "@/lib/celebrate";
 import { useTranslation } from "@/i18n/i18n";
 import { useAuth } from "@/lib/auth";
@@ -88,18 +89,11 @@ export default function Home() {
       <HomeHeader data={data} />
       {data.pendingMilestone && <MilestoneCard milestone={data.pendingMilestone} userId={data.user.id} />}
       {!data.partner && <ConnectBanner />}
+      <TodayCard data={data} />
       <AdventCard />
       {!data.quiz.mine && <QuizCard data={data} />}
       {data.partner && <LoveTapCard data={data} />}
-      {data.partner && <PartnerMoodCard mood={data.partnerMood} userId={data.user.id} partnerName={data.partner.name} />}
-      <MoodCheckIn myMood={data.myMood} userId={data.user.id} />
-      <DailyQuestionCard question={data.question} myAnswer={data.myAnswer} />
-      <DailyChallengeCard
-        challenge={data.challenge}
-        accepted={data.challengeAccepted}
-        completed={data.challengeCompleted}
-        userId={data.user.id}
-      />
+      {data.partner && <LoveJarCard userId={data.user.id} partnerName={data.partner.name} />}
       <GamesRow userId={data.user.id} />
       {data.quiz.mine && <QuizCard data={data} />}
       <UpcomingDatesCard dates={data.upcomingDates} />
@@ -357,75 +351,78 @@ function ConnectBanner() {
   );
 }
 
-function PartnerMoodCard({ mood, userId, partnerName }: { mood: any; userId: string; partnerName: string }) {
+// "Today": the three daily rituals in one card — your mood (and your
+// partner's), the daily question and the daily challenge. Done ones fold
+// into a single line, so the card shrinks as the day gets done.
+function TodayCard({ data }: { data: HomeData }) {
   const { t, lang } = useTranslation();
-  const level = mood ? MOOD_LEVELS.find((m) => m.level === mood.level) : null;
-  const title = t("home.partnerMoodTitleFor").replace("{name}", partnerName);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {level ? (
-          <>
-            <div className="flex items-center gap-3">
-              <div className="text-4xl">{level.emoji}</div>
-              <div>
-                <p className="text-sm font-semibold">{t("home.partnerMoodMessage" + level.level)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(mood.createdAt).toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })}
-                </p>
-              </div>
-            </div>
-            <ReactionBar
-              targetType="mood"
-              targetId={mood.id}
-              reactions={mood.reactions || []}
-              invalidateKeys={[["/api/home", userId]]}
-            />
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("home.noMoodYet")}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function MoodCheckIn({ myMood, userId }: { myMood: any; userId: string }) {
-  const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const userId = data.user.id;
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["/api/home", userId] });
+    qc.invalidateQueries({ queryKey: ["/api/memories", userId] });
+  };
 
-  const mutation = useMutation({
+  const mood = useMutation({
     mutationFn: (level: number) => apiRequest("POST", "/api/mood", { userId, level }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/home", userId] });
-      qc.invalidateQueries({ queryKey: ["/api/memories", userId] });
+      invalidate();
       toast({ title: t("home.moodSubmitted") });
     },
   });
+  const accept = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/challenge/accept", { userId, challengeId: data.challenge.id }),
+    onSuccess: invalidate,
+  });
+  const complete = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/challenge/complete", { userId, challengeId: data.challenge.id }),
+    onSuccess: () => {
+      invalidate();
+      toast({ title: t("home.challengeCompleted") });
+    },
+  });
+
+  const items = [
+    { key: "mood", done: !!data.myMood },
+    ...(data.question ? [{ key: "question", done: !!data.myAnswer }] : []),
+    ...(data.challenge ? [{ key: "challenge", done: data.challengeCompleted }] : []),
+  ];
+  const doneCount = items.filter((i) => i.done).length;
+  const myLevel = data.myMood ? MOOD_LEVELS.find((m) => m.level === data.myMood.level) : null;
+  const partnerLevel = data.partnerMood ? MOOD_LEVELS.find((m) => m.level === data.partnerMood.level) : null;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{myMood ? t("home.alreadyShared") : t("home.howAreYouToday")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {myMood ? (
-          <div className="flex justify-center py-2 text-5xl">
-            {MOOD_LEVELS.find((m) => m.level === myMood.level)?.emoji}
-          </div>
-        ) : (
-          <div className="flex justify-between gap-1">
+      <CardContent className="flex flex-col gap-3 py-4">
+        <div className="flex items-center justify-between">
+          <p className="text-lg font-extrabold">☀️ {t("today.title")}</p>
+          <span className="text-sm font-extrabold text-primary">
+            {doneCount === items.length ? t("today.allDone") : `${doneCount}/${items.length}`}
+          </span>
+        </div>
+        <div className="flex gap-1.5" aria-hidden>
+          {items.map((i) => (
+            <div key={i.key} className={cn("h-2 flex-1 rounded-full", i.done ? "bg-primary" : "bg-muted")} />
+          ))}
+        </div>
+
+        {/* Mood */}
+        <TodayRow done={!!data.myMood} title={data.myMood ? t("today.mood") : t("home.howAreYouToday")}>
+          {data.myMood ? (
+            <span className="text-2xl" aria-label={t("mood.level" + data.myMood.level)}>
+              {myLevel?.emoji}
+            </span>
+          ) : null}
+        </TodayRow>
+        {!data.myMood && (
+          <div className="-mt-1 flex justify-between gap-1">
             {MOOD_LEVELS.map((m) => (
               <button
                 key={m.level}
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate(m.level)}
-                className="flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-3xl transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+                disabled={mood.isPending}
+                onClick={() => mood.mutate(m.level)}
+                className="flex flex-1 flex-col items-center rounded-2xl py-1 text-3xl transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
                 aria-label={t("mood.level" + m.level)}
               >
                 {m.emoji}
@@ -433,8 +430,102 @@ function MoodCheckIn({ myMood, userId }: { myMood: any; userId: string }) {
             ))}
           </div>
         )}
+        {data.partner && (
+          <div className="-mt-1 flex flex-col gap-2 rounded-2xl bg-muted p-3">
+            {partnerLevel ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{partnerLevel.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold">{data.partner.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("home.partnerMoodMessage" + partnerLevel.level)} ·{" "}
+                      {new Date(data.partnerMood.createdAt).toLocaleTimeString(bcp47(lang), { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+                <ReactionBar
+                  targetType="mood"
+                  targetId={data.partnerMood.id}
+                  reactions={data.partnerMood.reactions || []}
+                  invalidateKeys={[["/api/home", userId]]}
+                />
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t("today.partnerNoMood").replace("{name}", data.partner.name)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Question */}
+        {data.question && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <TodayRow done={!!data.myAnswer} title={t("home.dailyQuestion")}>
+              {data.myAnswer && (
+                <Link href="/question" className="text-xs font-bold text-primary">
+                  {t("today.seeAnswers")} →
+                </Link>
+              )}
+            </TodayRow>
+            {!data.myAnswer && (
+              <>
+                <p className="text-sm font-semibold">{data.question.text}</p>
+                <Button asChild size="sm" className="self-start">
+                  <Link href="/question">{t("home.answer")}</Link>
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Challenge */}
+        {data.challenge && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <TodayRow done={data.challengeCompleted} title={t("home.dailyChallenge")}>
+              <Badge variant="accent">{t("category." + data.challenge.category)}</Badge>
+            </TodayRow>
+            {!data.challengeCompleted && (
+              <>
+                <p className="text-sm font-semibold">{data.challenge.text}</p>
+                {data.challengeAccepted ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground">
+                      {t("home.challengeAccepted")}
+                    </span>
+                    <Button size="sm" disabled={complete.isPending} onClick={() => complete.mutate()}>
+                      {t("home.markChallengeCompleted")}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" className="self-start" disabled={accept.isPending} onClick={() => accept.mutate()}>
+                    {t("home.acceptChallenge")}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function TodayRow({ done, title, children }: { done: boolean; title: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
+          done ? "bg-primary text-primary-foreground" : "border-2 border-primary/40"
+        )}
+      >
+        {done && <Check className="h-3.5 w-3.5" />}
+      </span>
+      <p className={cn("flex-1 text-sm font-extrabold", done && "text-muted-foreground")}>{title}</p>
+      {children}
+    </div>
   );
 }
 
@@ -477,110 +568,6 @@ function GamesRow({ userId }: { userId: string }) {
         })}
       </div>
     </div>
-  );
-}
-
-function DailyQuestionCard({ question, myAnswer }: { question: any; myAnswer: any }) {
-  const { t } = useTranslation();
-  if (!question) return null;
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-2 space-y-0">
-        <MessageCircle className="h-5 w-5 text-primary" />
-        <CardTitle>{t("home.dailyQuestion")}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-sm font-semibold">{question.text}</p>
-        {myAnswer ? (
-          <div className="rounded-2xl bg-muted p-3">
-            <p className="text-xs font-bold text-muted-foreground">{t("home.alreadyAnswered")}</p>
-            <p className="mt-1 text-sm">{myAnswer.answer}</p>
-          </div>
-        ) : (
-          <Button asChild size="sm" className="self-start">
-            <Link href="/question">{t("home.answer")}</Link>
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function DailyChallengeCard({
-  challenge,
-  accepted,
-  completed,
-  userId,
-}: {
-  challenge: any;
-  accepted: boolean;
-  completed: boolean;
-  userId: string;
-}) {
-  const { t } = useTranslation();
-  const { toast } = useToast();
-  const qc = useQueryClient();
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["/api/home", userId] });
-    qc.invalidateQueries({ queryKey: ["/api/memories", userId] });
-  };
-
-  const acceptMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/challenge/accept", { userId, challengeId: challenge.id }),
-    onSuccess: invalidate,
-  });
-
-  const completeMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/challenge/complete", { userId, challengeId: challenge.id }),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: t("home.challengeCompleted") });
-    },
-  });
-
-  if (!challenge) return null;
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-primary" />
-          <CardTitle>{t("home.dailyChallenge")}</CardTitle>
-        </div>
-        <Badge variant="accent">{t("category." + challenge.category)}</Badge>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-sm font-semibold">{challenge.text}</p>
-        {completed ? (
-          <div className="flex items-center gap-2 self-start rounded-full bg-primary/15 px-4 py-2 text-sm font-bold text-primary">
-            <Check className="h-4 w-4" /> {t("home.challengeCompleted")}
-          </div>
-        ) : accepted ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground">
-              {t("home.challengeAccepted")}
-            </span>
-            <Button
-              size="sm"
-              disabled={completeMutation.isPending}
-              onClick={() => completeMutation.mutate()}
-            >
-              {t("home.markChallengeCompleted")}
-            </Button>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            className="self-start"
-            disabled={acceptMutation.isPending}
-            onClick={() => acceptMutation.mutate()}
-          >
-            {t("home.acceptChallenge")}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

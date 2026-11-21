@@ -36,6 +36,8 @@ import {
   loveTapNotification,
   quizNotification,
   bucketDoneNotification,
+  jarNoteNotification,
+  jarDrawnNotification,
 } from "./notificationText.js";
 import { isValidQuizAnswers } from "../shared/coupleQuiz.js";
 import {
@@ -55,6 +57,7 @@ import {
   submitGameAnswerSchema,
   TEMPTICO_CLICK_SOURCES,
   ADVENT_MESSAGE_MAX,
+  LOVE_NOTE_MAX,
   REACTION_EMOJIS,
   REMINDER_TIMES,
   GAME_SLUGS,
@@ -1393,6 +1396,77 @@ export function registerRoutes(app: Express) {
         })).catch(() => {});
       }
       res.json(await storage.getLoveTapSummary(user));
+    })
+  );
+
+  // ---------------- Love jar ----------------
+  app.get(
+    "/api/jar/:userId",
+    ah(async (req, res) => {
+      const user = await requireUser(req, res, req.params.userId);
+      if (!user) return;
+      res.json(await storage.getLoveJar(user));
+    })
+  );
+
+  app.post(
+    "/api/jar",
+    ah(async (req, res) => {
+      const parsed = z
+        .object({ userId: z.string(), text: z.string().trim().min(2, "Prekratko").max(LOVE_NOTE_MAX, "Predolgo") })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      if (!user.partnerId) {
+        res.status(400).json({ error: "Najprej se poveži s partnerjem" });
+        return;
+      }
+      const { push } = await storage.addLoveNote(user, parsed.data.text);
+      if (push) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: jarNoteNotification(lang, user.name),
+          tag: "love-jar",
+        })).catch(() => {});
+      }
+      res.status(201).json(await storage.getLoveJar(user));
+    })
+  );
+
+  app.post(
+    "/api/jar/draw",
+    ah(async (req, res) => {
+      const parsed = z.object({ userId: z.string() }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Neveljavni podatki" });
+        return;
+      }
+      const user = await requireUser(req, res, parsed.data.userId);
+      if (!user) return;
+      const result = await storage.drawLoveNote(user);
+      if (result === "drawn" && user.partnerId) {
+        notifyUser(user.partnerId, (lang) => ({
+          title: "Together",
+          body: jarDrawnNotification(lang, user.name),
+          tag: "love-jar-drawn",
+        })).catch(() => {});
+      }
+      res.json(await storage.getLoveJar(user));
+    })
+  );
+
+  app.delete(
+    "/api/jar/:id",
+    ah(async (req, res) => {
+      const userId = req.query.userId as string;
+      const user = await requireUser(req, res, userId);
+      if (!user) return;
+      await storage.deleteLoveNote(user, Number(req.params.id));
+      res.json(await storage.getLoveJar(user));
     })
   );
 
