@@ -24,6 +24,9 @@ export function AdventCard() {
   const { data } = useAdvent();
   const [openDay, setOpenDay] = useState<AdventDay | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // The "hide a note" window: from the button (pick any day) or offered
+  // right after a day is done (tomorrow's door).
+  const [note, setNote] = useState<{ prompt: boolean } | null>(null);
 
   if (!data || data.phase === "off") return null;
   if (!data.joined) {
@@ -74,8 +77,10 @@ export function AdventCard() {
 
         <AdventHouse state={data} onPick={setOpenDay} />
 
-        {data.days.some((d) => d.canHideMessage) && data.today < 24 && (
-          <p className="text-xs text-muted-foreground">{t("advent.hideTeaser")}</p>
+        {data.days.some((d) => d.canHideMessage) && (
+          <Button variant="outline" onClick={() => setNote({ prompt: false })}>
+            {t("advent.noteButton")}
+          </Button>
         )}
         {data.today >= 24 && (data.phase === "active" || data.phase === "catchup") && (
           <Button asChild variant="outline">
@@ -85,7 +90,22 @@ export function AdventCard() {
 
         {data.reward ? <RewardBox code={data.reward.code} /> : reached ? <p className="text-sm text-muted-foreground">{t("advent.rewardPending")}</p> : null}
       </CardContent>
-      <DayDialog day={openDay} state={data} onClose={() => setOpenDay(null)} />
+      <DayDialog
+        day={openDay}
+        state={data}
+        onClose={() => setOpenDay(null)}
+        onCompleted={(next) => {
+          // Offer a note for tomorrow once the confetti has had its moment.
+          const tomorrow = next.days.find((d) => d.day === next.today + 1);
+          if (tomorrow?.canHideMessage && !tomorrow.myMessage) setTimeout(() => setNote({ prompt: true }), 3000);
+        }}
+      />
+      <NoteDialog
+        open={!!note}
+        prompt={!!note?.prompt}
+        state={data}
+        onClose={() => setNote(null)}
+      />
     </Card>
   );
 }
@@ -170,7 +190,17 @@ function AdventHouse({ state, onPick }: { state: AdventState; onPick: (d: Advent
   );
 }
 
-function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: AdventState; onClose: () => void }) {
+function DayDialog({
+  day,
+  state,
+  onClose,
+  onCompleted,
+}: {
+  day: AdventDay | null;
+  state: AdventState;
+  onClose: () => void;
+  onCompleted: (next: AdventState) => void;
+}) {
   const { t, lang } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -181,6 +211,7 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
       qc.setQueryData(adventQueryKey(user!.id, lang), next);
       onClose();
       celebrate();
+      onCompleted(next);
     },
   });
 
@@ -254,7 +285,6 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
                 )}
               </div>
             )}
-            {current.canHideMessage && <HideMessageBox key={current.day} day={current.day} existing={current.myMessage} />}
           </>
         )}
       </DialogContent>
@@ -262,57 +292,134 @@ function DayDialog({ day, state, onClose }: { day: AdventDay | null; state: Adve
   );
 }
 
-// Write (or change, or remove) the note the partner finds behind this door.
-function HideMessageBox({ day, existing }: { day: number; existing: string | null }) {
+// Hide a note behind a door for the partner. Defaults to tomorrow's door;
+// any door the partner hasn't opened yet can be picked instead. Your notes
+// are listed below, tap one to change or remove it.
+function NoteDialog({
+  open,
+  prompt,
+  state,
+  onClose,
+}: {
+  open: boolean;
+  prompt: boolean;
+  state: AdventState;
+  onClose: () => void;
+}) {
   const { t, lang } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [text, setText] = useState(existing ?? "");
-  const [editing, setEditing] = useState(!existing);
-  useEffect(() => setText(existing ?? ""), [existing]);
+  const home = qc.getQueryData<{ partner: { name: string } | null }>(["/api/home", user?.id]);
+  const partnerName = home?.partner?.name ?? "";
+
+  const choices = state.days.filter((d) => d.canHideMessage);
+  const fallback = choices.find((d) => d.day === state.today + 1) ?? choices.find((d) => d.day > state.today) ?? choices[0];
+  const [day, setDay] = useState<number | null>(null);
+  const [text, setText] = useState("");
+  const selected = choices.find((d) => d.day === day) ?? fallback;
+
+  // Each time the window opens, start on the default door with its note.
+  useEffect(() => {
+    if (!open) return;
+    setDay(fallback?.day ?? null);
+    setText(fallback?.myMessage ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const pickDay = (d: AdventDay) => {
+    setDay(d.day);
+    setText(d.myMessage ?? "");
+  };
 
   const save = useMutation({
-    mutationFn: (value: string) => apiRequest<AdventState>("POST", "/api/advent/message", { userId: user!.id, day, text: value }),
+    mutationFn: (value: string) =>
+      apiRequest<AdventState>("POST", "/api/advent/message", { userId: user!.id, day: selected!.day, text: value }),
     onSuccess: (next, value) => {
       qc.setQueryData(adventQueryKey(user!.id, lang), next);
       toast({ title: value.trim() ? t("advent.hideSaved") : t("advent.hideRemoved") });
-      setEditing(!value.trim());
+      onClose();
     },
   });
 
-  if (existing && !editing) {
-    return (
-      <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
-        <p className="text-xs font-bold text-primary">{t("advent.myHidden")}</p>
-        <p className="whitespace-pre-line text-sm">{existing}</p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {t("common.edit")}
-          </Button>
-          <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => save.mutate("")}>
-            {t("advent.hideDelete")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const dayLabel = (n: number) => (n === state.today + 1 ? t("advent.noteTomorrow") : n === state.today ? t("advent.noteToday") : String(n));
+  const mine = state.days.filter((d) => d.myMessage);
 
   return (
-    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-      <p className="text-sm font-bold">{t("advent.hideTitle")}</p>
-      <p className="text-xs text-muted-foreground">{t("advent.hideHint")}</p>
-      <Textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        maxLength={300}
-        rows={3}
-        placeholder={t("advent.hidePlaceholder")}
-      />
-      <Button variant="outline" disabled={!text.trim() || save.isPending} onClick={() => save.mutate(text)}>
-        {existing ? t("advent.hideUpdate") : t("advent.hideSave")}
-      </Button>
-    </div>
+    <Dialog open={open && !!selected} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto">
+        {selected && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{prompt ? t("advent.notePromptTitle") : t("advent.noteTitle")}</DialogTitle>
+              <DialogDescription>
+                {partnerName ? fill(t("advent.noteHint"), { name: partnerName }) : t("advent.hideHint")}
+              </DialogDescription>
+            </DialogHeader>
+
+            {!prompt && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-bold text-muted-foreground">{t("advent.notePickDay")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {choices.map((d) => (
+                    <button
+                      key={d.day}
+                      onClick={() => pickDay(d)}
+                      className={cn(
+                        "relative min-w-[2.5rem] rounded-full border px-3 py-1.5 text-sm font-bold",
+                        d.day === selected.day ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+                      )}
+                    >
+                      {dayLabel(d.day)}
+                      {d.myMessage && <span className="absolute -right-1 -top-1.5 text-[10px]">💌</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={300}
+              rows={4}
+              autoFocus={!prompt}
+              placeholder={t("advent.hidePlaceholder")}
+            />
+            <div className="flex gap-2">
+              <Button className="flex-1" disabled={!text.trim() || save.isPending} onClick={() => save.mutate(text)}>
+                {selected.myMessage ? t("advent.hideUpdate") : t("advent.hideSave")}
+              </Button>
+              {selected.myMessage ? (
+                <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate("")}>
+                  {t("advent.hideDelete")}
+                </Button>
+              ) : prompt ? (
+                <Button variant="ghost" onClick={onClose}>
+                  {t("advent.noteSkip")}
+                </Button>
+              ) : null}
+            </div>
+
+            {!prompt && mine.length > 0 && (
+              <div className="mt-2 flex flex-col gap-2 border-t border-border pt-3">
+                <p className="text-xs font-bold text-muted-foreground">{t("advent.myHiddenList")}</p>
+                {mine.map((d) => (
+                  <button
+                    key={d.day}
+                    onClick={() => pickDay(d)}
+                    className="flex items-start gap-2 rounded-2xl bg-muted p-3 text-left"
+                  >
+                    <span className="text-xs font-extrabold text-primary">{fill(t("advent.day"), { day: d.day })}</span>
+                    <span className="line-clamp-2 flex-1 text-sm">{d.myMessage}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
